@@ -1,0 +1,11 @@
+# nexops-data-generator dependencies
+#
+# simulator.py ALONE is STANDARD LIBRARY ONLY (json, random, time, datetime) -
+# you can run `python simulator.py` with no installs.
+#
+# The MQTT publish path (publisher.py PUBLISHER=mqtt and subscriber_test.py)
+# needs paho-mqtt:
+paho-mqtt>=1.6
+#
+# Optional, only if you want a no-Docker pure-Python broker for testing:
+# amqtt

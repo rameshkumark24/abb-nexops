@@ -1,0 +1,2 @@
+# Root level gitignore for monorepo
+# Individual folders have their own .gitignore files
