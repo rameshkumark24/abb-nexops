@@ -8,6 +8,7 @@ import type {
   Alarm,
   ControlPanelAlarm,
   AlarmPriority,
+  NexopsRisk,
 } from '@/types/telemetry';
 
 // ----------------------------------------------------------------------
@@ -62,17 +63,48 @@ function zoneFor(machine: string): string {
 }
 
 // ----------------------------------------------------------------------
-// computePerf - ties the headline perf number to the alarm model.
+// NexOps risk -> perf, and the "caught it early" flag.
 //
-// Rationale: by basing perf on alarm severity AND adding a small "drift
-// penalty" for developing/predictive faults, a fault that is still
-// INCUBATING (below its static trip limit) already pushes perf below the
-// perf<80 critical line in the UI - so the predictive story is visible
-// BEFORE the static alarm trips. The tiny jitter keeps healthy bars alive.
+// NEXOPS_PERF maps NexOps's OWN verdict to a perf number. Higher risk = lower
+// perf, with the LOW->100 .. CRITICAL->40 ladder requested for the demo.
+// MEDIUM sits right on the perf<80 at-risk line (~80) by design.
+//
+// isEarly is the headline feature: the gateway still considers the machine
+// calm (Status Normal OR alarm_priority Low) yet NexOps's own verdict is
+// elevated (MEDIUM/HIGH/CRITICAL) - i.e. we flagged it BEFORE the static
+// threshold tripped.
+// ----------------------------------------------------------------------
+
+const NEXOPS_PERF: Record<NexopsRisk, number> = {
+  CRITICAL: 40,
+  HIGH: 62,
+  MEDIUM: 80,
+  LOW: 100,
+};
+
+function gatewayIsCalm(raw: TelemetryRecord): boolean {
+  return raw.Status === 'Normal' || raw.alarm_priority === 'Low';
+}
+
+export function isEarlyWarning(raw: TelemetryRecord): boolean {
+  const risk: NexopsRisk = raw.nexops_risk ?? 'LOW';
+  return gatewayIsCalm(raw) && risk !== 'LOW';
+}
+
+// ----------------------------------------------------------------------
+// computePerf - ties the headline perf number to the risk model.
+//
+// RULE: NexOps risk takes precedence for the visual state, but can only ever
+// ESCALATE (never mask) the gateway's own view. We compute two perf numbers -
+// one from NexOps's verdict, one from the existing gateway-severity logic -
+// and take the WORST (lowest). So a gateway-Normal machine that NexOps rates
+// HIGH still drops below the perf<80 at-risk line (the "caught it early"
+// moment), while a gateway-Critical machine stays critical even if NexOps is
+// quiet. The tiny jitter keeps healthy bars alive.
 // ----------------------------------------------------------------------
 
 export function computePerf(raw: TelemetryRecord): number {
-  // 1) base by worst active alarm severity (check worst first)
+  // --- gateway-severity base (kept as the floor) ---
   let base: number;
   if (raw.Status === 'Normal') base = 100;
   else if (raw.alarm_priority === 'Critical') base = 40;
@@ -80,7 +112,7 @@ export function computePerf(raw: TelemetryRecord): number {
   else if (raw.alarm_priority === 'Medium' || raw.is_predictive) base = 85;
   else base = 100; // Low / unclassified -> treat as healthy
 
-  // 2) drift penalty up to 8 points for developing/predictive states.
+  // drift penalty up to 8 points for developing/predictive states.
   // We try to infer closeness to tripping from the message; if it isn't
   // cleanly inferable we use a modest fixed penalty of 4 for predictive.
   let penalty = 0;
@@ -93,11 +125,15 @@ export function computePerf(raw: TelemetryRecord): number {
       penalty = 4; // not cleanly inferable -> modest fixed
     }
   }
+  const gatewayPerf = base - penalty;
 
-  // 3) tiny jitter so healthy bars aren't frozen
+  // --- NexOps verdict (PRIMARY driver) ---
+  const nexopsPerf = NEXOPS_PERF[raw.nexops_risk ?? 'LOW'];
+
+  // tiny jitter so healthy bars aren't frozen
   const jitter = Math.random() * 3 - 1.5; // +/- 1.5
 
-  const perf = base - penalty + jitter;
+  const perf = Math.min(nexopsPerf, gatewayPerf) + jitter;
   return Math.round(Math.max(0, Math.min(100, perf)));
 }
 
@@ -110,6 +146,10 @@ export function mapToMachine(raw: TelemetryRecord): Machine {
     name: raw.Machine,
     zone: zoneFor(raw.Machine),
     perf: computePerf(raw),
+    nexopsRisk: raw.nexops_risk ?? 'LOW',
+    anomalyScore: raw.anomaly_score ?? null,
+    isEarly: isEarlyWarning(raw),
+    reasoning: raw.nexops_reasoning ?? '',
   };
 }
 
@@ -126,6 +166,10 @@ export function mapToAlarm(raw: TelemetryRecord): Alarm {
     time: formatTime(raw.Timestamp),
     msg: raw.message,
     type: raw.Status === 'Critical' ? 'CRITICAL' : 'WARNING',
+    nexopsRisk: raw.nexops_risk ?? 'LOW',
+    anomalyScore: raw.anomaly_score ?? null,
+    isEarly: isEarlyWarning(raw),
+    reasoning: raw.nexops_reasoning ?? '',
   };
 }
 
@@ -136,10 +180,22 @@ function dotForPriority(priority: AlarmPriority): string {
 }
 
 export function mapToControlPanelAlarm(raw: TelemetryRecord): ControlPanelAlarm {
+  const early = isEarlyWarning(raw);
+  const risk: NexopsRisk = raw.nexops_risk ?? 'LOW';
+  // On an early catch the gateway priority is still Low (a green dot), which
+  // understates the risk - colour the dot by NexOps's verdict instead so the
+  // control panel reflects what NexOps sees, not just the static threshold.
+  const dot = early
+    ? risk === 'CRITICAL'
+      ? '#ef4444'
+      : '#f59e0b'
+    : dotForPriority(raw.alarm_priority);
   return {
-    dot: dotForPriority(raw.alarm_priority),
+    dot,
     code: raw.object_name,
     text: `${raw.Alert} · ${raw.message}`,
+    isEarly: early,
+    reasoning: raw.nexops_reasoning ?? '',
   };
 }
 

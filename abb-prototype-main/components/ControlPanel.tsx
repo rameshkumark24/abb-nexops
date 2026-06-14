@@ -2,6 +2,7 @@
 
 import { Dot, COLORS } from './Shared';
 import { useLiveData } from '@/hooks/useLiveData';
+import type { ControlPanelAlarm } from '@/types/telemetry';
 
 const UNIT_GRID = [
   [1, 0, 0, 0, 0, 0],
@@ -28,10 +29,10 @@ const ALARM_COLORS = {
 
 // Shown before the first live record arrives so the public landing page
 // never renders an empty panel.
-const FALLBACK_ALARMS = [
-  { dot: ALARM_COLORS.dotRed, code: 'M-07', text: "Bearing temp +14°C · ARIA: lubrication failure pattern" },
-  { dot: ALARM_COLORS.dotAmber, code: 'M-12', text: 'Pressure trending high · loop PT-204' },
-  { dot: ALARM_COLORS.dotGreen, code: 'M-03', text: 'Calibration window passed · within tolerance' },
+const FALLBACK_ALARMS: ControlPanelAlarm[] = [
+  { dot: ALARM_COLORS.dotRed, code: 'M-07', text: "Bearing temp +14°C · ARIA: lubrication failure pattern", isEarly: false, reasoning: '' },
+  { dot: ALARM_COLORS.dotAmber, code: 'M-12', text: 'Pressure trending high · loop PT-204', isEarly: false, reasoning: '' },
+  { dot: ALARM_COLORS.dotGreen, code: 'M-03', text: 'Calibration window passed · within tolerance', isEarly: false, reasoning: '' },
 ];
 
 export default function ControlPanel() {
@@ -101,10 +102,15 @@ export default function ControlPanel() {
               borderBottom: i < alarms.length - 1 ? `1px solid ${COLORS.borderFaint}` : 'none',
             }}
           >
-            <Dot color={a.dot} size={6} cls="" />
+            <Dot color={a.dot} size={6} cls={a.isEarly ? 'pulse-fast' : ''} />
             <span className="mono" style={{ color: COLORS.textSec, fontWeight: 500, marginRight: 2 }}>
               {a.code}
             </span>
+            {a.isEarly && (
+              <span className="mono blink-critical" style={{ color: '#f59e0b', fontWeight: 600, marginRight: 4 }} title={a.reasoning}>
+                ⚠ EARLY
+              </span>
+            )}
             {a.text}
           </div>
         ))}

@@ -11,12 +11,14 @@ import type {
   AlarmType,
   AlarmPriority,
   AlarmState,
+  NexopsRisk,
 } from '@/types/telemetry';
 import {
   mapToMachine,
   mapToAlarm,
   mapToTask,
   mapToControlPanelAlarm,
+  isEarlyWarning,
 } from '@/lib/adapter';
 
 // ======================================================================
@@ -107,6 +109,20 @@ function makeMockRecord(seq: number): TelemetryRecord {
   const priorityLevel =
     priority === 'Critical' ? 1 : priority === 'High' ? 2 : priority === 'Medium' ? 3 : 4;
 
+  // Mock NexOps anomaly view: mirror gateway severity, but let a predictive
+  // (incubating) fault read as elevated so the fallback still exercises the
+  // "caught early" path the real backend produces.
+  const nexopsRisk: NexopsRisk =
+    priority === 'Critical'
+      ? 'CRITICAL'
+      : priority === 'High' || predictive
+      ? 'HIGH'
+      : priority === 'Medium'
+      ? 'MEDIUM'
+      : 'LOW';
+  const anomalyScore =
+    nexopsRisk === 'CRITICAL' ? 0.9 : nexopsRisk === 'HIGH' ? 0.78 : nexopsRisk === 'MEDIUM' ? 0.55 : 0.12;
+
   return {
     Machine: machine,
     Timestamp: formatNow(),
@@ -127,6 +143,12 @@ function makeMockRecord(seq: number): TelemetryRecord {
     object_name: `TAG-${machine.slice(0, 3).toUpperCase()}${(seq % 9) + 1}`,
     object_description: machine,
     message,
+    anomaly_score: anomalyScore,
+    anomaly_status: 'scored',
+    nexops_risk: nexopsRisk,
+    nexops_reasoning: predictive
+      ? 'anomaly_score 0.78 high while gateway calm — predicted issue before static threshold'
+      : `gateway ${priority}`,
   };
 }
 
@@ -253,7 +275,13 @@ export function useLiveData() {
       machineMap.current.set(raw.Machine, mapToMachine(raw));
       setMachines(Array.from(machineMap.current.values()));
 
-      if (raw.Status !== 'Normal') {
+      // Feeds surface anything the gateway alarmed on OR anything NexOps caught
+      // early (gateway still calm but NexOps risk elevated) - otherwise the
+      // headline "caught it early" records (Status Normal) would never reach the
+      // buzz/alarm/task feeds.
+      const early = isEarlyWarning(raw);
+
+      if (raw.Status !== 'Normal' || early) {
         // alarms: rolling list, most recent first (~10)
         setAlarms((prev) => [mapToAlarm(raw), ...prev].slice(0, 10));
         // controlAlarms: compact rolling list for the landing control panel (~3)

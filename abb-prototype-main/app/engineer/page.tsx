@@ -93,21 +93,38 @@ export default function EngineerConsole() {
 
             <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {alarms.map((buzz, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className={`fade-in-up ${buzz.type === 'CRITICAL' ? 'glow-critical' : ''}`}
-                  style={{ background: buzz.type === 'CRITICAL' ? '#0f0808' : '#0f0d08', border: `1px solid ${buzz.type === 'CRITICAL' ? '#3b1515' : '#3b2e15'}`, padding: 16, borderRadius: 6 }}
+                  style={{ background: buzz.type === 'CRITICAL' ? '#0f0808' : '#0f0d08', border: `1px solid ${buzz.isEarly ? '#f59e0b' : buzz.type === 'CRITICAL' ? '#3b1515' : '#3b2e15'}`, padding: 16, borderRadius: 6 }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <span className={`mono ${buzz.type === 'CRITICAL' ? 'blink-critical' : ''}`} style={{ fontSize: 10, color: buzz.type === 'CRITICAL' ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>
-                      ⚠ {buzz.type}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className={`mono ${buzz.type === 'CRITICAL' ? 'blink-critical' : ''}`} style={{ fontSize: 10, color: buzz.type === 'CRITICAL' ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>
+                        ⚠ {buzz.type}
+                      </span>
+                      {buzz.isEarly && (
+                        <span className="mono blink-critical" style={{ fontSize: 9, color: '#f59e0b', background: '#1a1408', border: '1px solid #3b2e15', padding: '1px 6px', borderRadius: 3, letterSpacing: '0.08em', fontWeight: 600 }}>
+                          ⚠ EARLY · NEXOPS {buzz.nexopsRisk}
+                        </span>
+                      )}
                     </span>
                     <span className="mono" style={{ fontSize: 9, color: COLORS.textFaint }}>{buzz.time}</span>
                   </div>
                   <div style={{ fontSize: 13, color: COLORS.textPrimary, display: 'flex', gap: 8, alignItems: 'flex-start', lineHeight: 1.5 }}>
                     <IconAlertTriangle size={16} color={buzz.type === 'CRITICAL' ? '#ef4444' : '#f59e0b'} style={{ flexShrink: 0, marginTop: 2 }} />
-                    {buzz.msg}
+                    {/* EARLY items lead with NexOps's angle - the gateway message is
+                        "all parameters normal", which is the whole point and must NOT
+                        be the headline. Non-early items keep the gateway message. */}
+                    {buzz.isEarly
+                      ? buzz.reasoning || 'NexOps early warning — anomaly detected before the static threshold'
+                      : buzz.msg}
                   </div>
+                  {buzz.isEarly && (
+                    <div className="mono" style={{ fontSize: 9.5, color: COLORS.textFaint, marginTop: 8, lineHeight: 1.5 }}>
+                      gateway: nominal
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

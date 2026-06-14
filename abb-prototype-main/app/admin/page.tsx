@@ -10,9 +10,16 @@ const INIT_EMPLOYEES = [
   { id: 'E103', name: 'Charlie Davis', tasks: 15, avgTime: '30m' },
 ];
 
+// NexOps risk -> colour, reusing the existing palette tokens.
+const riskColor = (risk: string): string =>
+  risk === 'CRITICAL' ? '#ef4444' : risk === 'HIGH' ? '#f97316' : risk === 'MEDIUM' ? '#f59e0b' : '#22c55e';
+
 export default function AdminConsole() {
   // Live machine performance comes from the single data seam.
   const { machines } = useLiveData();
+  // NexOps "caught it early" count: machines the gateway still calls calm but
+  // NexOps has flagged as elevated.
+  const earlyCount = machines.filter((m) => m.isEarly).length;
   const [employees, setEmployees] = useState(INIT_EMPLOYEES);
   const [searchId, setSearchId] = useState('');
   const [newEmp, setNewEmp] = useState({ id: '', name: '', tasks: 0, avgTime: '' });
@@ -117,6 +124,10 @@ export default function AdminConsole() {
                   <div style={{ fontSize: 40, fontWeight: 300, color: '#22c55e' }}>98.2%</div>
                   <div className="mono" style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 4 }}>AVG PERFORMANCE</div>
                 </div>
+                <div>
+                  <div style={{ fontSize: 40, fontWeight: 300, color: earlyCount > 0 ? '#f59e0b' : '#22c55e' }}>{earlyCount}</div>
+                  <div className="mono" style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 4 }}>EARLY WARNINGS</div>
+                </div>
                 {activeTab === 'machines' && (
                   <div>
                     <div style={{ fontSize: 40, fontWeight: 300, color: '#ef4444' }}>3</div>
@@ -153,8 +164,22 @@ export default function AdminConsole() {
                             <Dot color={isCritical ? '#ef4444' : '#e2e8f0'} size={7} cls={isCritical ? 'pulse-fast' : ''} />
                             <span className="mono" style={{ fontSize: 12, color: isCritical ? '#ef4444' : '#e2e8f0', fontWeight: 500 }}>{m.name}</span>
                             <span className="mono" style={{ fontSize: 9, color: COLORS.textFaint, marginLeft: 4 }}>{m.zone}</span>
+                            {m.isEarly && (
+                              <span
+                                className="mono blink-critical"
+                                title={m.reasoning}
+                                style={{ fontSize: 8.5, color: '#f59e0b', background: '#1a1408', border: '1px solid #3b2e15', padding: '1px 6px', borderRadius: 3, letterSpacing: '0.08em', marginLeft: 2 }}
+                              >
+                                ⚠ EARLY
+                              </span>
+                            )}
                           </div>
-                          <span className={`mono ${isCritical ? 'blink-critical' : ''}`} style={{ fontSize: 14, color: isCritical ? '#ef4444' : '#e2e8f0', fontWeight: 600 }}>{m.perf}%</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span className="mono" title={m.reasoning} style={{ fontSize: 9, color: riskColor(m.nexopsRisk), letterSpacing: '0.06em' }}>
+                              NEXOPS {m.nexopsRisk}
+                            </span>
+                            <span className={`mono ${isCritical ? 'blink-critical' : ''}`} style={{ fontSize: 14, color: isCritical ? '#ef4444' : '#e2e8f0', fontWeight: 600 }}>{m.perf}%</span>
+                          </div>
                         </div>
                         <div style={{ height: 10, background: '#1a1d27', borderRadius: 5, overflow: 'hidden' }}>
                           <div 

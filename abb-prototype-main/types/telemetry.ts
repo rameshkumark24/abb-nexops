@@ -17,6 +17,10 @@ export type AlarmPriority = 'Critical' | 'High' | 'Medium' | 'Low';
 export type AlarmState = 'ACT' | 'ACK' | 'RTN';
 export type AckState = 'Unacknowledged' | 'Acknowledged';
 
+// NexOps anomaly layer (added upstream by the backend bridge).
+export type NexopsRisk = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type AnomalyStatus = 'warming_up' | 'scored' | 'error';
+
 export interface TelemetryRecord {
   Machine: string;
   Timestamp: string; // "YYYY-MM-DD HH:MM:SS"
@@ -37,6 +41,12 @@ export interface TelemetryRecord {
   object_name: string; // ABB tag, e.g. "TIC-HEX01"
   object_description: string;
   message: string;
+
+  // --- NexOps anomaly layer (added by the backend, independent of gateway) ---
+  anomaly_score: number | null; // 0..1, higher = more anomalous; null while warming up
+  anomaly_status: AnomalyStatus; // 'warming_up' | 'scored' | 'error'
+  nexops_risk: NexopsRisk; // NexOps's own risk verdict
+  nexops_reasoning: string; // short human explanation of the verdict
 }
 
 // ----------------------------------------------------------------------
@@ -47,6 +57,11 @@ export interface Machine {
   name: string;
   perf: number;
   zone: string;
+  // NexOps intelligence surfaced into the UI:
+  nexopsRisk: NexopsRisk;
+  anomalyScore: number | null;
+  isEarly: boolean; // gateway calm (Normal/Low) but NexOps risk elevated
+  reasoning: string;
 }
 
 export interface Task {
@@ -61,10 +76,17 @@ export interface Alarm {
   time: string;
   msg: string;
   type: 'CRITICAL' | 'WARNING';
+  // NexOps view carried through so feeds can show the EARLY tag + reasoning.
+  nexopsRisk: NexopsRisk;
+  anomalyScore: number | null;
+  isEarly: boolean;
+  reasoning: string;
 }
 
 export interface ControlPanelAlarm {
   dot: string;
   code: string;
   text: string;
+  isEarly: boolean;
+  reasoning: string;
 }
