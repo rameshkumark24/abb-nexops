@@ -40,7 +40,7 @@ from datetime import datetime
 # ----------------------------------------------------------------------
 
 OUTPUT_FILE = "refinery_live_data.jsonl"
-INTERVAL_SECONDS = 2
+INTERVAL_SECONDS = 1
 TOTAL_RECORDS = None          # None = run forever, or set an integer limit
 
 # --- v2 knobs ---

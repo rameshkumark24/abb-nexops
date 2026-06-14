@@ -4,8 +4,11 @@ uvicorn[standard]
 paho-mqtt
 websockets
 
+# --- Stage: anomaly (NOW REQUIRED) — online Isolation Forest risk layer ---
+scikit-learn        # Stage: anomaly (Isolation Forest)
+numpy               # Stage: anomaly (feature vectors / score normalization)
+
 # --- NOT needed yet; uncomment as later stages land ---
-# scikit-learn        # Stage: anomaly (Isolation Forest)
 # influxdb-client     # Stage: history (time-series storage)
 # psycopg[binary]     # Stage: assignment (Postgres engineer assignment)
 # anthropic           # Stage: ARIA (explanations)

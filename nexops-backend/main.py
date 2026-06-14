@@ -36,8 +36,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import config
 from adapter import normalize
+from anomaly import AnomalyEngine
+from risk import compute_nexops_risk, fallback_risk
 
 app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
+
+# One anomaly engine for the whole process. It maintains per-machine state
+# internally (rolling window + Isolation Forest per machine), so a single
+# instance shared across all MQTT messages is correct.
+engine = AnomalyEngine()
 
 # CORS: allow all origins for the demo so the Next.js app on :3000 can hit
 # the HTTP/WS endpoints on :8000 without preflight headaches.
@@ -114,8 +121,30 @@ def on_message(client, userdata, msg):
     # The ONE normalization choke point.
     record = normalize(raw)
 
+    # ---- Stage: anomaly — NexOps's OWN risk view, ADDED to the record -----
+    # We AUGMENT, never replace: every original gateway field is kept; we only
+    # add anomaly_score / anomaly_status / nexops_risk / nexops_reasoning.
+    #
+    # FAIL-SAFE: the entire ML step is wrapped in try/except. If anything goes
+    # wrong, we attach a null score + a gateway-mirrored fallback risk and log
+    # the error — the live feed must NEVER break because of the ML layer.
+    try:
+        result = engine.update_and_score(record)
+        risk = compute_nexops_risk(record, result["anomaly_score"])
+        record["anomaly_score"] = result["anomaly_score"]   # None while warming up
+        record["anomaly_status"] = result["status"]         # "warming_up" | "scored"
+        record["nexops_risk"] = risk["nexops_risk"]
+        record["nexops_reasoning"] = risk["reasoning"]
+    except Exception as exc:
+        fb = fallback_risk(record)
+        record["anomaly_score"] = None
+        record["anomaly_status"] = "error"
+        record["nexops_risk"] = fb["nexops_risk"]
+        record["nexops_reasoning"] = fb["reasoning"]
+        print(f"[anomaly] scoring failed for "
+              f"{record.get('Machine', '?')}: {exc} (feed continues)")
+
     # ---- Later-stage insertion points (NOT implemented in this task) ----
-    # TODO(Stage: anomaly) run Isolation Forest here, attach anomaly_score
     # TODO(Stage: history) write record to InfluxDB here
     # TODO(Stage: assignment) enrich with engineer assignment from Postgres here
     # TODO(Stage: ARIA) attach ARIA explanation here
