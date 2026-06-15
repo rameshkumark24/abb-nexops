@@ -30,9 +30,9 @@ const ALARM_COLORS = {
 // Shown before the first live record arrives so the public landing page
 // never renders an empty panel.
 const FALLBACK_ALARMS: ControlPanelAlarm[] = [
-  { dot: ALARM_COLORS.dotRed, code: 'M-07', text: "Bearing temp +14°C · ARIA: lubrication failure pattern", isEarly: false, reasoning: '' },
-  { dot: ALARM_COLORS.dotAmber, code: 'M-12', text: 'Pressure trending high · loop PT-204', isEarly: false, reasoning: '' },
-  { dot: ALARM_COLORS.dotGreen, code: 'M-03', text: 'Calibration window passed · within tolerance', isEarly: false, reasoning: '' },
+  { dot: ALARM_COLORS.dotRed, code: 'M-07', text: "Bearing temp +14°C · ARIA: lubrication failure pattern", isEarly: false, reasoning: '', siteAlert: false, emergencyType: null, isNuisance: false },
+  { dot: ALARM_COLORS.dotAmber, code: 'M-12', text: 'Pressure trending high · loop PT-204', isEarly: false, reasoning: '', siteAlert: false, emergencyType: null, isNuisance: false },
+  { dot: ALARM_COLORS.dotGreen, code: 'M-03', text: 'Calibration window passed · within tolerance', isEarly: false, reasoning: '', siteAlert: false, emergencyType: null, isNuisance: false },
 ];
 
 export default function ControlPanel() {
@@ -92,6 +92,7 @@ export default function ControlPanel() {
         {alarms.map((a, i) => (
           <div
             key={i}
+            className={a.siteAlert ? 'blink-critical' : ''}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -99,18 +100,29 @@ export default function ControlPanel() {
               padding: '7px 16px',
               fontSize: 10.5,
               color: COLORS.textMuted,
+              // SITE EMERGENCY gets the strongest treatment; nuisance is greyed.
+              background: a.siteAlert ? 'rgba(239,68,68,0.10)' : 'transparent',
+              opacity: a.isNuisance ? 0.5 : 1,
               borderBottom: i < alarms.length - 1 ? `1px solid ${COLORS.borderFaint}` : 'none',
             }}
           >
-            <Dot color={a.dot} size={6} cls={a.isEarly ? 'pulse-fast' : ''} />
+            <Dot color={a.siteAlert ? '#ef4444' : a.dot} size={6} cls={a.siteAlert || a.isEarly ? 'pulse-fast' : ''} />
             <span className="mono" style={{ color: COLORS.textSec, fontWeight: 500, marginRight: 2 }}>
               {a.code}
             </span>
-            {a.isEarly && (
+            {a.isNuisance ? (
+              <span className="mono" style={{ color: COLORS.textFaint, fontWeight: 600, marginRight: 4, letterSpacing: '0.06em' }}>
+                ⊘ NUISANCE — FILTERED
+              </span>
+            ) : a.siteAlert ? (
+              <span className="mono blink-critical" style={{ color: '#ef4444', fontWeight: 700, marginRight: 4 }}>
+                🚨 SITE
+              </span>
+            ) : a.isEarly ? (
               <span className="mono blink-critical" style={{ color: '#f59e0b', fontWeight: 600, marginRight: 4 }} title={a.reasoning}>
                 ⚠ EARLY
               </span>
-            )}
+            ) : null}
             {a.text}
           </div>
         ))}

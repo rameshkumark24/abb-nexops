@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { NavBar, COLORS, Dot } from '@/components/Shared';
+import { SiteAlertBanner } from '@/components/SiteAlertBanner';
 import { useLiveData } from '@/hooks/useLiveData';
 
 const INIT_EMPLOYEES = [
@@ -16,7 +17,7 @@ const riskColor = (risk: string): string =>
 
 export default function AdminConsole() {
   // Live machine performance comes from the single data seam.
-  const { machines } = useLiveData();
+  const { machines, siteAlert } = useLiveData();
   // NexOps "caught it early" count: machines the gateway still calls calm but
   // NexOps has flagged as elevated.
   const earlyCount = machines.filter((m) => m.isEarly).length;
@@ -73,7 +74,8 @@ export default function AdminConsole() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <NavBar onBack={() => window.location.href = '/'} />
-      
+      <SiteAlertBanner alert={siteAlert} />
+
       <div className="fade-in-up" style={{ padding: '40px 56px', maxWidth: 1280, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: 32 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div>
@@ -182,18 +184,25 @@ export default function AdminConsole() {
                           </div>
                         </div>
                         <div style={{ height: 10, background: '#1a1d27', borderRadius: 5, overflow: 'hidden' }}>
-                          <div 
+                          <div
                             className={`grow-bar ${isCritical ? 'blink-critical' : 'shimmer-bar'}`}
-                            style={{ 
-                              width: `${m.perf}%`, 
-                              height: '100%', 
-                              background: isCritical 
-                                ? 'linear-gradient(90deg, #ef4444, #b91c1c, #ef4444)' 
-                                : 'linear-gradient(90deg, #94a3b8, #f1f5f9, #94a3b8)', 
+                            style={{
+                              width: `${m.perf}%`,
+                              height: '100%',
+                              background: isCritical
+                                ? 'linear-gradient(90deg, #ef4444, #b91c1c, #ef4444)'
+                                : 'linear-gradient(90deg, #94a3b8, #f1f5f9, #94a3b8)',
                               borderRadius: 5
-                            }} 
+                            }}
                           />
                         </div>
+                        {/* Assigned engineer for the active fault (only when one is dispatched). */}
+                        {m.assignedEngineer && m.assignedEngineer !== 'Unassigned' && (
+                          <div className="mono" style={{ fontSize: 9, color: COLORS.textMuted, marginTop: 6 }}>
+                            👤 {m.assignedEngineer}
+                            {m.faultCategory ? ` · ${m.faultCategory}` : ''}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

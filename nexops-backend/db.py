@@ -109,7 +109,12 @@ class FaultMTTR(Base):
 
 
 class Assignment(Base):
-    """A persisted assignment of an alarm/fault to an engineer."""
+    """A persisted assignment of an alarm/fault to an engineer, with lifecycle.
+
+    Lifecycle: status moves assigned -> in_progress -> resolved. Resolving stamps
+    resolved_at, computes resolution_minutes, and (in lifecycle.resolve_task)
+    decrements the engineer's active_tasks to free capacity.
+    """
 
     __tablename__ = "assignments"
 
@@ -118,11 +123,19 @@ class Assignment(Base):
     machine = Column(String, nullable=True)
     fault_category = Column(String, nullable=False)
     engineer_id = Column(Integer, ForeignKey("engineers.id"), nullable=True)
+    # engineer_name: denormalized snapshot so a summary/queue can show who was
+    # assigned without a join (and survives even if the roster later changes).
+    engineer_name = Column(String, nullable=True)
     assigned_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     # status: "assigned" | "in_progress" | "resolved"
     status = Column(String, nullable=False, default="assigned")
     # score: the match score the engine used to choose this engineer.
     score = Column(Float, nullable=True)
+    # --- lifecycle timestamps (additive) ---
+    started_at = Column(DateTime, nullable=True)   # set when -> in_progress
+    resolved_at = Column(DateTime, nullable=True)  # set when -> resolved
+    # elapsed assigned_at -> resolved_at, in minutes; computed on resolve.
+    resolution_minutes = Column(Float, nullable=True)
 
 
 # ----------------------------------------------------------------------

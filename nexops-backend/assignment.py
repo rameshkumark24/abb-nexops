@@ -9,6 +9,8 @@ It is STANDALONE: not imported by main.py yet. The live bridge will wire it in
 later at the existing TODO(Stage: assignment) marker.
 """
 
+import re
+
 from db import Assignment, Engineer, FaultMTTR
 
 # ----------------------------------------------------------------------
@@ -110,10 +112,19 @@ def _is_critical(record: dict) -> bool:
 # A site-wide emergency must ALWAYS be dispatched, so we detect it broadly.
 # ----------------------------------------------------------------------
 
-# alarm_type values that denote safety / emergency categories.
-SAFETY_ALARM_TYPES = ("safety", "system")
-# Text fragments that always denote a site emergency, regardless of priority.
-SAFETY_KEYWORDS = ("fire", "gas leak", "emergency", "explos", "toxic")
+# alarm_type values that denote a genuine SAFETY category. Only "Safety" counts:
+# "System" is a catch-all (it tags benign status notices AS WELL AS emergency
+# stops), so it is NOT treated as safety here. Real emergency-stop events are
+# still caught below - they carry Critical priority and the word "EMERGENCY".
+SAFETY_ALARM_TYPES = ("safety",)
+# Words/phrases that denote a site emergency, regardless of priority.
+SAFETY_KEYWORDS = ("fire", "gas leak", "emergency", "explosion", "explosive", "toxic")
+# Match each keyword as a WHOLE word/phrase, never a loose substring - so "fire"
+# triggers on "FIRE DETECTED" but NOT inside "Fired Heater" / "misfire", and a
+# "general system notice" never matches anything.
+_SAFETY_KEYWORD_RE = re.compile(
+    r"\b(?:" + "|".join(re.escape(kw) for kw in SAFETY_KEYWORDS) + r")\b"
+)
 
 
 def is_safety_critical(record: dict) -> bool:
@@ -121,8 +132,10 @@ def is_safety_critical(record: dict) -> bool:
     BYPASS the capacity cap). Keys on ANY of:
       - alarm_priority == "Critical"
       - nexops_risk    == "CRITICAL"
-      - alarm_type in {"Safety", "System"}  (emergency-stop / safety categories)
-      - Alert/message text contains FIRE / GAS LEAK / EMERGENCY (etc.)
+      - alarm_type == "Safety"  (genuine safety category; NOT "System")
+      - Alert/message contains a whole-word FIRE / GAS LEAK / EMERGENCY (etc.)
+    A plain "System" status notice with no Critical severity and no safety
+    keyword (e.g. "General system notice") is therefore NON-critical.
     """
     if str(record.get("alarm_priority", "") or "").lower() == "critical":
         return True
@@ -133,7 +146,7 @@ def is_safety_critical(record: dict) -> bool:
     text = " ".join(
         str(record.get(k, "") or "") for k in ("Alert", "message")
     ).lower()
-    return any(kw in text for kw in SAFETY_KEYWORDS)
+    return bool(_SAFETY_KEYWORD_RE.search(text))
 
 
 def _unassigned(category: str, reason: str) -> dict:
@@ -350,6 +363,7 @@ def record_assignment(record: dict, result: dict, session) -> Assignment:
         machine=record.get("Machine"),
         fault_category=result.get("fault_category", "general"),
         engineer_id=result.get("engineer_id"),
+        engineer_name=result.get("engineer_name"),
         status="assigned",
         score=result.get("score"),
     )

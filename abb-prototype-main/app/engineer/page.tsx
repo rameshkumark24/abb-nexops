@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { NavBar, COLORS, Dot } from '@/components/Shared';
+import { SiteAlertBanner } from '@/components/SiteAlertBanner';
 import { IconAlertTriangle } from '@/components/Icons';
 import { useLiveData } from '@/hooks/useLiveData';
 
@@ -15,8 +16,8 @@ const ARIA_RESPONSES = [
 ];
 
 export default function EngineerConsole() {
-  // Live task queue + high-risk buzz come from the single data seam.
-  const { tasks, alarms } = useLiveData();
+  // Live task queue + high-risk buzz + site emergency come from the single seam.
+  const { tasks, alarms, siteAlert } = useLiveData();
   // Tech reassignment is a UI-local concern, keyed by machine so a choice
   // sticks across live ticks (task ids change as new records arrive).
   const [techOverrides, setTechOverrides] = useState<Record<string, string>>({});
@@ -76,7 +77,8 @@ export default function EngineerConsole() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <NavBar onBack={() => window.location.href = '/'} />
-      
+      <SiteAlertBanner alert={siteAlert} />
+
       <div className="fade-in-up" style={{ padding: '40px 56px', maxWidth: 1400, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: 32 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 8 }}>Field Engineer Console</h1>
@@ -92,7 +94,30 @@ export default function EngineerConsole() {
             </div>
 
             <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {alarms.map((buzz, i) => (
+              {alarms.map((buzz, i) => {
+                // NUISANCE = filtered noise. Render it heavily de-emphasised so
+                // real alarms stand out; NexOps has already classified it as not
+                // actionable, so it never gets the EARLY/critical treatment.
+                if (buzz.isNuisance) {
+                  return (
+                    <div
+                      key={i}
+                      className="fade-in-up"
+                      style={{ background: '#0b0d12', border: `1px dashed ${COLORS.borderSub}`, padding: '10px 16px', borderRadius: 6, opacity: 0.55 }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="mono" style={{ fontSize: 9, color: COLORS.textFaint, letterSpacing: '0.08em' }}>
+                          ⊘ NUISANCE — FILTERED
+                        </span>
+                        <span className="mono" style={{ fontSize: 9, color: COLORS.textFaint }}>{buzz.time}</span>
+                      </div>
+                      <div className="mono" style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+                        {buzz.msg}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
                 <div
                   key={i}
                   className={`fade-in-up ${buzz.type === 'CRITICAL' ? 'glow-critical' : ''}`}
@@ -126,7 +151,8 @@ export default function EngineerConsole() {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -145,10 +171,26 @@ export default function EngineerConsole() {
                 <span>ASSIGNED TO</span>
               </div>
               
-              {tasks.map(t => (
+              {tasks.map(t => {
+                // The dropdown must be able to show the REAL auto-assigned
+                // engineer (from the backend roster, e.g. "Ravi Kumar"), which
+                // usually isn't in the static AVAILABLE_TECHS list - so we fold
+                // it in (deduped) and default the selection to it.
+                const techOptions = Array.from(
+                  new Set([t.assignedEngineer, ...AVAILABLE_TECHS].filter(Boolean))
+                );
+                return (
                 <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '0.8fr 2fr 1.2fr 0.8fr 1.5fr', padding: '14px 16px', borderBottom: `1px solid ${COLORS.borderFaint}`, fontSize: 12, color: COLORS.textSec, alignItems: 'center' }}>
                   <span className="mono" style={{ color: COLORS.textPrimary, fontWeight: 500 }}>{t.id}</span>
-                  <span style={{ paddingRight: 12 }}>{t.title}</span>
+                  <span style={{ paddingRight: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <span>{t.title}</span>
+                    {/* "why this engineer" - the live assignment reasoning. */}
+                    {t.assignmentReason && (
+                      <span className="mono" style={{ fontSize: 8.5, color: COLORS.textFaint, lineHeight: 1.4 }}>
+                        {t.faultCategory ? `[${t.faultCategory}] ` : ''}{t.assignmentReason}
+                      </span>
+                    )}
+                  </span>
                   <span className="mono" style={{ fontSize: 10 }}>{t.machine}</span>
                   <span className={`mono ${t.priority === 'CRITICAL' ? 'blink-critical' : ''}`} style={{ fontSize: 9, color: t.priority === 'CRITICAL' ? '#ef4444' : t.priority === 'WARNING' ? '#f59e0b' : '#22c55e', fontWeight: 600 }}>
                     {t.priority}
@@ -156,14 +198,17 @@ export default function EngineerConsole() {
                   <select
                     value={techOverrides[t.machine] ?? t.tech}
                     onChange={e => reallocateTask(t.machine, e.target.value)}
+                    title={t.assignmentReason ?? 'Auto-assigned by NexOps'}
+                    aria-label={`Assigned engineer for ${t.machine}`}
                     style={selectStyle}
                   >
-                    {AVAILABLE_TECHS.map(tech => (
+                    {techOptions.map(tech => (
                       <option key={tech} value={tech}>{tech}</option>
                     ))}
                   </select>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <p style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 16, lineHeight: 1.6 }}>
               Reallocate tasks via dropdown if a technician is unavailable.

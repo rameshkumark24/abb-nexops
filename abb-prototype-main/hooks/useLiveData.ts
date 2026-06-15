@@ -12,12 +12,14 @@ import type {
   AlarmPriority,
   AlarmState,
   NexopsRisk,
+  SiteAlert,
 } from '@/types/telemetry';
 import {
   mapToMachine,
   mapToAlarm,
   mapToTask,
   mapToControlPanelAlarm,
+  mapToSiteAlert,
   isEarlyWarning,
 } from '@/lib/adapter';
 
@@ -149,6 +151,18 @@ function makeMockRecord(seq: number): TelemetryRecord {
     nexops_reasoning: predictive
       ? 'anomaly_score 0.78 high while gateway calm — predicted issue before static threshold'
       : `gateway ${priority}`,
+    // Assignment + emergency layer (mock): the tripped-critical roll doubles as a
+    // site-wide FIRE emergency so the fallback also exercises the RED ZONE banner.
+    assigned_engineer: status === 'Normal' ? 'Unassigned' : 'Ravi Kumar',
+    assigned_engineer_id: status === 'Normal' ? null : 1,
+    assignment_reason:
+      status === 'Normal' ? null : 'Ravi Kumar: mechanical skill match, low load, fastest MTTR',
+    fault_category: status === 'Normal' ? null : 'mechanical',
+    site_alert: roll === 4,
+    alert_scope: roll === 4 ? 'site' : 'normal',
+    emergency_type: roll === 4 ? 'fire' : null,
+    is_nuisance: false,
+    nuisance_type: null,
   };
 }
 
@@ -255,17 +269,29 @@ function subscribe(
 // must project it. This keeps shape knowledge in the hook/adapter only.
 // ======================================================================
 
+// How long a RED ZONE site alert persists after the last site_alert record, so
+// the banner doesn't flicker between ticks while an emergency is ongoing.
+// Set to 30s (> the simulator's ~16s per-machine revisit gap) so the banner
+// stays SOLID across the gap; it still clears ~30s after the last site_alert
+// record, so a resolved emergency stops showing. Tune here if the revisit
+// cadence changes.
+const SITE_ALERT_PERSIST_MS = 30000;
+
 export function useLiveData() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [controlAlarms, setControlAlarms] = useState<ControlPanelAlarm[]>([]);
   const [connected, setConnected] = useState(false);
+  // The active site-wide emergency (or null). Persisted ~30s after the last
+  // site_alert record so it doesn't flicker; clears when none arrive.
+  const [siteAlert, setSiteAlert] = useState<SiteAlert | null>(null);
 
   // Keyed by machine name so each grid/task entry reflects the machine's
   // latest state instead of growing without bound.
   const machineMap = useRef<Map<string, Machine>>(new Map());
   const taskMap = useRef<Map<string, Task>>(new Map());
+  const siteAlertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // `connected` is now driven by the socket lifecycle (onopen/onclose),
@@ -280,26 +306,51 @@ export function useLiveData() {
       // headline "caught it early" records (Status Normal) would never reach the
       // buzz/alarm/task feeds.
       const early = isEarlyWarning(raw);
+      // NUISANCE = filterable noise. We DO carry it into the alarm/control feeds
+      // (so the UI can show it greyed + "nuisance - filtered"), but we NEVER
+      // create a task for it (don't dispatch an engineer to noise) and it never
+      // triggers the site alert.
+      const nuisance = raw.is_nuisance === true;
 
-      if (raw.Status !== 'Normal' || early) {
+      if (raw.Status !== 'Normal' || early || nuisance) {
         // alarms: rolling list, most recent first (~10)
         setAlarms((prev) => [mapToAlarm(raw), ...prev].slice(0, 10));
         // controlAlarms: compact rolling list for the landing control panel (~3)
         setControlAlarms((prev) => [mapToControlPanelAlarm(raw), ...prev].slice(0, 3));
-        // tasks: one active task per affected machine (small, stable list)
+      }
+
+      if (!nuisance && (raw.Status !== 'Normal' || early)) {
+        // tasks: one active task per affected REAL fault (small, stable list)
         taskMap.current.set(raw.Machine, mapToTask(raw));
         setTasks(Array.from(taskMap.current.values()).slice(-5));
-      } else if (taskMap.current.has(raw.Machine)) {
-        // machine returned to normal -> retire its active task
+      } else if (!nuisance && raw.Status === 'Normal' && !early && taskMap.current.has(raw.Machine)) {
+        // machine returned to normal -> retire its active task (a nuisance
+        // reading must not retire a real, ongoing task)
         taskMap.current.delete(raw.Machine);
         setTasks(Array.from(taskMap.current.values()).slice(-5));
+      }
+
+      // SITE-WIDE RED ZONE: a real (non-nuisance) site emergency latches the
+      // banner and (re)arms a ~30s persistence timer; when no site_alert record
+      // arrives for that window, the banner clears on its own.
+      if (raw.site_alert === true && !nuisance) {
+        setSiteAlert(mapToSiteAlert(raw));
+        if (siteAlertTimer.current) clearTimeout(siteAlertTimer.current);
+        siteAlertTimer.current = setTimeout(() => {
+          setSiteAlert(null);
+          siteAlertTimer.current = null;
+        }, SITE_ALERT_PERSIST_MS);
       }
     }, setConnected);
 
     return () => {
       unsubscribe();
+      if (siteAlertTimer.current) {
+        clearTimeout(siteAlertTimer.current);
+        siteAlertTimer.current = null;
+      }
     };
   }, []);
 
-  return { machines, alarms, tasks, connected, controlAlarms };
+  return { machines, alarms, tasks, connected, controlAlarms, siteAlert };
 }

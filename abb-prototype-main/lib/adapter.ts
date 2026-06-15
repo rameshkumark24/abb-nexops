@@ -9,6 +9,8 @@ import type {
   ControlPanelAlarm,
   AlarmPriority,
   NexopsRisk,
+  SiteAlert,
+  EmergencyType,
 } from '@/types/telemetry';
 
 // ----------------------------------------------------------------------
@@ -150,6 +152,8 @@ export function mapToMachine(raw: TelemetryRecord): Machine {
     anomalyScore: raw.anomaly_score ?? null,
     isEarly: isEarlyWarning(raw),
     reasoning: raw.nexops_reasoning ?? '',
+    assignedEngineer: raw.assigned_engineer ?? 'Unassigned',
+    faultCategory: raw.fault_category ?? null,
   };
 }
 
@@ -170,6 +174,30 @@ export function mapToAlarm(raw: TelemetryRecord): Alarm {
     anomalyScore: raw.anomaly_score ?? null,
     isEarly: isEarlyWarning(raw),
     reasoning: raw.nexops_reasoning ?? '',
+    siteAlert: raw.site_alert === true,
+    emergencyType: raw.emergency_type ?? null,
+    isNuisance: raw.is_nuisance === true,
+  };
+}
+
+// Human labels for the site-emergency banner.
+const EMERGENCY_LABELS: Record<string, string> = {
+  fire: 'FIRE DETECTED',
+  gas_leak: 'GAS LEAK',
+  emergency_stop: 'EMERGENCY STOP',
+};
+
+// Project a raw record into the banner's SiteAlert shape. Call ONLY when
+// raw.site_alert is true (the hook decides that + handles persistence).
+export function mapToSiteAlert(raw: TelemetryRecord): SiteAlert {
+  const et: EmergencyType = raw.emergency_type ?? null;
+  const label = (et && EMERGENCY_LABELS[et]) || raw.Alert || 'SITE EMERGENCY';
+  return {
+    machine: raw.Machine,
+    emergencyType: et,
+    engineer: raw.assigned_engineer ?? 'Unassigned',
+    time: formatTime(raw.Timestamp),
+    label,
   };
 }
 
@@ -196,6 +224,9 @@ export function mapToControlPanelAlarm(raw: TelemetryRecord): ControlPanelAlarm 
     text: `${raw.Alert} · ${raw.message}`,
     isEarly: early,
     reasoning: raw.nexops_reasoning ?? '',
+    siteAlert: raw.site_alert === true,
+    emergencyType: raw.emergency_type ?? null,
+    isNuisance: raw.is_nuisance === true,
   };
 }
 
@@ -206,11 +237,17 @@ function priorityFromStatus(raw: TelemetryRecord): Task['priority'] {
 }
 
 export function mapToTask(raw: TelemetryRecord): Task {
+  const assignedEngineer = raw.assigned_engineer ?? 'Unassigned';
   return {
     id: `T-${raw.alarm_id}`,
     title: raw.Alert,
     machine: raw.Machine,
-    tech: 'Unassigned',
+    // The dropdown DEFAULT is now the REAL auto-assigned engineer, not a static
+    // "Unassigned" placeholder. Manual override still works in the UI.
+    tech: assignedEngineer,
     priority: priorityFromStatus(raw),
+    assignedEngineer,
+    assignmentReason: raw.assignment_reason ?? null,
+    faultCategory: raw.fault_category ?? null,
   };
 }

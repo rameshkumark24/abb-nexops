@@ -1,184 +1,290 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavBar, COLORS, Dot } from '@/components/Shared';
+import { SiteAlertBanner } from '@/components/SiteAlertBanner';
 import { IconAlertTriangle, IconWrench } from '@/components/Icons';
+import { useLiveData } from '@/hooks/useLiveData';
+import { useTasks } from '@/hooks/useTasks';
+import type { TaskStatus } from '@/types/telemetry';
+
+// Visual treatment per lifecycle status (drives the small status pill).
+const STATUS_META: Record<TaskStatus, { label: string; color: string }> = {
+  assigned: { label: 'ASSIGNED', color: '#f59e0b' },
+  in_progress: { label: 'IN PROGRESS', color: '#3b82f6' },
+  resolved: { label: 'RESOLVED', color: '#22c55e' },
+};
+
+// Extract the HH:MM:SS clock from an ISO timestamp without Date parsing, so
+// there are no timezone surprises (shows exactly what the backend recorded).
+function clockOf(iso: string | null): string {
+  if (!iso) return '—';
+  const t = iso.split('T')[1];
+  return t ? t.slice(0, 8) : iso;
+}
 
 export default function TechnicianConsole() {
-  const [taskStatus, setTaskStatus] = useState<'pending' | 'in-progress' | 'completed'>('pending');
-  const [techNotes, setTechNotes] = useState('');
-  const [savedNotes, setSavedNotes] = useState<string[]>([]);
+  // Same live seam as the other roles so the site-wide RED ZONE banner reaches
+  // the technician too. The task QUEUE itself is driven by the HTTP lifecycle
+  // endpoints via useTasks (separate from the WebSocket telemetry stream).
+  const { siteAlert } = useLiveData();
+  const { tasks, loading, error, start, resolve } = useTasks();
 
-  const handleStart = () => setTaskStatus('in-progress');
-  
-  const handleSaveNote = () => {
-    if (techNotes.trim()) {
-      setSavedNotes([...savedNotes, techNotes]);
-      setTechNotes('');
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
+
+  // Auto-dismiss the "capacity freed" confirmation after a few seconds.
+  useEffect(() => {
+    if (!confirmation) return;
+    const t = setTimeout(() => setConfirmation(null), 6000);
+    return () => clearTimeout(t);
+  }, [confirmation]);
+
+  const handleStart = async (id: number) => {
+    setBusyId(id);
+    await start(id);
+    setBusyId(null);
+  };
+
+  const handleResolve = async (id: number) => {
+    setBusyId(id);
+    const res = await resolve(id);
+    setBusyId(null);
+    if (res.ok) {
+      const { resolution_minutes: mins, engineer_active_tasks: freed, engineer_name } = res.data;
+      const who = engineer_name ?? 'engineer';
+      const parts = [`Task #${id} resolved`];
+      if (mins != null) parts.push(`${mins} min to resolve`);
+      if (freed != null) parts.push(`${who} now at ${freed} active task(s) — capacity freed`);
+      setConfirmation(parts.join('  ·  '));
+    } else {
+      setConfirmation(`Could not resolve task #${id}: ${res.error}`);
     }
   };
 
-  const handleComplete = () => setTaskStatus('completed');
+  const containerStyle = { maxWidth: 720, margin: '0 auto' } as const;
 
   const cardStyle = {
     background: COLORS.cardBg,
     border: `1px solid ${COLORS.borderFaint}`,
     borderRadius: 8,
-    padding: 36,
-    maxWidth: 640,
-    margin: '0 auto',
+    padding: 22,
   };
 
-  const btnStyle = (variant: 'primary' | 'secondary' | 'success') => ({
-    background: variant === 'primary' ? COLORS.textPrimary : variant === 'success' ? '#22c55e' : 'transparent',
-    color: variant === 'secondary' ? COLORS.textPrimary : '#0a0b0d',
-    border: variant === 'secondary' ? `1px solid ${COLORS.borderSub}` : 'none',
-    padding: '14px 24px',
+  const actionBtn = (variant: 'primary' | 'success', disabled: boolean) => ({
+    background: variant === 'success' ? '#22c55e' : COLORS.textPrimary,
+    color: '#0a0b0d',
+    border: 'none',
+    padding: '10px 18px',
     borderRadius: 6,
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 600,
-    cursor: 'pointer',
-    width: '100%',
+    cursor: disabled ? 'default' : 'pointer',
     letterSpacing: '0.06em',
+    opacity: disabled ? 0.5 : 1,
+    whiteSpace: 'nowrap' as const,
     transition: 'all 0.2s ease',
   });
 
+  const pill = (status: TaskStatus) => {
+    const m = STATUS_META[status] ?? STATUS_META.assigned;
+    return (
+      <span
+        className="mono"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 9,
+          letterSpacing: '0.1em',
+          color: m.color,
+          border: `1px solid ${m.color}55`,
+          background: `${m.color}14`,
+          padding: '4px 10px',
+          borderRadius: 999,
+        }}
+      >
+        <Dot color={m.color} size={6} cls={status === 'assigned' ? 'pulse-fast' : 'pulse'} />
+        {m.label}
+      </span>
+    );
+  };
+
+  // The main panel: loading -> error (no data) -> empty -> the live list.
+  let body: React.ReactNode;
+  if (loading && tasks.length === 0) {
+    body = (
+      <div style={{ ...containerStyle, ...cardStyle, textAlign: 'center', padding: '56px 36px' }}>
+        <div className="mono" style={{ fontSize: 11, color: COLORS.textMuted, letterSpacing: '0.1em' }}>
+          LOADING TASK QUEUE…
+        </div>
+      </div>
+    );
+  } else if (error && tasks.length === 0) {
+    body = (
+      <div style={{ ...containerStyle, ...cardStyle, textAlign: 'center', padding: '56px 36px' }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            background: 'rgba(239,68,68,0.1)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px',
+            border: '1px solid rgba(239,68,68,0.2)',
+          }}
+        >
+          <IconAlertTriangle size={28} color="#ef4444" />
+        </div>
+        <h2 style={{ fontSize: 20, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 10 }}>
+          Cannot reach task service
+        </h2>
+        <p style={{ color: COLORS.textMuted, fontSize: 13, lineHeight: 1.7, margin: 0 }}>
+          The NexOps task endpoint isn’t responding. The queue will refresh automatically once it’s back.
+        </p>
+      </div>
+    );
+  } else if (tasks.length === 0) {
+    body = (
+      <div
+        className="glow-success"
+        style={{ ...containerStyle, ...cardStyle, textAlign: 'center', padding: '56px 36px' }}
+      >
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            background: 'rgba(34,197,94,0.1)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px',
+            border: '1px solid rgba(34,197,94,0.2)',
+          }}
+        >
+          <IconWrench size={28} color="#22c55e" />
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 10 }}>
+          No open tasks — all clear
+        </h2>
+        <p style={{ color: COLORS.textMuted, fontSize: 13, lineHeight: 1.7, margin: 0 }}>
+          Every assignment is resolved. New tasks appear here automatically as NexOps dispatches them.
+        </p>
+      </div>
+    );
+  } else {
+    body = (
+      <div style={{ ...containerStyle, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {tasks.map((t) => {
+          const busy = busyId === t.id;
+          return (
+            <div key={t.id} className="card-hover fade-in-up" style={cardStyle}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 18,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    {pill(t.status)}
+                    <span className="mono" style={{ fontSize: 10, color: COLORS.textFaint }}>
+                      #{t.id} · {clockOf(t.assigned_at)}
+                    </span>
+                  </div>
+                  <h2 style={{ fontSize: 18, fontWeight: 400, color: COLORS.textPrimary, margin: '0 0 6px' }}>
+                    {t.machine ?? 'Unknown unit'}
+                  </h2>
+                  <div className="mono" style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
+                    FAULT · {(t.fault_category ?? 'uncategorized').toUpperCase()}
+                  </div>
+                  <div className="mono" style={{ fontSize: 11, color: COLORS.textSec }}>
+                    ENGINEER · {t.engineer_name ?? 'Unassigned'}
+                  </div>
+                </div>
+
+                <div style={{ flexShrink: 0 }}>
+                  {t.status === 'assigned' && (
+                    <button onClick={() => handleStart(t.id)} disabled={busy} style={actionBtn('primary', busy)}>
+                      {busy ? 'STARTING…' : 'START'}
+                    </button>
+                  )}
+                  {t.status === 'in_progress' && (
+                    <button onClick={() => handleResolve(t.id)} disabled={busy} style={actionBtn('success', busy)}>
+                      {busy ? 'RESOLVING…' : '✓ MARK RESOLVED'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <NavBar onBack={() => window.location.href = '/'} />
-      
+      <NavBar onBack={() => (window.location.href = '/')} />
+      <SiteAlertBanner alert={siteAlert} />
+
       <div className="fade-in-up" style={{ padding: '40px 56px', flex: 1 }}>
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 8 }}>Technician Console</h1>
-          <p style={{ color: COLORS.textMuted, fontSize: 13 }}>Single-screen workflow for diagnostics and resolution.</p>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 8 }}>
+            Technician Console
+          </h1>
+          <p style={{ color: COLORS.textMuted, fontSize: 13 }}>
+            Live task queue — start and resolve assignments as NexOps dispatches them.
+          </p>
         </div>
 
-        {taskStatus === 'completed' ? (
-          <div className="glow-success fade-in-up" style={{ ...cardStyle, textAlign: 'center', padding: '64px 36px' }}>
-            <div style={{ width: 72, height: 72, background: 'rgba(34,197,94,0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 28px', border: '1px solid rgba(34,197,94,0.2)' }}>
-              <IconWrench size={32} color="#22c55e" />
+        {/* Resolve confirmation (capacity freed) — auto-dismisses. */}
+        {confirmation && (
+          <div style={{ ...containerStyle, marginBottom: 16 }}>
+            <div
+              className="mono fade-in-up"
+              style={{
+                background: 'rgba(34,197,94,0.08)',
+                border: '1px solid rgba(34,197,94,0.3)',
+                borderRadius: 6,
+                padding: '10px 14px',
+                fontSize: 11,
+                color: '#22c55e',
+                letterSpacing: '0.04em',
+              }}
+            >
+              ✓ {confirmation}
             </div>
-            <h2 style={{ fontSize: 26, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 12 }}>Task Resolved</h2>
-            <p style={{ color: COLORS.textMuted, marginBottom: 36, lineHeight: 1.7, fontSize: 13 }}>
-              Equipment serviced successfully. Logs updated and synced with ARIA monitoring.
-            </p>
-
-            {savedNotes.length > 0 && (
-              <div style={{ textAlign: 'left', marginBottom: 32 }}>
-                <div className="mono" style={{ fontSize: 9, color: COLORS.textFaint, letterSpacing: '0.1em', marginBottom: 12 }}>
-                  DIAGNOSTIC LOG ({savedNotes.length} ENTRIES)
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {savedNotes.map((note, idx) => (
-                    <div key={idx} style={{ background: '#090b10', padding: '10px 14px', borderRadius: 4, fontSize: 12, color: COLORS.textSec, borderLeft: '3px solid #22c55e', lineHeight: 1.5 }}>
-                      {note}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <button onClick={() => { setTaskStatus('pending'); setSavedNotes([]); }} style={btnStyle('secondary')}>
-              RETURN TO QUEUE
-            </button>
-          </div>
-        ) : (
-          <div className={`card-hover ${taskStatus === 'pending' ? 'glow-critical' : ''}`} style={cardStyle}>
-            {/* Task Notification Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28 }}>
-              <div>
-                <div className={`mono ${taskStatus === 'pending' ? 'blink-critical' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: taskStatus === 'pending' ? '#ef4444' : '#f59e0b', letterSpacing: '0.12em', marginBottom: 14 }}>
-                  <Dot color={taskStatus === 'pending' ? '#ef4444' : '#f59e0b'} size={7} cls="pulse-fast" />
-                  {taskStatus === 'pending' ? '⚠ NEW TASK — IMMEDIATE ACTION REQUIRED' : 'TASK IN PROGRESS'}
-                </div>
-                <h2 style={{ fontSize: 22, fontWeight: 400, color: COLORS.textPrimary, marginBottom: 8 }}>Coolant Flow Valve Inspection</h2>
-                <div className="mono" style={{ fontSize: 11, color: COLORS.textMuted }}>
-                  UNIT T-21 · BOILER-A · ZONE A
-                </div>
-              </div>
-              <div className={taskStatus === 'pending' ? 'blink-critical' : ''}>
-                <IconAlertTriangle size={28} color={taskStatus === 'pending' ? '#ef4444' : '#f59e0b'} />
-              </div>
-            </div>
-
-            {/* Task Details */}
-            <div style={{ background: '#090b10', padding: 18, borderRadius: 6, border: `1px solid ${COLORS.borderSub}`, marginBottom: 28 }}>
-              <div className="mono" style={{ fontSize: 9, color: COLORS.textFaint, letterSpacing: '0.1em', marginBottom: 10 }}>
-                ARIA DIAGNOSTIC SUMMARY
-              </div>
-              <p style={{ fontSize: 13, color: COLORS.textSec, lineHeight: 1.7, margin: 0 }}>
-                Secondary valve is possibly stuck or blocked. Inspect physical valve, clear debris, and verify flow returns above 70% threshold. Risk index currently at 88%.
-              </p>
-            </div>
-
-            {/* Risk bar */}
-            <div style={{ marginBottom: 28 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span className="mono" style={{ fontSize: 9, color: COLORS.textFaint, letterSpacing: '0.1em' }}>RISK INDEX</span>
-                <span className={`mono ${taskStatus === 'pending' ? 'blink-critical' : ''}`} style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>88%</span>
-              </div>
-              <div style={{ height: 8, background: '#1a1d27', borderRadius: 4, overflow: 'hidden' }}>
-                <div className={`grow-bar ${taskStatus === 'pending' ? 'blink-critical' : ''}`} style={{ width: '88%', height: '100%', background: 'linear-gradient(90deg, #ef4444, #b91c1c, #ef4444)', borderRadius: 4 }} />
-              </div>
-            </div>
-
-            {taskStatus === 'pending' ? (
-              <button onClick={handleStart} style={btnStyle('primary')}>
-                START TASK
-              </button>
-            ) : (
-              <div className="fade-in-up" style={{ borderTop: `1px solid ${COLORS.borderFaint}`, paddingTop: 28 }}>
-                {/* Saved Notes */}
-                <div style={{ marginBottom: 24 }}>
-                  <label className="mono" style={{ display: 'block', fontSize: 10, color: COLORS.textFaint, letterSpacing: '0.1em', marginBottom: 14 }}>
-                    DIAGNOSTIC NOTES
-                  </label>
-                  
-                  {savedNotes.length > 0 && (
-                    <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                      {savedNotes.map((note, idx) => (
-                        <div key={idx} className="fade-in-up" style={{ background: '#13161e', padding: '12px 14px', borderRadius: 6, fontSize: 13, color: COLORS.textSec, borderLeft: '3px solid #22c55e', lineHeight: 1.5 }}>
-                          {note}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <textarea
-                    value={techNotes}
-                    onChange={(e) => setTechNotes(e.target.value)}
-                    placeholder="Describe the issue found, parts replaced, actions taken..."
-                    style={{
-                      width: '100%',
-                      background: '#090b10',
-                      border: `1px solid ${COLORS.borderSub}`,
-                      borderRadius: 6,
-                      padding: 14,
-                      fontFamily: 'inherit',
-                      fontSize: 13,
-                      color: COLORS.textPrimary,
-                      outline: 'none',
-                      minHeight: 110,
-                      resize: 'vertical',
-                      marginBottom: 12,
-                      lineHeight: 1.5,
-                      transition: 'border-color 0.2s'
-                    }}
-                  />
-                  <button onClick={handleSaveNote} style={{...btnStyle('secondary'), opacity: techNotes.trim() ? 1 : 0.4}} disabled={!techNotes.trim()}>
-                    SAVE NOTE
-                  </button>
-                </div>
-
-                {/* Complete */}
-                <button onClick={handleComplete} style={btnStyle('success')}>
-                  ✓ MARK TASK COMPLETED
-                </button>
-              </div>
-            )}
           </div>
         )}
+
+        {/* Backend unreachable but we still have a last-known queue: warn softly. */}
+        {error && tasks.length > 0 && (
+          <div style={{ ...containerStyle, marginBottom: 16 }}>
+            <div
+              className="mono"
+              style={{
+                background: 'rgba(245,158,11,0.08)',
+                border: '1px solid rgba(245,158,11,0.3)',
+                borderRadius: 6,
+                padding: '10px 14px',
+                fontSize: 11,
+                color: '#f59e0b',
+                letterSpacing: '0.04em',
+              }}
+            >
+              ⚠ Cannot reach task service — showing last known queue
+            </div>
+          </div>
+        )}
+
+        {body}
       </div>
     </div>
   );

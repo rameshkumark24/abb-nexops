@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import paho.mqtt.client as mqtt
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 import config
 from adapter import normalize
@@ -45,6 +46,7 @@ from assignment import (
     fault_category_for,
     is_safety_critical,
 )
+from lifecycle import start_task, resolve_task, get_active_assignments
 from db import Engineer, get_session, init_db
 from seed import seed
 
@@ -63,6 +65,21 @@ engine = AnomalyEngine()
 # background callback thread, but guarded with a lock for safety.
 active_assignments: dict[tuple[str, str], dict] = {}
 _assign_lock = threading.Lock()
+
+
+def clear_dedupe_for(machine, fault_category) -> bool:
+    """Drop the in-memory dedupe entry for (machine, fault_category).
+
+    Called when a task is RESOLVED so that, if the SAME fault recurs on the SAME
+    machine later, it is treated as a brand-new fault and re-assigned (instead of
+    being wrongly deduped against the now-finished assignment). We match on the
+    exact (machine, fault_category) key - the same key on_message() uses when it
+    assigns - so the resolved fault's slot is freed. Returns True if an entry was
+    removed."""
+    if not machine:
+        return False
+    with _assign_lock:
+        return active_assignments.pop((machine, fault_category), None) is not None
 
 
 def should_assign(record: dict) -> bool:
@@ -372,6 +389,71 @@ async def shutdown():
 async def health():
     """Simple health check - open in a browser to confirm the service is up."""
     return {"status": "ok", "clients": len(manager.active)}
+
+
+# ----------------------------------------------------------------------
+# Task lifecycle endpoints (the NEW browser -> backend direction).
+#
+# These are SYNC `def` path operations on purpose: FastAPI runs sync endpoints
+# in a worker threadpool, so each request gets its OWN thread AND its OWN
+# short-lived DB session (created here, closed in finally). A session object is
+# never shared across requests or with the MQTT callback thread - same per-call
+# safety as on_message(). Errors return a clean JSON body + status code and can
+# never crash the bridge or the MQTT loop.
+# ----------------------------------------------------------------------
+
+@app.post("/tasks/{assignment_id}/start")
+def http_start_task(assignment_id: int):
+    """assigned -> in_progress. Returns the updated task summary."""
+    session = get_session()
+    try:
+        return start_task(assignment_id, session)
+    except LookupError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        return JSONResponse(status_code=409, content={"error": str(exc)})
+    except Exception as exc:  # never let a DB error crash the bridge
+        print(f"[tasks] start failed for {assignment_id}: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
+@app.post("/tasks/{assignment_id}/resolve")
+def http_resolve_task(assignment_id: int):
+    """-> resolved. Decrements the engineer's active_tasks (frees capacity) and
+    clears the in-memory dedupe entry so the same fault can re-assign if it
+    recurs. Returns the summary incl. engineer_active_tasks (freed capacity)."""
+    session = get_session()
+    try:
+        summary = resolve_task(assignment_id, session)
+        # Free the dedupe slot for this machine+fault so a recurrence re-assigns.
+        cleared = clear_dedupe_for(summary.get("machine"), summary.get("fault_category"))
+        summary["dedupe_cleared"] = cleared
+        return summary
+    except LookupError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        return JSONResponse(status_code=409, content={"error": str(exc)})
+    except Exception as exc:  # never let a DB error crash the bridge
+        print(f"[tasks] resolve failed for {assignment_id}: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
+@app.get("/tasks")
+def http_list_tasks(include_resolved: bool = False):
+    """The technician's open queue (non-resolved). ?include_resolved=true also
+    returns resolved tasks."""
+    session = get_session()
+    try:
+        return get_active_assignments(session, include_resolved=include_resolved)
+    except Exception as exc:  # never let a DB error crash the bridge
+        print(f"[tasks] list failed: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
 
 
 @app.websocket("/ws")
