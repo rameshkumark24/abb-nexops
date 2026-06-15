@@ -12,11 +12,22 @@ later at the existing TODO(Stage: assignment) marker.
 from db import Assignment, Engineer, FaultMTTR
 
 # ----------------------------------------------------------------------
-# Weights (skill DOMINANT). They sum to 1.0 so a final score is in 0..1.
+# Weights (skill DOMINANT). The four BASE weights sum to 1.0 so a base score
+# is in 0..1.
 # ----------------------------------------------------------------------
-SKILL_WEIGHT = 0.60   # having the matching skill is the biggest driver
-LOAD_WEIGHT = 0.20    # prefer engineers with spare capacity
-MTTR_WEIGHT = 0.20    # prefer engineers historically fast at THIS category
+SKILL_WEIGHT = 0.50   # having the matching skill is still the biggest driver
+LOAD_WEIGHT = 0.18    # prefer engineers with spare capacity (a SOFT nudge)
+MTTR_WEIGHT = 0.18    # prefer engineers historically fast at THIS category
+EXP_WEIGHT = 0.14     # prefer more experienced engineers
+# (0.50 + 0.18 + 0.18 + 0.14 = 1.00)
+
+# CRITICAL faults weigh experience heavier: the experience term is multiplied by
+# this factor (effective EXP weight = EXP_WEIGHT * CRIT_EXP_MULTIPLIER = 0.28 for
+# Critical). This intentionally over-weights experience for critical faults; it
+# is fine that the effective weights then exceed 1.0, because every candidate
+# for the SAME fault is scored with identical weights, so only the RANKING (not
+# the absolute 0..1 range) matters.
+CRIT_EXP_MULTIPLIER = 2.0
 
 # Tunables
 SKILL_BASE = 0.15     # skill_match when the engineer LACKS the category skill
@@ -45,6 +56,9 @@ FAULT_KEYWORDS = {
     "thermal": [
         "temp", "temperature", "overheat", "thermal", "cooling", "coolant",
         "heat", "fouling",
+    ],
+    "hydraulic": [
+        "hydraulic", "hydraulics", "actuator",
     ],
 }
 
@@ -81,7 +95,32 @@ def _mttr_for(session, engineer_id: int, category: str) -> float:
     return float(row.mttr_minutes) if row is not None else NO_HISTORY_MTTR
 
 
-def _reasoning(best: dict, category: str) -> str:
+def _is_critical(record: dict) -> bool:
+    """A fault is 'critical' when the gateway priority is Critical OR NexOps has
+    elevated the risk to CRITICAL. Critical faults weigh experience heavier."""
+    if str(record.get("alarm_priority", "") or "").lower() == "critical":
+        return True
+    if str(record.get("nexops_risk", "") or "").upper() == "CRITICAL":
+        return True
+    return False
+
+
+def _unassigned(category: str, reason: str) -> dict:
+    """A clear, non-crashing 'nobody could take this' result."""
+    return {
+        "assigned": False,
+        "engineer_id": None,
+        "engineer_name": None,
+        "fault_category": category,
+        "score": 0.0,
+        "critical": False,
+        "reasoning": reason,
+        "candidates": [],
+        "excluded_at_capacity": [],
+    }
+
+
+def _reasoning(best: dict, category: str, critical: bool) -> str:
     """Build a short human explanation of WHY this engineer won."""
     skill_part = (
         f"{category} skill match" if best["has_skill"] else f"no direct {category} skill"
@@ -90,10 +129,13 @@ def _reasoning(best: dict, category: str) -> str:
     if best["active_tasks"] >= MAX_LOAD * 0.6:
         load_part = f"high load ({best['active_tasks']} tasks)"
     speed_part = f"{category} MTTR {best['mttr_minutes']:.0f}m"
-    return (
-        f"{best['engineer_name']}: {skill_part}, {load_part}, {speed_part} "
-        f"(score {best['score']:.3f})"
-    )
+    exp_part = f"{best['experience_years']}y experience"
+    text = f"{best['engineer_name']}: {skill_part}, {load_part}, {speed_part}, {exp_part}"
+    if critical and best["experience_years"] >= 10:
+        text += f" - senior ({best['experience_years']}y) preferred for CRITICAL fault"
+    elif critical:
+        text += " - CRITICAL fault (experience weighted higher)"
+    return text + f" (score {best['score']:.3f})"
 
 
 def assign_engineer(record: dict, session) -> dict:
@@ -107,36 +149,66 @@ def assign_engineer(record: dict, session) -> dict:
                        has_skill}, ... ]  # sorted best-first
       }
 
-    Weighted model (weights sum to 1.0):
+    Weighted model (base weights sum to 1.0):
         score = SKILL_WEIGHT * skill_match    # 1.0 if has category skill else SKILL_BASE
               + LOAD_WEIGHT  * load_factor     # (MAX_LOAD - active_tasks)/MAX_LOAD, clamped 0..1
-              + MTTR_WEIGHT  * speed_factor     # min-max normalized over the candidate pool,
-                                                #   1.0 = fastest in pool, 0.0 = slowest
+              + MTTR_WEIGHT  * speed_factor     # min-max normalized over the eligible pool,
+                                                #   1.0 = fastest, 0.0 = slowest
+              + exp_weight   * exp_factor       # min-max normalized experience over the pool;
+                                                #   exp_weight is boosted for CRITICAL faults
 
-    No-available-engineer case returns a clear "unassigned" result (never raises).
+    HARD CAPACITY CAP: engineers with active_tasks >= max_capacity are filtered
+    OUT before scoring (cannot take another task at all), distinct from the SOFT
+    load_factor which only nudges among those still under cap.
+
+    Returns an extra "assigned" bool, "critical" bool, and "excluded_at_capacity"
+    list. The no-eligible cases (nobody available, or everyone at capacity)
+    return a clear unassigned result (never raises).
     """
     category = fault_category_for(record)
+    critical = _is_critical(record)
 
-    engineers = (
-        session.query(Engineer).filter(Engineer.available.is_(True)).all()
-    )
-    if not engineers:
-        return {
-            "engineer_id": None,
-            "engineer_name": None,
-            "fault_category": category,
-            "score": 0.0,
-            "reasoning": f"No available engineer for a {category} fault - left UNASSIGNED.",
-            "candidates": [],
+    available = session.query(Engineer).filter(Engineer.available.is_(True)).all()
+    if not available:
+        return _unassigned(
+            category, f"No engineer is available for a {category} fault - left UNASSIGNED."
+        )
+
+    # HARD CAPACITY CAP (a FILTER, not a score tweak): an engineer at/over
+    # max_capacity is removed entirely, even if they hold the ONLY matching
+    # skill. This is different from the SOFT load_factor term below, which merely
+    # nudges the score among engineers that are still under their cap.
+    eligible = [e for e in available if e.active_tasks < e.max_capacity]
+    excluded_at_capacity = [
+        {
+            "engineer_id": e.id,
+            "engineer_name": e.name,
+            "active_tasks": e.active_tasks,
+            "max_capacity": e.max_capacity,
         }
+        for e in available
+        if e.active_tasks >= e.max_capacity
+    ]
 
-    # Per-category MTTR for each candidate, used to normalize speed_factor
-    # RELATIVE to the pool (fastest -> 1.0, slowest -> 0.0).
-    mttrs = {e.id: _mttr_for(session, e.id, category) for e in engineers}
+    if not eligible:
+        result = _unassigned(
+            category, "All qualified engineers are at capacity - left UNASSIGNED."
+        )
+        result["excluded_at_capacity"] = excluded_at_capacity
+        return result
+
+    # Normalize speed_factor and exp_factor RELATIVE to the ELIGIBLE pool.
+    mttrs = {e.id: _mttr_for(session, e.id, category) for e in eligible}
     min_m, max_m = min(mttrs.values()), max(mttrs.values())
 
+    exps = {e.id: (e.experience_years or 0) for e in eligible}
+    min_e, max_e = min(exps.values()), max(exps.values())
+
+    # Experience is weighted heavier for critical faults.
+    exp_weight = EXP_WEIGHT * CRIT_EXP_MULTIPLIER if critical else EXP_WEIGHT
+
     candidates = []
-    for e in engineers:
+    for e in eligible:
         has_skill = category in (e.skills or [])
         skill_match = 1.0 if has_skill else SKILL_BASE
 
@@ -147,10 +219,15 @@ def assign_engineer(record: dict, session) -> dict:
         m = mttrs[e.id]
         speed_factor = (max_m - m) / (max_m - min_m) if max_m > min_m else 0.5
 
+        # exp_factor: min-max over the pool; if all equal, neutral 0.5
+        ex = exps[e.id]
+        exp_factor = (ex - min_e) / (max_e - min_e) if max_e > min_e else 0.5
+
         score = (
             SKILL_WEIGHT * skill_match
             + LOAD_WEIGHT * load_factor
             + MTTR_WEIGHT * speed_factor
+            + exp_weight * exp_factor
         )
 
         candidates.append(
@@ -161,8 +238,11 @@ def assign_engineer(record: dict, session) -> dict:
                 "skill_match": round(skill_match, 3),
                 "load_factor": round(load_factor, 3),
                 "speed_factor": round(speed_factor, 3),
+                "exp_factor": round(exp_factor, 3),
                 "active_tasks": e.active_tasks,
+                "max_capacity": e.max_capacity,
                 "mttr_minutes": m,
+                "experience_years": ex,
                 "score": round(score, 4),
             }
         )
@@ -172,12 +252,15 @@ def assign_engineer(record: dict, session) -> dict:
     best = candidates[0]
 
     return {
+        "assigned": True,
         "engineer_id": best["engineer_id"],
         "engineer_name": best["engineer_name"],
         "fault_category": category,
         "score": best["score"],
-        "reasoning": _reasoning(best, category),
+        "critical": critical,
+        "reasoning": _reasoning(best, category, critical),
         "candidates": candidates,
+        "excluded_at_capacity": excluded_at_capacity,
     }
 
 

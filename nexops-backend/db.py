@@ -77,6 +77,13 @@ class Engineer(Base):
     skills = Column(JSON, nullable=False, default=list)
     active_tasks = Column(Integer, nullable=False, default=0)
     available = Column(Boolean, nullable=False, default=True)
+    # experience_years: drives the EXPERIENCE factor in scoring (weighs heavier
+    # for Critical faults).
+    experience_years = Column(Integer, nullable=False, default=0)
+    # max_capacity: HARD cap on concurrent active tasks. An engineer with
+    # active_tasks >= max_capacity is excluded from assignment entirely (this is
+    # separate from the soft load_factor nudge).
+    max_capacity = Column(Integer, nullable=False, default=6)
 
     mttr = relationship(
         "FaultMTTR", back_populates="engineer", cascade="all, delete-orphan"

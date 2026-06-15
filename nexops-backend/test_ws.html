@@ -16,6 +16,9 @@
     .early { background: #3b0d0d; border-left: 3px solid #ef4444; padding-left: 8px; }
     .early-tag { color: #fca5a5; font-weight: bold; }
     .warming { color: #64748b; }
+    /* Engineer assignment */
+    .assigned   { color: #38bdf8; font-weight: bold; }
+    .unassigned { color: #64748b; }
   </style>
 </head>
 <body>
@@ -55,11 +58,19 @@
       const earlyTag = isEarly ? ' <span class="early-tag">⚠ EARLY</span>' : '';
       const riskHtml = `<span class="risk-${risk}">${risk}</span>`;
 
+      // Engineer assignment: faults get routed; Normal/LOW records stay Unassigned.
+      const eng = rec.assigned_engineer || 'Unassigned';
+      const cat = rec.fault_category;
+      const assignedHtml = (eng && eng !== 'Unassigned')
+        ? `<span class="assigned">→ assigned: ${eng}${cat ? ` (${cat})` : ''}</span>`
+        : `<span class="unassigned">→ Unassigned</span>`;
+
       div.innerHTML =
         `${rec.Timestamp}  ${rec.Machine}  [${rec.Status}]  ${rec.Alert}  ` +
         `· gateway:${rec.alarm_priority || '—'}  · NexOps:${riskHtml} ` +
-        `anomaly:${scoreText}${earlyTag}\n` +
-        `    ${rec.nexops_reasoning || ''}  — ${rec.message || ''}`;
+        `anomaly:${scoreText}${earlyTag}  ${assignedHtml}\n` +
+        `    ${rec.nexops_reasoning || ''}  — ${rec.message || ''}` +
+        `${rec.assignment_reason ? `\n    ↳ ${rec.assignment_reason}` : ''}`;
 
       logEl.prepend(div);
     };

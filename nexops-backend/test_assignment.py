@@ -3,14 +3,22 @@ Prove the weighted assignment engine in ISOLATION.
 
 What it does:
   1. inits + (re)seeds the DB (clean fixture every run),
-  2. prints the engineer roster (so you can see who is loaded / unavailable),
-  3. feeds several SAMPLE telemetry records of different fault types through
-     assign_engineer(), printing for each: the fault category, EVERY available
-     engineer's score breakdown, and the chosen engineer + reasoning.
+  2. prints the engineer roster (who is loaded / at capacity / unavailable),
+  3. feeds SAMPLE telemetry records of different fault types through
+     assign_engineer(), printing for each: the fault category, anyone EXCLUDED
+     by the hard capacity cap, every eligible engineer's full score breakdown
+     (skill/load/speed/exp), and the chosen engineer + reasoning,
+  4. demonstrates the two NEW behaviours explicitly:
+       - a hydraulic fault whose ONLY skilled engineer (Mara) is AT CAPACITY ->
+         she is excluded and the fault routes to the next-best generalist,
+       - a CRITICAL electrical fault where EXPERIENCE tips the choice to the
+         senior (Hassan, 18y) over the faster-but-junior Priya,
+       - a capacity-exhaustion case where EVERY engineer is at cap -> a clean
+         "all at capacity" unassigned result (no crash).
 
-Scoring here is PURE - no assignments are written, so the printed scores are
-stable and comparable across records. (record_assignment is exercised at the end
-as a small demo of the persistence side.)
+Scoring is PURE - no assignments are written during the sample loop, so the
+printed scores are stable and comparable. (record_assignment + the cap-exhaustion
+case mutate the DB and run last; the DB is reseeded on the next run.)
 
 Run:  python test_assignment.py
 """
@@ -50,6 +58,26 @@ SAMPLES = [
         "Alert": "Status Check",
         "message": "General system notice - no specific fault signature",
     },
+    {
+        # CRITICAL electrical fault -> experience is weighted heavier, tipping the
+        # choice to the senior (Hassan, 18y) over the faster-but-junior Priya.
+        "alarm_id": 5005,
+        "Machine": "Switchgear",
+        "alarm_type": "Electrical",
+        "alarm_priority": "Critical",
+        "nexops_risk": "CRITICAL",
+        "Alert": "Critical Overvoltage Trip",
+        "message": "Critical overvoltage on feeder - electrical breaker tripped, immediate risk",
+    },
+    {
+        # Hydraulic fault -> the ONLY hydraulic-skilled engineer (Mara) is at
+        # capacity, so she is excluded and the fault routes to the next-best.
+        "alarm_id": 5006,
+        "Machine": "Press",
+        "alarm_type": "Process",
+        "Alert": "Hydraulic Actuator Fault",
+        "message": "Hydraulic actuator fault - hydraulic pressure low, actuator not extending",
+    },
 ]
 
 
@@ -58,10 +86,15 @@ def print_roster(session):
     print("ENGINEER ROSTER")
     print("=" * 72)
     for e in session.query(Engineer).order_by(Engineer.id).all():
-        flag = "AVAILABLE" if e.available else "UNAVAILABLE (skipped)"
+        if not e.available:
+            flag = "UNAVAILABLE (skipped)"
+        elif e.active_tasks >= e.max_capacity:
+            flag = "AT CAPACITY (excluded)"
+        else:
+            flag = "available"
         print(
-            f"  #{e.id} {e.name:<14} | {flag:<22} | load={e.active_tasks:<2} "
-            f"| skills={e.skills}"
+            f"  #{e.id} {e.name:<13} | {flag:<22} | load={e.active_tasks}/{e.max_capacity} "
+            f"| exp={e.experience_years:>2}y | skills={e.skills}"
         )
     print()
 
@@ -74,24 +107,39 @@ def print_result(record):
         session.close()
 
     category = result["fault_category"]
+    crit = "  [CRITICAL]" if result.get("critical") else ""
     print("-" * 72)
-    print(f"RECORD alarm_id={record['alarm_id']} machine={record['Machine']!r}")
+    print(f"RECORD alarm_id={record['alarm_id']} machine={record['Machine']!r}{crit}")
     print(f"  Alert  : {record['Alert']}")
     print(f"  Message: {record['message']}")
     print(f"  => fault_category = {category!r}")
-    print(f"  candidate scores (available engineers only, best first):")
+
+    excluded = result.get("excluded_at_capacity") or []
+    if excluded:
+        names = ", ".join(
+            f"{x['engineer_name']} ({x['active_tasks']}/{x['max_capacity']})" for x in excluded
+        )
+        print(f"  EXCLUDED by capacity cap: {names}")
+
+    if not result["candidates"]:
+        print(f"  RESULT : UNASSIGNED - {result['reasoning']}")
+        print()
+        return
+
+    print(f"  candidate scores (eligible engineers only, best first):")
     for c in result["candidates"]:
         marker = "  <== CHOSEN" if c["engineer_id"] == result["engineer_id"] else ""
         print(
-            f"    {c['engineer_name']:<14} score={c['score']:.3f}  "
+            f"    {c['engineer_name']:<13} score={c['score']:.3f}  "
             f"[skill={c['skill_match']:.2f} load={c['load_factor']:.2f} "
-            f"speed={c['speed_factor']:.2f}]  "
-            f"tasks={c['active_tasks']} mttr={c['mttr_minutes']:.0f}m{marker}"
+            f"speed={c['speed_factor']:.2f} exp={c['exp_factor']:.2f}]  "
+            f"tasks={c['active_tasks']}/{c['max_capacity']} "
+            f"exp={c['experience_years']}y mttr={c['mttr_minutes']:.0f}m{marker}"
         )
-    if result["engineer_id"] is None:
-        print(f"  RESULT : UNASSIGNED - {result['reasoning']}")
-    else:
+    if result.get("assigned"):
         print(f"  CHOSEN : {result['reasoning']}")
+    else:
+        print(f"  RESULT : UNASSIGNED - {result['reasoning']}")
     print()
 
 
@@ -128,6 +176,30 @@ def main():
         print(f"  {result['engineer_name']} active_tasks: {before} -> {after}")
     finally:
         session.close()
+    print()
+
+    # --- capacity-exhaustion demo: push EVERY engineer to their cap ---
+    # Proves the "all qualified engineers at capacity" path returns a clean
+    # unassigned result instead of crashing or force-assigning over the cap.
+    # (Runs LAST because it mutates loads; the DB is reseeded on the next run.)
+    print("=" * 72)
+    print("CAPACITY-EXHAUSTION DEMO: every engineer pushed to their max_capacity")
+    print("=" * 72)
+    session = get_session()
+    try:
+        for e in session.query(Engineer).all():
+            e.active_tasks = e.max_capacity
+        session.commit()
+    finally:
+        session.close()
+    session = get_session()
+    try:
+        result = assign_engineer(SAMPLES[0], session)  # any fault now has nobody
+    finally:
+        session.close()
+    print(f"  fault_category={result['fault_category']!r}  assigned={result.get('assigned')}")
+    print(f"  RESULT : {result['reasoning']}")
+    print()
 
 
 if __name__ == "__main__":

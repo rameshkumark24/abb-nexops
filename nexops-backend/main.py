@@ -24,6 +24,7 @@ import asyncio
 import json
 import os
 import sys
+import threading
 
 # Make local modules (config.py, adapter.py) resolve no matter how the app is
 # launched - `uvicorn main:app`, `python -m uvicorn main:app`, or from any CWD.
@@ -38,6 +39,9 @@ import config
 from adapter import normalize
 from anomaly import AnomalyEngine
 from risk import compute_nexops_risk, fallback_risk
+from assignment import assign_engineer, record_assignment, fault_category_for
+from db import Engineer, get_session, init_db
+from seed import seed
 
 app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
 
@@ -45,6 +49,45 @@ app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
 # internally (rolling window + Isolation Forest per machine), so a single
 # instance shared across all MQTT messages is correct.
 engine = AnomalyEngine()
+
+# Dedupe of live engineer assignments, keyed by (machine, fault_category). An
+# ongoing alarm fires every tick; we assign ONCE and REUSE that engineer on
+# subsequent ticks so we don't re-score or re-increment the engineer's load.
+# The entry is cleared when the machine returns to Normal/RTN, so a future
+# recurrence is treated as a fresh fault. Mutated only from paho's single
+# background callback thread, but guarded with a lock for safety.
+active_assignments: dict[tuple[str, str], dict] = {}
+_assign_lock = threading.Lock()
+
+
+def should_assign(record: dict) -> bool:
+    """True only for genuine, actionable faults - never for plain Normal/LOW.
+
+    Assign when ANY of:
+      - gateway Status is "Warning" or "Critical",
+      - the record is flagged is_predictive,
+      - NexOps risk is HIGH or CRITICAL,
+      - it's an "early catch": gateway still calm (Status Normal / priority Low)
+        but NexOps already elevated the risk to MEDIUM+ (the isEarly case).
+    """
+    status = record.get("Status")
+    if status in ("Warning", "Critical"):
+        return True
+    if record.get("is_predictive"):
+        return True
+
+    risk = str(record.get("nexops_risk", "") or "").upper()
+    if risk in ("HIGH", "CRITICAL"):
+        return True
+
+    gateway_calm = (
+        status == "Normal"
+        or str(record.get("alarm_priority", "") or "").lower() == "low"
+    )
+    if gateway_calm and risk in ("MEDIUM", "HIGH", "CRITICAL"):
+        return True
+
+    return False
 
 # CORS: allow all origins for the demo so the Next.js app on :3000 can hit
 # the HTTP/WS endpoints on :8000 without preflight headaches.
@@ -144,9 +187,68 @@ def on_message(client, userdata, msg):
         print(f"[anomaly] scoring failed for "
               f"{record.get('Machine', '?')}: {exc} (feed continues)")
 
+    # ---- Stage: assignment — route genuine faults to an engineer ----------
+    # ADDITIVE + FAIL-SAFE. We attach assignment fields to the record; any DB or
+    # scoring error falls back to "Unassigned" and NEVER blocks the broadcast or
+    # the anomaly layer.
+    #
+    # THREAD/SESSION SAFETY: this runs on paho's background thread. We create a
+    # SQLAlchemy session PER MESSAGE inside this handler and close it here, so a
+    # session object is never shared across the thread boundary. The engine /
+    # connection pool (and SQLite check_same_thread=False, set in db.py) make
+    # the per-call session pattern safe.
+    record["assigned_engineer"] = "Unassigned"
+    record["assigned_engineer_id"] = None
+    record["assignment_reason"] = None
+    record["fault_category"] = None
+    try:
+        machine = record.get("Machine", "?")
+        back_to_normal = (
+            record.get("Status") == "Normal" or record.get("alarm_state") == "RTN"
+        )
+
+        if should_assign(record):
+            category = fault_category_for(record)
+            key = (machine, category)
+            with _assign_lock:
+                cached = active_assignments.get(key)
+
+            if cached is not None:
+                # Same ongoing fault -> REUSE the engineer. No re-score, no
+                # re-increment of load.
+                result = cached
+            else:
+                # New fault for this machine+category -> score + persist once.
+                session = get_session()
+                try:
+                    result = assign_engineer(record, session)
+                    record_assignment(record, result, session)
+                finally:
+                    session.close()
+                with _assign_lock:
+                    active_assignments[key] = result
+
+            record["assigned_engineer"] = result.get("engineer_name") or "Unassigned"
+            record["assigned_engineer_id"] = result.get("engineer_id")
+            record["assignment_reason"] = result.get("reasoning")
+            record["fault_category"] = result.get("fault_category") or category
+
+        elif back_to_normal:
+            # Machine recovered -> drop ALL its active assignments so the next
+            # recurrence is treated as a brand-new fault and re-assigned.
+            with _assign_lock:
+                for stale in [k for k in active_assignments if k[0] == machine]:
+                    active_assignments.pop(stale, None)
+    except Exception as exc:
+        # Keep the defaults set above; never let the DB layer break the feed.
+        record["assigned_engineer"] = "Unassigned"
+        record["assigned_engineer_id"] = None
+        record["assignment_reason"] = None
+        print(f"[assignment] failed for {record.get('Machine', '?')}: {exc} "
+              f"(feed continues)")
+
     # ---- Later-stage insertion points (NOT implemented in this task) ----
     # TODO(Stage: history) write record to InfluxDB here
-    # TODO(Stage: assignment) enrich with engineer assignment from Postgres here
     # TODO(Stage: ARIA) attach ARIA explanation here
     # ---------------------------------------------------------------------
 
@@ -164,6 +266,26 @@ async def startup():
     global event_loop, mqtt_client
     # Capture the loop the WebSocket sends must run on.
     event_loop = asyncio.get_running_loop()
+
+    # --- Assignment subsystem: ensure the DB exists and has a roster. ---
+    # Create tables if absent, then seed the demo roster ONLY if empty (so we
+    # don't wipe an existing DB on every restart). Fail-safe: if this errors,
+    # the bridge still runs; assignment simply falls back to "Unassigned".
+    try:
+        init_db()
+        s = get_session()
+        try:
+            count = s.query(Engineer).count()
+        finally:
+            s.close()
+        if count == 0:
+            seed()  # wipe-and-fill demo roster (opens/closes its own session)
+            print("[assignment] empty DB -> seeded demo roster")
+        else:
+            print(f"[assignment] DB ready ({count} engineers) -> skip seeding")
+    except Exception as exc:
+        print(f"[assignment] DB init/seed failed: {exc} "
+              f"(assignments will fall back to Unassigned)")
 
     mqtt_client = mqtt.Client()
     mqtt_client.on_connect = on_connect
