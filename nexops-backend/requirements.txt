@@ -8,7 +8,11 @@ websockets
 scikit-learn        # Stage: anomaly (Isolation Forest)
 numpy               # Stage: anomaly (feature vectors / score normalization)
 
+# --- Stage: assignment (standalone) — weighted engineer assignment ---
+SQLAlchemy          # ORM; the SAME models run on both SQLite (default) and Postgres
+psycopg2-binary     # Postgres driver — ONLY needed if DATABASE_URL points at Postgres.
+                    # The default SQLite backend needs nothing extra.
+
 # --- NOT needed yet; uncomment as later stages land ---
 # influxdb-client     # Stage: history (time-series storage)
-# psycopg[binary]     # Stage: assignment (Postgres engineer assignment)
 # anthropic           # Stage: ARIA (explanations)

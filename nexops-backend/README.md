@@ -24,9 +24,13 @@ No machine learning, no databases, no ARIA yet — those are clearly marked
 | `adapter.py`      | `FIELD_MAP` + `normalize()` — the rename choke point   |
 | `anomaly.py`      | `AnomalyEngine` — online, per-machine Isolation Forest |
 | `risk.py`         | `compute_nexops_risk()` — fuse gateway + anomaly view  |
+| `db.py`           | SQLAlchemy models + engine (Postgres-first, SQLite-fallback) |
+| `seed.py`         | Wipe-and-reseed the demo engineer roster + MTTR history |
+| `assignment.py`   | Weighted engineer-assignment engine (pure logic)      |
 | `main.py`         | FastAPI app: MQTT subscriber + WebSocket fan-out       |
 | `requirements.txt`| Dependencies                                          |
 | `test_ws.html`    | Standalone browser test page                           |
+| `test_assignment.py` | Standalone proof of the assignment engine          |
 
 ## Run order (Windows-friendly)
 
@@ -141,6 +145,84 @@ pip install scikit-learn numpy
 
 (Both are already listed in [`requirements.txt`](requirements.txt), so
 `pip install -r requirements.txt` covers them too.)
+
+## Role Allocation (weighted engineer assignment)
+
+A **standalone, testable** subsystem that picks the best engineer for a fault.
+It is **not wired into the live bridge yet** — it's proven on its own first via
+[`test_assignment.py`](test_assignment.py).
+
+### Storage: SQLite by default, Postgres opt-in
+
+The DB layer ([`db.py`](db.py)) uses **SQLAlchemy**, so the same models run on
+either backend. It defaults to a **zero-setup local SQLite file** and upgrades
+to Postgres just by setting `DATABASE_URL`:
+
+```powershell
+# SQLite (default — nothing to install or configure):
+#   sqlite:///nexops.db
+
+# Postgres (opt-in — needs psycopg2-binary, already in requirements.txt):
+$env:DATABASE_URL = "postgresql://user:pass@localhost:5432/nexops"
+```
+
+`DATABASE_URL` precedence: **env var > `config.py` > SQLite default.** Tables:
+`engineers`, `fault_mttr` (per-engineer MTTR by fault category), `assignments`.
+
+### Run it
+
+```powershell
+python seed.py             # WIPE + re-fill the demo roster (idempotent)
+python test_assignment.py  # seeds, then scores sample faults and prints results
+```
+
+`seed.py` drops and recreates the tables every run, so it's safe to re-run.
+`test_assignment.py` calls the seed for you, so it's the one-command demo.
+
+### The weighted score
+
+Three named weights at the top of [`assignment.py`](assignment.py) (skill is
+dominant; they sum to 1.0, so the score is in `0..1`):
+
+```
+score = SKILL_WEIGHT * skill_match     # 0.60  -> 1.0 if engineer has the skill, else 0.15
+      + LOAD_WEIGHT  * load_factor      # 0.20  -> (MAX_LOAD - active_tasks) / MAX_LOAD, clamped 0..1
+      + MTTR_WEIGHT  * speed_factor     # 0.20  -> min-max normalized over the candidate pool:
+                                        #          1.0 = fastest at THIS category, 0.0 = slowest
+```
+
+- **skill_match** — `1.0` if the engineer's `skills` include the fault category,
+  else a small base (`SKILL_BASE = 0.15`).
+- **load_factor** — capacity, normalized by `MAX_LOAD = 10`: `0` tasks → `1.0`,
+  `≥10` tasks → `0.0`. An overloaded engineer is dragged down, not excluded.
+- **speed_factor** — historical MTTR for *this* category, min-max normalized
+  across the available candidates so the fastest gets `1.0`. Engineers with no
+  history for the category fall back to a deliberately slow `NO_HISTORY_MTTR`.
+
+Only `available` engineers are scored (an off-shift engineer is **skipped**
+entirely). If none are available, the result is a clear `UNASSIGNED` (no crash).
+
+### Fault-category mapping
+
+`fault_category_for(record)` maps a record to one category. The strongest signal
+is `alarm_type == "Electrical"`; otherwise it keyword-matches across
+`alarm_type + Alert + message` (checked in this order, first hit wins; default
+`"general"`):
+
+| Category     | Example keywords                                            |
+|--------------|------------------------------------------------------------|
+| `mechanical` | vibration, bearing, imbalance, misalign, rotor, gearbox, seal, lubricat, cavitation |
+| `electrical` | overcurrent, overload, voltage, current, winding, insulation, phase, breaker, motor |
+| `thermal`    | temp, overheat, thermal, cooling, coolant, heat, fouling   |
+| `general`    | (fallback when nothing else matches)                       |
+
+### Scoring vs. persistence
+
+`assign_engineer(record, session)` is **pure** (reads the DB, writes nothing) and
+returns `{ engineer_id, engineer_name, fault_category, score, reasoning,
+candidates }`. A separate `record_assignment(record, result, session)` persists
+the `Assignment` row and increments the chosen engineer's `active_tasks` — so
+scoring is testable without side effects.
 
 ## Frontend integration
 
