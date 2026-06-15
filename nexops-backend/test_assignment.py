@@ -13,8 +13,9 @@ What it does:
          she is excluded and the fault routes to the next-best generalist,
        - a CRITICAL electrical fault where EXPERIENCE tips the choice to the
          senior (Hassan, 18y) over the faster-but-junior Priya,
-       - a capacity-exhaustion case where EVERY engineer is at cap -> a clean
-         "all at capacity" unassigned result (no crash).
+       - a capacity-exhaustion case where EVERY engineer is at cap -> a
+         NON-critical fault stays "all at capacity" UNASSIGNED, while a
+         CRITICAL/safety fault BYPASSES the cap and is STILL assigned.
 
 Scoring is PURE - no assignments are written during the sample loop, so the
 printed scores are stable and comparable. (record_assignment + the cap-exhaustion
@@ -178,12 +179,14 @@ def main():
         session.close()
     print()
 
-    # --- capacity-exhaustion demo: push EVERY engineer to their cap ---
-    # Proves the "all qualified engineers at capacity" path returns a clean
-    # unassigned result instead of crashing or force-assigning over the cap.
+    # --- capacity-exhaustion + CRITICAL-BYPASS demo ----------------------
+    # Push EVERY engineer to their cap, then prove the two behaviours:
+    #   (b) a NON-critical fault stays UNASSIGNED (the hard cap is enforced),
+    #   (a) a CRITICAL/safety fault is STILL ASSIGNED (the cap is bypassed),
+    #       and is flagged safety_critical + cap_overridden.
     # (Runs LAST because it mutates loads; the DB is reseeded on the next run.)
     print("=" * 72)
-    print("CAPACITY-EXHAUSTION DEMO: every engineer pushed to their max_capacity")
+    print("CAPACITY-EXHAUSTION + CRITICAL-BYPASS DEMO: every engineer at max_capacity")
     print("=" * 72)
     session = get_session()
     try:
@@ -192,13 +195,33 @@ def main():
         session.commit()
     finally:
         session.close()
+
+    non_critical = {
+        "alarm_id": 5007, "Machine": "Pump", "alarm_type": "Predictive",
+        "Alert": "Bearing Vibration High",
+        "message": "Vibration RMS rising on bearing #2 - mechanical wear developing",
+    }
+    critical_safety = {
+        "alarm_id": 5008, "Machine": "Storage Tank", "alarm_type": "Safety",
+        "alarm_priority": "Critical", "nexops_risk": "CRITICAL",
+        "Alert": "FIRE DETECTED",
+        "message": "FIRE DETECTED on Storage Tank - site emergency",
+    }
+
     session = get_session()
     try:
-        result = assign_engineer(SAMPLES[0], session)  # any fault now has nobody
+        r_non = assign_engineer(non_critical, session)
+        r_crit = assign_engineer(critical_safety, session)
     finally:
         session.close()
-    print(f"  fault_category={result['fault_category']!r}  assigned={result.get('assigned')}")
-    print(f"  RESULT : {result['reasoning']}")
+
+    print("  (b) NON-critical fault while everyone is at cap (cap ENFORCED):")
+    print(f"      assigned={r_non.get('assigned')}  -> {r_non['reasoning']}")
+    print("  (a) CRITICAL/safety fault while everyone is at cap (cap BYPASSED):")
+    print(f"      assigned={r_crit.get('assigned')}  "
+          f"safety_critical={r_crit.get('safety_critical')}  "
+          f"cap_overridden={r_crit.get('cap_overridden')}")
+    print(f"      -> {r_crit.get('engineer_name')}: {r_crit['reasoning']}")
     print()
 
 

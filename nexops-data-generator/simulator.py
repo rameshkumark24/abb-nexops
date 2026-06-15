@@ -43,20 +43,103 @@ OUTPUT_FILE = "refinery_live_data.jsonl"
 INTERVAL_SECONDS = 1
 TOTAL_RECORDS = None          # None = run forever, or set an integer limit
 
-# --- v2 knobs ---
+# ======================================================================
+# DEMO TUNING KNOBS  (dial the drama up or down from right here)
+# ======================================================================
+# Intended behaviour: an EEMUA-191-realistic plant - mostly NORMAL, with the
+# occasional slowly-developing fault that stands out clearly. At any moment only
+# ~1-3 of the 16 machines should have something developing; everything else
+# reports "All parameters within normal operating range".
+#
+# TIMING MODEL (needed to read the rates below): the engine processes ONE machine
+# per tick, round-robin, and INTERVAL_SECONDS = 1 -> ~1 tick per second, so each
+# individual machine is revisited every ~16 s. A "tick" in the incubation counter
+# therefore equals one VISIT to that machine (~16 s of wall-clock).
+#
+# QUICK DIAL:
+#   calmer -> lower DEGRADATION_SEED_CHANCE / SUDDEN_EVENT_CHANCE, raise INCUBATION_TICKS
+#   busier -> raise DEGRADATION_SEED_CHANCE / SUDDEN_EVENT_CHANCE, lower INCUBATION_TICKS
+#   dramatic "alarm flood" -> flip ESCALATION_ENABLED = True (see below) and raise
+#                             the phase *_mult values.
+
 NOISE_ENABLED = True          # add Gaussian sensor noise to every reading
 DEGRADATION_ENABLED = True    # enable slow cascading faults
-# Chance per machine per tick that a NEW slow degradation begins (if none active)
-DEGRADATION_SEED_CHANCE = 0.12
-# How many ticks a degradation incubates BELOW threshold before crossing it.
-# Larger = longer "early-warning" window for the anomaly detector to shine.
-INCUBATION_TICKS = (15, 30)
+
+# Chance, on the ONE machine processed each tick (~1/s), that a NEW slow fault
+# begins (only if that machine has none active). At ~1 tick/s this is roughly the
+# fleet-wide new-fault rate PER SECOND, so:
+#   0.006 -> ~1 new fault every ~167 s (~2.8 min)   <-- realistic / calm (DEFAULT)
+#   0.02  -> ~1 new fault every ~50 s               (noticeably busier)
+#   0.12  -> several new faults per minute           (old value -> alarm spam)
+DEGRADATION_SEED_CHANCE = 0.006
+
+# Chance per tick of a sudden INSTANT alarm (safety trips, overspeed, etc.).
+# Kept genuinely rare so safety alarms are real events, not background noise:
+#   0.002 -> ~1 every ~500 s (~8 min)               <-- realistic / calm (DEFAULT)
+#   0.04  -> ~1 every ~25 s                          (old value -> far too frequent)
+SUDDEN_EVENT_CHANCE = 0.002
+
+# How many ticks (machine VISITS, ~16 s each) a fault incubates BELOW the static
+# threshold before it trips. This is the PREDICTIVE / EARLY-WARNING window - the
+# demo centrepiece - so we keep it LONG: (20, 40) visits ~= 5-11 min of visible
+# drift before the static gateway alarm fires. Raise for an even longer window.
+INCUBATION_TICKS = (20, 40)
+
+# Nuisance / texture layer: a SMALL amount of realistic, NON-actionable noise
+# (single-sample sensor glitches + borderline threshold chatter) - the kind a
+# "dumb" gateway would alarm on but NexOps must FILTER OUT. This is texture, NOT
+# a flood, so the default stays low. Nuisance readings are tagged
+# is_nuisance=True / nuisance_type, NEVER set is_predictive, and NEVER use the
+# slow-degradation machinery, so they are trivially separable from real faults.
+#   0.03 -> ~3% of an otherwise-Normal machine's readings glitch  <-- realistic (DEFAULT)
+#   0.10 -> noticeably noisier feed (still not a flood)
+#   0.00 -> no nuisance at all (pure signal)
+NUISANCE_ENABLED = True
+NUISANCE_CHANCE = 0.03
+
+# ======================================================================
+# SCALE CONFIG  (why this 16-machine slice provably scales to the pitch)
+# ======================================================================
+# The pitch is a 500-machine plant with ~250 technicians. This prototype is a
+# faithful SCALED-DOWN SLICE that holds the same RATIOS, so the scaling claim is
+# honest rather than merely asserted:
+#
+#   Target ratios (held by this slice):
+#     * technicians : machines = 1 : 2   (8 techs / 16 machines, the same ratio
+#                                          as 250 techs / 500 machines)
+#     * fault / nuisance / sudden rates are defined PER MACHINE PER READING - the
+#       probabilities above are rolled INDEPENDENTLY for each machine - so total
+#       alarm volume = machines x per-machine-rate x readings-per-machine.
+#
+#   Scaling relationship (the key honest claim):
+#     Every rate above is a PER-MACHINE probability. Hold the per-machine reading
+#     cadence constant and grow the fleet, and total alarm volume grows LINEARLY
+#     with machine count, nothing else changing:
+#         extend MACHINES to 500 assets and the SAME logic yields ~500/16 ~= 31x
+#         the alarm volume of this slice, with the tech:machine ratio unchanged.
+#     We keep 16 machines / 8 techs for the live demo, but because the rates are
+#     per-machine the relationship is real and parameter-driven, not faked.
+#
+#   NOTE on the live stream: the engine samples ONE machine per tick (round-robin),
+#   so the console/MQTT feed is a fixed-rate SAMPLE of the fleet. The per-machine
+#   statistics (and therefore the ratios) are scale-invariant - which is exactly
+#   what makes "it scales" provable.
+PROTO_MACHINES = 16          # == len(MACHINES); this demo slice
+PROTO_TECHNICIANS = 8        # matches the assignment subsystem's seeded roster
+PITCH_MACHINES = 500         # pitch-scale fleet
+PITCH_TECHNICIANS = 250      # pitch-scale workforce (holds the 1:2 ratio)
 
 # ----------------------------------------------------------------------
-# v3.1 DEMO ESCALATION PHASES
-# The demo starts CALM (rare, slow-developing faults) and then ESCALATES
-# (faults arrive more often AND develop faster), so you can show normal
-# monitoring first, then an "alarm flood" stress scenario.
+# DEMO ESCALATION PHASES  (DISABLED for the realistic calm plant)
+# Previously the demo ramped UP fault frequency into an "alarm flood". We want a
+# steady, EEMUA-realistic plant instead, so escalation is now OFF: when
+# ESCALATION_ENABLED is False, get_phase() returns neutral 1.0 multipliers (no
+# extra faults, no speed-up) and the plant never escalates.
+#
+# The phase machinery is kept intact (so a flood demo is one flag away), but the
+# phases below have ALSO been flattened to calm 1.0 multipliers. To recreate the
+# old flood arc you would set ESCALATION_ENABLED = True AND raise the *_mult
+# values again.
 #
 # Each phase is defined by elapsed seconds since start:
 #   until        : phase lasts until this many seconds have elapsed
@@ -67,15 +150,13 @@ INCUBATION_TICKS = (15, 30)
 #   label        : shown in the console banner when the phase begins
 # ----------------------------------------------------------------------
 
-ESCALATION_ENABLED = True
+ESCALATION_ENABLED = False
 
 DEMO_PHASES = [
-    {"until": 30,   "seed_mult": 1.0, "sudden_mult": 1.0, "speed_mult": 1.2,
+    # Flattened to CALM: a single open-ended phase, all multipliers 1.0 (no extra
+    # faults, no speed-up). The plant stays steady and mostly normal.
+    {"until": None, "seed_mult": 1.0, "sudden_mult": 1.0, "speed_mult": 1.0,
      "label": "calm"},
-    {"until": 70,   "seed_mult": 2.0, "sudden_mult": 2.0, "speed_mult": 1.8,
-     "label": "building"},
-    {"until": None, "seed_mult": 4.0, "sudden_mult": 3.5, "speed_mult": 2.6,
-     "label": "flood"},
 ]
 
 # Track which phase we're in so we only announce a change once
@@ -505,8 +586,8 @@ SUDDEN_SCENARIOS = {
     ],
 }
 
-# Chance per tick of a sudden event firing (kept rare; degradation is the star)
-SUDDEN_EVENT_CHANCE = 0.04
+# NOTE: SUDDEN_EVENT_CHANCE is defined in the DEMO TUNING KNOBS block near the
+# top of the file (kept rare there; slow degradation is the star of the demo).
 
 PRIORITY_LEVELS = {"Critical": 1, "High": 2, "Medium": 3, "Low": 4}
 
@@ -779,6 +860,70 @@ def maybe_sudden_event(machine_name, state, phase=None):
 
 
 # ----------------------------------------------------------------------
+# Nuisance / texture layer  (PART A)
+# Small, realistic, NON-actionable noise a "dumb" gateway would alarm on but
+# NexOps should FILTER OUT. Two kinds:
+#   transient : a single-reading sensor glitch spike that self-clears next read
+#   chatter   : a value that marginally crosses a threshold then settles
+# Both are tagged is_nuisance=True / nuisance_type and NEVER set is_predictive
+# and NEVER touch the slow-degradation machinery. The caller only invokes this on
+# an otherwise-Normal machine-tick, so nuisance can NEVER mask a real fault. The
+# spike is applied to the REPORTED value only (state["_values"] is left normal),
+# so a transient is gone on the very next reading.
+# ----------------------------------------------------------------------
+
+def _nuisance_features(machine_name):
+    """Owned numeric features eligible to glitch (exclude discrete leak/pilot)."""
+    return [f for f in MACHINE_FEATURES[machine_name]["features"]
+            if f not in ("leak", "pilot")]
+
+
+def maybe_nuisance(machine_name, state, phase=None):
+    """Maybe emit a small nuisance reading. Returns an alarm-like dict (with
+    extra nuisance_* keys plus a one-shot spike to apply to the OUTPUT value), or
+    None. Rate is the per-machine NUISANCE_CHANCE; `phase` is accepted for a
+    consistent signature but does NOT amplify nuisance (texture stays calm)."""
+    if not NUISANCE_ENABLED or random.random() > NUISANCE_CHANCE:
+        return None
+    feats = _nuisance_features(machine_name)
+    if not feats:
+        return None
+
+    feat = random.choice(feats)
+    high_lo, high_hi = BANDS[feat]["High"]
+    span = max(1e-6, high_hi - high_lo)
+    tag = MACHINE_FEATURES[machine_name]["tag"]
+    desc = MACHINE_FEATURES[machine_name]["desc"]
+    unit = _unit_for(feat)
+
+    # Borderline chatter is the more common nuisance; sharp transients rarer.
+    kind = random.choices(["chatter", "transient"], weights=[70, 30])[0]
+    if kind == "chatter":
+        # marginal crossing: JUST over the High threshold, then settles
+        value = high_lo + random.uniform(0.02, 0.25) * span
+        alert = "Threshold Chatter"
+        message = (f"{feat.replace('_', ' ').title()} momentarily crossed limit = "
+                   f"{_round(feat, value)} {unit} then settled "
+                   f"(nuisance/chatter - no developing trend)")
+    else:
+        # single-sample sensor glitch: a sharp spike high in the High band
+        value = high_lo + random.uniform(0.5, 1.0) * span
+        alert = "Sensor Spike (Transient)"
+        message = (f"{feat.replace('_', ' ').title()} single-sample spike = "
+                   f"{_round(feat, value)} {unit} "
+                   f"(nuisance/transient glitch - self-clears next reading)")
+
+    return {
+        "status": "Warning", "alert": alert, "alarm_type": "Process",
+        "severity": "Low", "object_name": tag, "object_description": desc,
+        "message": message, "predictive": False, "tripped": False,
+        # nuisance markers + one-shot output override (NOT written to state):
+        "nuisance": True, "nuisance_type": kind,
+        "spike_feat": feat, "spike_value": _clamp_hard(feat, value),
+    }
+
+
+# ----------------------------------------------------------------------
 # Record generation (per tick, per machine)
 # ----------------------------------------------------------------------
 
@@ -838,6 +983,10 @@ def generate_record(alarm_id, machine_name, phase=None):
                     values["leak"] = "Normal"
                 if "pilot" in values:
                     values["pilot"] = "Lit"
+                # 2b) otherwise-Normal machine -> maybe a SMALL nuisance blip.
+                # This runs ONLY here (no active degradation, no sudden event),
+                # so nuisance can never mask or overwrite a real fault.
+                alarm = maybe_nuisance(machine_name, state, phase)
 
     # 3) default = normal if nothing fired
     if alarm is None:
@@ -854,6 +1003,13 @@ def generate_record(alarm_id, machine_name, phase=None):
             noisy[feat] = val
         else:
             noisy[feat] = _round(feat, add_noise(feat, val))
+
+    # 4b) nuisance is a ONE-SHOT spike on the REPORTED value only: we override
+    # the output here but leave state["_values"] untouched, so a transient blip
+    # is gone on the very next reading (no incubation, nothing to "relax" back).
+    if alarm.get("nuisance") and alarm.get("spike_feat") in noisy:
+        sf = alarm["spike_feat"]
+        noisy[sf] = _round(sf, alarm["spike_value"])
 
     # 5) persistent alarm lifecycle: ACT -> ACK -> RTN
     severity = alarm["severity"]
@@ -892,6 +1048,10 @@ def generate_record(alarm_id, machine_name, phase=None):
         "alarm_state": alarm_state,
         "ack_state": ack,
         "is_predictive": alarm.get("predictive", False),
+        # Additive nuisance markers: True/typed only for non-actionable texture
+        # (transient/chatter); real faults & EARLY catches keep False/None.
+        "is_nuisance": alarm.get("nuisance", False),
+        "nuisance_type": alarm.get("nuisance_type"),
         "object_name": alarm["object_name"],
         "object_description": alarm["object_description"],
         "message": alarm["message"],
@@ -916,7 +1076,13 @@ def fmt(value, width, prec=1):
 
 
 def print_live_row(record):
-    pred = "*" if record["is_predictive"] else " "   # * = predictive early warning
+    # marker: * = predictive early-warning (actionable), ~ = nuisance (filterable)
+    if record["is_predictive"]:
+        marker = "*"
+    elif record.get("is_nuisance"):
+        marker = "~"
+    else:
+        marker = " "
     line = (
         f"{record['Machine']:<20}"
         f"{record['Timestamp']:<20}"
@@ -924,7 +1090,7 @@ def print_live_row(record):
         f"{fmt(record['Pressure'], 10, 2)}"
         f"{fmt(record['Level'], 8, 1)}"
         f"{fmt(record['Flow'], 8, 1)}"
-        f"  {record['Status']:<9}{record['alarm_state']:<5}{pred:<2}{record['Alert']}"
+        f"  {record['Status']:<9}{record['alarm_state']:<5}{marker:<2}{record['Alert']}"
     )
     print(line)
 
@@ -935,11 +1101,17 @@ def print_live_row(record):
 
 def main():
     global _demo_start_time, _current_phase_index
-    print("Starting LIVE Refinery / Warehouse Monitoring Feed (v3.1 - 16 assets, escalating demo)")
+    print("Starting LIVE Refinery / Warehouse Monitoring Feed (v3.3 - 16 assets, calm/EEMUA-realistic)")
     print(f"Monitoring units: {', '.join(MACHINES)}")
-    print("Legend:  State = ACT/ACK/RTN   '*' = predictive early-warning (below static limit)")
+    print("Legend:  State = ACT/ACK/RTN   '*' = predictive early-warning (actionable)   "
+          "'~' = nuisance (filterable texture)")
+    print(f"Scale slice: {PROTO_MACHINES} machines / {PROTO_TECHNICIANS} techs (1:2 ratio) - "
+          f"per-machine rates scale linearly to {PITCH_MACHINES} machines / "
+          f"{PITCH_TECHNICIANS} techs (~{PITCH_MACHINES // PROTO_MACHINES}x volume).")
     if ESCALATION_ENABLED:
         print("Demo arc: starts CALM, then escalates to an ALARM FLOOD over time.")
+    else:
+        print("Mode: steady CALM plant - mostly Normal, occasional slow faults, a little nuisance.")
     print("Press CTRL+C to stop.\n")
     print(HEADER)
     print("-" * len(HEADER))

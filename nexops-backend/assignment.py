@@ -105,6 +105,37 @@ def _is_critical(record: dict) -> bool:
     return False
 
 
+# ----------------------------------------------------------------------
+# Critical / SAFETY detection (drives the capacity-cap BYPASS).
+# A site-wide emergency must ALWAYS be dispatched, so we detect it broadly.
+# ----------------------------------------------------------------------
+
+# alarm_type values that denote safety / emergency categories.
+SAFETY_ALARM_TYPES = ("safety", "system")
+# Text fragments that always denote a site emergency, regardless of priority.
+SAFETY_KEYWORDS = ("fire", "gas leak", "emergency", "explos", "toxic")
+
+
+def is_safety_critical(record: dict) -> bool:
+    """True for critical/SAFETY events that must ALWAYS be dispatched (they
+    BYPASS the capacity cap). Keys on ANY of:
+      - alarm_priority == "Critical"
+      - nexops_risk    == "CRITICAL"
+      - alarm_type in {"Safety", "System"}  (emergency-stop / safety categories)
+      - Alert/message text contains FIRE / GAS LEAK / EMERGENCY (etc.)
+    """
+    if str(record.get("alarm_priority", "") or "").lower() == "critical":
+        return True
+    if str(record.get("nexops_risk", "") or "").upper() == "CRITICAL":
+        return True
+    if str(record.get("alarm_type", "") or "").lower() in SAFETY_ALARM_TYPES:
+        return True
+    text = " ".join(
+        str(record.get(k, "") or "") for k in ("Alert", "message")
+    ).lower()
+    return any(kw in text for kw in SAFETY_KEYWORDS)
+
+
 def _unassigned(category: str, reason: str) -> dict:
     """A clear, non-crashing 'nobody could take this' result."""
     return {
@@ -114,13 +145,17 @@ def _unassigned(category: str, reason: str) -> dict:
         "fault_category": category,
         "score": 0.0,
         "critical": False,
+        "safety_critical": False,
+        "cap_overridden": False,
+        "staffing_escalation": False,
         "reasoning": reason,
         "candidates": [],
         "excluded_at_capacity": [],
     }
 
 
-def _reasoning(best: dict, category: str, critical: bool) -> str:
+def _reasoning(best: dict, category: str, critical: bool,
+               safety_critical: bool = False, cap_overridden: bool = False) -> str:
     """Build a short human explanation of WHY this engineer won."""
     skill_part = (
         f"{category} skill match" if best["has_skill"] else f"no direct {category} skill"
@@ -135,6 +170,9 @@ def _reasoning(best: dict, category: str, critical: bool) -> str:
         text += f" - senior ({best['experience_years']}y) preferred for CRITICAL fault"
     elif critical:
         text += " - CRITICAL fault (experience weighted higher)"
+    if safety_critical:
+        text += (" | CRITICAL safety event - capacity cap overridden"
+                 if cap_overridden else " | CRITICAL safety event - immediate dispatch")
     return text + f" (score {best['score']:.3f})"
 
 
@@ -157,28 +195,44 @@ def assign_engineer(record: dict, session) -> dict:
               + exp_weight   * exp_factor       # min-max normalized experience over the pool;
                                                 #   exp_weight is boosted for CRITICAL faults
 
-    HARD CAPACITY CAP: engineers with active_tasks >= max_capacity are filtered
-    OUT before scoring (cannot take another task at all), distinct from the SOFT
-    load_factor which only nudges among those still under cap.
+    HARD CAPACITY CAP: for NON-critical faults, engineers with active_tasks >=
+    max_capacity are filtered OUT before scoring (cannot take another task at
+    all), distinct from the SOFT load_factor which only nudges among those still
+    under cap.
 
-    Returns an extra "assigned" bool, "critical" bool, and "excluded_at_capacity"
-    list. The no-eligible cases (nobody available, or everyone at capacity)
-    return a clear unassigned result (never raises).
+    CRITICAL / SAFETY BYPASS: when is_safety_critical(record) is true (fire /
+    gas-leak / emergency-stop / Critical safety event), the hard cap is IGNORED -
+    every AVAILABLE (on-shift) engineer is scored so the event is ALWAYS
+    dispatched. Only a total absence of available engineers can leave a critical
+    event unassigned, and that is flagged as a STAFFING ESCALATION (not a routine
+    'at capacity').
+
+    Returns extra flags: "assigned", "critical", "safety_critical",
+    "cap_overridden", "staffing_escalation", and "excluded_at_capacity".
     """
     category = fault_category_for(record)
     critical = _is_critical(record)
+    safety_critical = is_safety_critical(record)
 
+    # Skip UNAVAILABLE / off-shift engineers for everyone.
     available = session.query(Engineer).filter(Engineer.available.is_(True)).all()
     if not available:
+        # Nobody on shift at all. For a safety event this is a STAFFING
+        # ESCALATION (a people problem), explicitly NOT a routine 'at capacity'.
+        if safety_critical:
+            res = _unassigned(
+                category,
+                "CRITICAL safety event but NO engineer is on shift - STAFFING "
+                "ESCALATION required (could not dispatch).",
+            )
+            res["safety_critical"] = True
+            res["staffing_escalation"] = True
+            return res
         return _unassigned(
             category, f"No engineer is available for a {category} fault - left UNASSIGNED."
         )
 
-    # HARD CAPACITY CAP (a FILTER, not a score tweak): an engineer at/over
-    # max_capacity is removed entirely, even if they hold the ONLY matching
-    # skill. This is different from the SOFT load_factor term below, which merely
-    # nudges the score among engineers that are still under their cap.
-    eligible = [e for e in available if e.active_tasks < e.max_capacity]
+    # Who is at/over the hard cap (used for the cap and for the override note).
     excluded_at_capacity = [
         {
             "engineer_id": e.id,
@@ -190,25 +244,42 @@ def assign_engineer(record: dict, session) -> dict:
         if e.active_tasks >= e.max_capacity
     ]
 
-    if not eligible:
-        result = _unassigned(
-            category, "All qualified engineers are at capacity - left UNASSIGNED."
-        )
-        result["excluded_at_capacity"] = excluded_at_capacity
-        return result
+    if safety_critical:
+        # BYPASS the hard cap: a fire / gas-leak / emergency-stop / Critical
+        # safety event must ALWAYS be dispatched. We still skip UNAVAILABLE
+        # engineers, but we IGNORE the active_tasks>=max_capacity exclusion and
+        # score EVERY available engineer, so the event is never left unassigned
+        # while anyone is on shift.
+        pool = available
+    else:
+        # NON-critical: enforce the HARD CAPACITY CAP (a FILTER, not a score
+        # tweak) - an engineer at/over max_capacity is removed entirely, even if
+        # they hold the only matching skill. If that leaves nobody, it's a
+        # routine 'at capacity' (NOT a staffing escalation).
+        pool = [e for e in available if e.active_tasks < e.max_capacity]
+        if not pool:
+            result = _unassigned(
+                category, "All qualified engineers are at capacity - left UNASSIGNED."
+            )
+            result["excluded_at_capacity"] = excluded_at_capacity
+            return result
 
-    # Normalize speed_factor and exp_factor RELATIVE to the ELIGIBLE pool.
-    mttrs = {e.id: _mttr_for(session, e.id, category) for e in eligible}
+    # The cap was meaningfully overridden when a safety event had to reach past
+    # at-capacity engineers to dispatch someone.
+    cap_overridden = safety_critical and bool(excluded_at_capacity)
+
+    # Normalize speed_factor and exp_factor RELATIVE to the scoring pool.
+    mttrs = {e.id: _mttr_for(session, e.id, category) for e in pool}
     min_m, max_m = min(mttrs.values()), max(mttrs.values())
 
-    exps = {e.id: (e.experience_years or 0) for e in eligible}
+    exps = {e.id: (e.experience_years or 0) for e in pool}
     min_e, max_e = min(exps.values()), max(exps.values())
 
     # Experience is weighted heavier for critical faults.
     exp_weight = EXP_WEIGHT * CRIT_EXP_MULTIPLIER if critical else EXP_WEIGHT
 
     candidates = []
-    for e in eligible:
+    for e in pool:
         has_skill = category in (e.skills or [])
         skill_match = 1.0 if has_skill else SKILL_BASE
 
@@ -258,7 +329,10 @@ def assign_engineer(record: dict, session) -> dict:
         "fault_category": category,
         "score": best["score"],
         "critical": critical,
-        "reasoning": _reasoning(best, category, critical),
+        "safety_critical": safety_critical,
+        "cap_overridden": cap_overridden,
+        "staffing_escalation": False,
+        "reasoning": _reasoning(best, category, critical, safety_critical, cap_overridden),
         "candidates": candidates,
         "excluded_at_capacity": excluded_at_capacity,
     }

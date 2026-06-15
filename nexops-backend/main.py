@@ -39,7 +39,12 @@ import config
 from adapter import normalize
 from anomaly import AnomalyEngine
 from risk import compute_nexops_risk, fallback_risk
-from assignment import assign_engineer, record_assignment, fault_category_for
+from assignment import (
+    assign_engineer,
+    record_assignment,
+    fault_category_for,
+    is_safety_critical,
+)
 from db import Engineer, get_session, init_db
 from seed import seed
 
@@ -64,12 +69,20 @@ def should_assign(record: dict) -> bool:
     """True only for genuine, actionable faults - never for plain Normal/LOW.
 
     Assign when ANY of:
+      - it's a critical/SAFETY event (fire/gas/emergency or Critical) - these
+        ALWAYS enter the assignment path so the capacity bypass can guarantee
+        they're never left unassigned,
       - gateway Status is "Warning" or "Critical",
       - the record is flagged is_predictive,
       - NexOps risk is HIGH or CRITICAL,
       - it's an "early catch": gateway still calm (Status Normal / priority Low)
         but NexOps already elevated the risk to MEDIUM+ (the isEarly case).
     """
+    # Safety/critical events ALWAYS get the assignment path (capacity is bypassed
+    # downstream in assign_engineer), so a site emergency is never skipped here.
+    if is_safety_critical(record):
+        return True
+
     status = record.get("Status")
     if status in ("Warning", "Critical"):
         return True
@@ -88,6 +101,27 @@ def should_assign(record: dict) -> bool:
         return True
 
     return False
+
+
+def emergency_type_for(record: dict):
+    """Derive a coarse emergency_type label for the UI, or None.
+
+    Mapping over Alert + message text (checked in order, first hit wins):
+      - "gas leak"  -> "gas_leak"
+      - "fire"      -> "fire"
+      - "emergency" -> "emergency_stop"   (e.g. EMERGENCY STOP ACTIVATED)
+      - otherwise   -> None  (a Critical event with no specific signature)
+    """
+    text = " ".join(
+        str(record.get(k, "") or "") for k in ("Alert", "message")
+    ).lower()
+    if "gas leak" in text:
+        return "gas_leak"
+    if "fire" in text:
+        return "fire"
+    if "emergency" in text:
+        return "emergency_stop"
+    return None
 
 # CORS: allow all origins for the demo so the Next.js app on :3000 can hit
 # the HTTP/WS endpoints on :8000 without preflight headaches.
@@ -245,6 +279,27 @@ def on_message(client, userdata, msg):
         record["assigned_engineer_id"] = None
         record["assignment_reason"] = None
         print(f"[assignment] failed for {record.get('Machine', '?')}: {exc} "
+              f"(feed continues)")
+
+    # ---- Site-wide emergency tagging (ADDITIVE + FAIL-SAFE) ---------------
+    # Critical/safety events (SAME detection that drove the capacity bypass) are
+    # SITE-WIDE emergencies: the UI uses site_alert to trigger a red-zone alert
+    # visible to ALL roles (plant manager, engineer, technician). Nuisance /
+    # filterable noise is NEVER a site alert. On any error we default to a calm
+    # (non-emergency) tag so the live feed keeps flowing.
+    record["site_alert"] = False
+    record["alert_scope"] = "normal"
+    record["emergency_type"] = None
+    try:
+        if not record.get("is_nuisance") and is_safety_critical(record):
+            record["site_alert"] = True
+            record["alert_scope"] = "site"
+            record["emergency_type"] = emergency_type_for(record)
+    except Exception as exc:
+        record["site_alert"] = False
+        record["alert_scope"] = "normal"
+        record["emergency_type"] = None
+        print(f"[site_alert] tagging failed for {record.get('Machine', '?')}: {exc} "
               f"(feed continues)")
 
     # ---- Later-stage insertion points (NOT implemented in this task) ----
