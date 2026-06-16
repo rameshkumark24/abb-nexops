@@ -23,6 +23,20 @@ MTTR_WEIGHT = 0.18    # prefer engineers historically fast at THIS category
 EXP_WEIGHT = 0.14     # prefer more experienced engineers
 # (0.50 + 0.18 + 0.18 + 0.14 = 1.00)
 
+# ZONE PREFERENCE (Stage 1 of the zone hierarchy). A small ADDITIVE bonus given
+# to an engineer whose zone == the machine's zone (read from record["zone"]).
+# It is a TIEBREAKER, never an override: it is deliberately far smaller than the
+# skill gap. Having vs lacking the category skill is worth
+# SKILL_WEIGHT * (1.0 - SKILL_BASE) = 0.50 * 0.85 = 0.425, so a 0.08 same-zone
+# bonus can NEVER make an unskilled local beat a skilled engineer in another
+# zone. That is precisely what gives us cross-zone FALLBACK: when no skilled
+# engineer exists in the machine's zone, a skilled OTHER-zone engineer still wins
+# (skill 0.425 >> zone 0.08). Like CRIT_EXP_MULTIPLIER, this can push a winning
+# score slightly above 1.0; only the RANKING matters, since every candidate for
+# the same fault is scored with identical weights. When a record has NO "zone"
+# (or an engineer has no zone), the term is 0 and behaviour is exactly as before.
+ZONE_WEIGHT = 0.08
+
 # CRITICAL faults weigh experience heavier: the experience term is multiplied by
 # this factor (effective EXP weight = EXP_WEIGHT * CRIT_EXP_MULTIPLIER = 0.28 for
 # Critical). This intentionally over-weights experience for critical faults; it
@@ -161,6 +175,7 @@ def _unassigned(category: str, reason: str) -> dict:
         "safety_critical": False,
         "cap_overridden": False,
         "staffing_escalation": False,
+        "machine_zone": None,
         "reasoning": reason,
         "candidates": [],
         "excluded_at_capacity": [],
@@ -168,7 +183,8 @@ def _unassigned(category: str, reason: str) -> dict:
 
 
 def _reasoning(best: dict, category: str, critical: bool,
-               safety_critical: bool = False, cap_overridden: bool = False) -> str:
+               safety_critical: bool = False, cap_overridden: bool = False,
+               machine_zone: str = None) -> str:
     """Build a short human explanation of WHY this engineer won."""
     skill_part = (
         f"{category} skill match" if best["has_skill"] else f"no direct {category} skill"
@@ -178,11 +194,23 @@ def _reasoning(best: dict, category: str, critical: bool,
         load_part = f"high load ({best['active_tasks']} tasks)"
     speed_part = f"{category} MTTR {best['mttr_minutes']:.0f}m"
     exp_part = f"{best['experience_years']}y experience"
-    text = f"{best['engineer_name']}: {skill_part}, {load_part}, {speed_part}, {exp_part}"
+    zone_tag = f" [zone {best.get('zone') or '-'}]"
+    text = f"{best['engineer_name']}{zone_tag}: {skill_part}, {load_part}, {speed_part}, {exp_part}"
     if critical and best["experience_years"] >= 10:
         text += f" - senior ({best['experience_years']}y) preferred for CRITICAL fault"
     elif critical:
         text += " - CRITICAL fault (experience weighted higher)"
+    # Zone note: why the chosen engineer's zone relates to the machine's zone.
+    if machine_zone:
+        best_zone = best.get("zone") or "-"
+        if best.get("same_zone"):
+            text += f" | same-zone match (zone {machine_zone}) - local engineer preferred"
+        elif safety_critical:
+            text += (f" | CRITICAL event - best AVAILABLE dispatched across zones "
+                     f"(machine zone {machine_zone} -> engineer zone {best_zone})")
+        else:
+            text += (f" | no suitable engineer in zone {machine_zone} - cross-zone "
+                     f"FALLBACK to zone {best_zone}")
     if safety_critical:
         text += (" | CRITICAL safety event - capacity cap overridden"
                  if cap_overridden else " | CRITICAL safety event - immediate dispatch")
@@ -200,13 +228,24 @@ def assign_engineer(record: dict, session) -> dict:
                        has_skill}, ... ]  # sorted best-first
       }
 
-    Weighted model (base weights sum to 1.0):
+    Weighted model (base weights sum to 1.0; zone is an additive bonus on top):
         score = SKILL_WEIGHT * skill_match    # 1.0 if has category skill else SKILL_BASE
               + LOAD_WEIGHT  * load_factor     # (MAX_LOAD - active_tasks)/MAX_LOAD, clamped 0..1
               + MTTR_WEIGHT  * speed_factor     # min-max normalized over the eligible pool,
                                                 #   1.0 = fastest, 0.0 = slowest
               + exp_weight   * exp_factor       # min-max normalized experience over the pool;
                                                 #   exp_weight is boosted for CRITICAL faults
+              + ZONE_WEIGHT  * zone_factor      # +ZONE_WEIGHT iff engineer.zone == machine zone
+                                                #   (record["zone"]); a small SAME-ZONE tiebreaker
+
+    ZONE PREFERENCE: the machine's zone comes from record["zone"]. Same-zone
+    engineers get a small ZONE_WEIGHT bonus so a LOCAL engineer is preferred -
+    but only as a tiebreaker, never over skill (the bonus is far smaller than the
+    skill gap). If NO skilled engineer exists in the machine's zone, a skilled
+    OTHER-zone engineer still wins => cross-zone FALLBACK. A missing/empty zone on
+    the record disables the term entirely (behaviour identical to before zones).
+    NOTE: a CRITICAL/safety event is dispatched to the best AVAILABLE engineer and
+    may therefore cross zones regardless of the local roster.
 
     HARD CAPACITY CAP: for NON-critical faults, engineers with active_tasks >=
     max_capacity are filtered OUT before scoring (cannot take another task at
@@ -226,6 +265,9 @@ def assign_engineer(record: dict, session) -> dict:
     category = fault_category_for(record)
     critical = _is_critical(record)
     safety_critical = is_safety_critical(record)
+    # The machine's zone (if the record carries one). Empty/missing -> no zone
+    # preference, so the engine behaves exactly as it did before zones existed.
+    machine_zone = str(record.get("zone", "") or "").strip() or None
 
     # Skip UNAVAILABLE / off-shift engineers for everyone.
     available = session.query(Engineer).filter(Engineer.available.is_(True)).all()
@@ -307,11 +349,19 @@ def assign_engineer(record: dict, session) -> dict:
         ex = exps[e.id]
         exp_factor = (ex - min_e) / (max_e - min_e) if max_e > min_e else 0.5
 
+        # zone_factor: 1.0 when the engineer is in the machine's zone (a small
+        # same-zone bonus); 0.0 otherwise, and always 0.0 when the record has no
+        # zone. A skilled other-zone engineer still beats an unskilled local one.
+        eng_zone = getattr(e, "zone", None)
+        same_zone = bool(machine_zone) and eng_zone == machine_zone
+        zone_factor = 1.0 if same_zone else 0.0
+
         score = (
             SKILL_WEIGHT * skill_match
             + LOAD_WEIGHT * load_factor
             + MTTR_WEIGHT * speed_factor
             + exp_weight * exp_factor
+            + ZONE_WEIGHT * zone_factor
         )
 
         candidates.append(
@@ -323,6 +373,9 @@ def assign_engineer(record: dict, session) -> dict:
                 "load_factor": round(load_factor, 3),
                 "speed_factor": round(speed_factor, 3),
                 "exp_factor": round(exp_factor, 3),
+                "zone": eng_zone,
+                "same_zone": same_zone,
+                "zone_factor": round(zone_factor, 3),
                 "active_tasks": e.active_tasks,
                 "max_capacity": e.max_capacity,
                 "mttr_minutes": m,
@@ -345,7 +398,9 @@ def assign_engineer(record: dict, session) -> dict:
         "safety_critical": safety_critical,
         "cap_overridden": cap_overridden,
         "staffing_escalation": False,
-        "reasoning": _reasoning(best, category, critical, safety_critical, cap_overridden),
+        "machine_zone": machine_zone,
+        "reasoning": _reasoning(best, category, critical, safety_critical,
+                                cap_overridden, machine_zone),
         "candidates": candidates,
         "excluded_at_capacity": excluded_at_capacity,
     }

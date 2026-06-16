@@ -84,6 +84,15 @@ class Engineer(Base):
     # active_tasks >= max_capacity is excluded from assignment entirely (this is
     # separate from the soft load_factor nudge).
     max_capacity = Column(Integer, nullable=False, default=6)
+    # zone: which plant ZONE (A|B|C|D) this engineer belongs to. Stage 1 of the
+    # zone hierarchy. DESIGN CHOICE: we keep zone as a simple STRING on the
+    # engineer (the "simpler option") rather than a separate Zone reference table
+    # - there is nothing yet to hang off a Zone row (the plant-manager / zone-
+    # manager USER roles arrive in a later stage), so a string is enough for the
+    # assignment engine to PREFER same-zone engineers. nullable=True keeps the
+    # column purely ADDITIVE: pre-existing rows / records without a zone still
+    # load, and the engine treats a missing zone as "no zone preference".
+    zone = Column(String, nullable=True)
 
     mttr = relationship(
         "FaultMTTR", back_populates="engineer", cascade="all, delete-orphan"

@@ -98,15 +98,18 @@ NUISANCE_ENABLED = True
 NUISANCE_CHANCE = 0.03
 
 # ======================================================================
-# SCALE CONFIG  (why this 16-machine slice provably scales to the pitch)
+# SCALE CONFIG  (why this zone-structured slice provably scales to the pitch)
 # ======================================================================
 # The pitch is a 500-machine plant with ~250 technicians. This prototype is a
 # faithful SCALED-DOWN SLICE that holds the same RATIOS, so the scaling claim is
-# honest rather than merely asserted:
+# honest rather than merely asserted. Stage 1 of the ZONE HIERARCHY grows the
+# slice from 16 asset TYPES to ~26 machine INSTANCES across 4 ZONES (A/B/C/D),
+# staffed by ~24 engineers (~6 per zone) - so this slice now runs at roughly a
+# 1:1 tech:machine ratio inside a zone-structured plant:
 #
-#   Target ratios (held by this slice):
-#     * technicians : machines = 1 : 2   (8 techs / 16 machines, the same ratio
-#                                          as 250 techs / 500 machines)
+#   Ratios held by this slice:
+#     * technicians : machines ~= 1 : 1   (24 techs / 26 machines, ~6 techs and
+#                                          ~6-7 machines per zone)
 #     * fault / nuisance / sudden rates are defined PER MACHINE PER READING - the
 #       probabilities above are rolled INDEPENDENTLY for each machine - so total
 #       alarm volume = machines x per-machine-rate x readings-per-machine.
@@ -115,19 +118,25 @@ NUISANCE_CHANCE = 0.03
 #     Every rate above is a PER-MACHINE probability. Hold the per-machine reading
 #     cadence constant and grow the fleet, and total alarm volume grows LINEARLY
 #     with machine count, nothing else changing:
-#         extend MACHINES to 500 assets and the SAME logic yields ~500/16 ~= 31x
+#         extend MACHINES to 500 assets and the SAME logic yields ~500/26 ~= 19x
 #         the alarm volume of this slice, with the tech:machine ratio unchanged.
-#     We keep 16 machines / 8 techs for the live demo, but because the rates are
-#     per-machine the relationship is real and parameter-driven, not faked.
+#     The relationship is real and parameter-driven, not faked.
 #
-#   NOTE on the live stream: the engine samples ONE machine per tick (round-robin),
-#   so the console/MQTT feed is a fixed-rate SAMPLE of the fleet. The per-machine
-#   statistics (and therefore the ratios) are scale-invariant - which is exactly
-#   what makes "it scales" provable.
-PROTO_MACHINES = 16          # == len(MACHINES); this demo slice
-PROTO_TECHNICIANS = 8        # matches the assignment subsystem's seeded roster
+#   NOTE on the live stream / VOLUME (Stage-1 detail): the engine samples ONE
+#   machine per tick (round-robin), so the console/MQTT feed is a FIXED-RATE
+#   sample of the fleet - one record per second regardless of fleet size. Because
+#   the seed/sudden/nuisance dice are rolled only on THAT one machine each tick,
+#   growing 16 -> 26 machines does NOT raise the live feed's alarm volume; it just
+#   spreads faults across more assets (each machine is now revisited every ~26 s
+#   instead of ~16 s, so per-machine drift is a touch slower - still calm). The
+#   per-machine rates are what scale linearly when you sample ALL machines each
+#   tick. If a future "sample every machine each tick" mode ever makes volume feel
+#   high, the knobs to lower are DEGRADATION_SEED_CHANCE / SUDDEN_EVENT_CHANCE /
+#   NUISANCE_CHANCE; defaults here stay realistic.
+PROTO_MACHINES = 26          # == len(MACHINES) == len(FLEET); this demo slice
+PROTO_TECHNICIANS = 24       # matches the assignment subsystem's seeded roster
 PITCH_MACHINES = 500         # pitch-scale fleet
-PITCH_TECHNICIANS = 250      # pitch-scale workforce (holds the 1:2 ratio)
+PITCH_TECHNICIANS = 250      # pitch-scale workforce
 
 # ----------------------------------------------------------------------
 # DEMO ESCALATION PHASES  (DISABLED for the realistic calm plant)
@@ -173,7 +182,11 @@ def get_phase(elapsed_seconds):
             return phase
     return DEMO_PHASES[-1]
 
-MACHINES = [
+# The 16 base asset TYPES (each owns a feature profile in _BASE_MACHINE_FEATURES,
+# bands, sudden scenarios and degradation modes). The live fleet (FLEET, below)
+# stamps out multiple zone-tagged INSTANCES of these types - it does NOT invent
+# new sensor types.
+MACHINE_TYPES = [
     "Compressor", "Pump", "Storage Tank", "Distillation Column",
     "Heat Exchanger", "Boiler", "Motor", "Control Valve",
     "MCC Panel", "Generator",
@@ -333,10 +346,12 @@ NOISE_STD = {
 }
 
 # ----------------------------------------------------------------------
-# Machine feature map  (unchanged from v1)
+# Machine feature map  (per asset TYPE; unchanged from v1).
+# Keyed by base type. The live, instance-keyed MACHINE_FEATURES is built from
+# this below (one entry per FLEET instance, tag made unique + zone stamped on).
 # ----------------------------------------------------------------------
 
-MACHINE_FEATURES = {
+_BASE_MACHINE_FEATURES = {
     "Compressor": {"features": ["gen_temp", "comp_pressure", "vibration", "current", "rpm"],
                    "dash": {"Temp": "gen_temp", "Pressure": "comp_pressure", "Level": None, "Flow": None},
                    "tag": "PIC-CMP01", "desc": "Process Gas Compressor Discharge"},
@@ -396,6 +411,92 @@ MACHINE_FEATURES = {
                                            "Level": None, "Flow": None},
                                   "tag": "PIC-IAC01", "desc": "Instrument Air Compressor"},
 }
+
+# ----------------------------------------------------------------------
+# FLEET  (Stage 1 of the zone hierarchy: machines mapped to zones)
+# ----------------------------------------------------------------------
+# We scale the live fleet from 16 asset TYPES to ~26 machine INSTANCES spread
+# across 4 plant ZONES (A/B/C/D). Each instance REUSES an existing type's full
+# feature/band/scenario profile (no new sensor types invented) - we just stamp
+# out multiples (e.g. "Pump A1", "Pump D1") and tag each with its zone.
+#
+# Each FLEET entry is (instance_name, base_type, zone). ~6-7 machines per zone,
+# every zone carrying a realistic mix of rotating / thermal / electrical assets
+# (so a same-zone engineer can usually be found for a local fault).
+FLEET = [
+    # ---- Zone A (7) ----
+    ("Compressor A1", "Compressor", "A"),
+    ("Pump A1", "Pump", "A"),
+    ("Distillation Column A1", "Distillation Column", "A"),
+    ("Heat Exchanger A1", "Heat Exchanger", "A"),
+    ("Motor A1", "Motor", "A"),
+    ("MCC Panel A1", "MCC Panel", "A"),
+    ("Fired Heater A1", "Fired Heater", "A"),
+    # ---- Zone B (7) ----
+    ("Pump B1", "Pump", "B"),
+    ("Boiler B1", "Boiler", "B"),
+    ("Heat Exchanger B1", "Heat Exchanger", "B"),
+    ("Motor B1", "Motor", "B"),
+    ("Generator B1", "Generator", "B"),
+    ("Cooling Tower B1", "Cooling Tower", "B"),
+    ("Separator B1", "Separator", "B"),
+    # ---- Zone C (6) ----
+    ("Compressor C1", "Compressor", "C"),
+    ("Storage Tank C1", "Storage Tank", "C"),
+    ("Control Valve C1", "Control Valve", "C"),
+    ("Reactor C1", "Reactor", "C"),
+    ("Fired Heater C1", "Fired Heater", "C"),
+    ("Instrument Air Compressor C1", "Instrument Air Compressor", "C"),
+    # ---- Zone D (6) ----
+    ("Pump D1", "Pump", "D"),
+    ("Boiler D1", "Boiler", "D"),
+    ("Motor D1", "Motor", "D"),
+    ("Storage Tank D1", "Storage Tank", "D"),
+    ("Flare System D1", "Flare System", "D"),
+    ("MCC Panel D1", "MCC Panel", "D"),
+]
+
+# Live instance list (round-robin order) + lookups derived from FLEET.
+MACHINES = [name for name, _base, _zone in FLEET]
+# instance name -> base asset type (used to find its feature/scenario profile)
+MACHINE_TYPE = {name: base for name, base, _zone in FLEET}
+# instance name -> zone ("A"|"B"|"C"|"D"); stamped onto every emitted record
+MACHINE_ZONES = {name: zone for name, _base, zone in FLEET}
+
+
+def _unique_tag(base_tag, n):
+    """Make a per-instance historian tag from a base tag, e.g.
+    ("PIC-CMP01", 2) -> "PIC-CMP02" (strip the trailing number, re-append n)."""
+    stem = base_tag.rstrip("0123456789")
+    return f"{stem}{n:02d}"
+
+
+def _build_machine_features():
+    """Build the instance-keyed MACHINE_FEATURES from _BASE_MACHINE_FEATURES.
+
+    Every downstream lookup indexes MACHINE_FEATURES by the INSTANCE name, so we
+    give each instance its own entry: the base type's feature list + dash map
+    (shared, read-only), a UNIQUE tag, a zone-tagged description, plus explicit
+    "zone" and "base_type" fields.
+    """
+    features = {}
+    type_counts = {}
+    for name, base, zone in FLEET:
+        type_counts[base] = type_counts.get(base, 0) + 1
+        base_def = _BASE_MACHINE_FEATURES[base]
+        features[name] = {
+            "features": base_def["features"],
+            "dash": base_def["dash"],
+            "tag": _unique_tag(base_def["tag"], type_counts[base]),
+            "desc": f"{base_def['desc']} (Zone {zone})",
+            "zone": zone,
+            "base_type": base,
+        }
+    return features
+
+
+# Instance-keyed feature map: MACHINE_FEATURES[<instance name>] -> profile.
+MACHINE_FEATURES = _build_machine_features()
 
 DASH_COLUMNS = ["Temp", "Pressure", "Level", "Flow"]
 
@@ -817,7 +918,8 @@ def maybe_sudden_event(machine_name, state, phase=None):
     sudden_mult = phase["sudden_mult"] if phase else 1.0
     if random.random() > SUDDEN_EVENT_CHANCE * sudden_mult:
         return None
-    scns = SUDDEN_SCENARIOS.get(machine_name, [])
+    # SUDDEN_SCENARIOS is keyed by base TYPE; map the instance to its type.
+    scns = SUDDEN_SCENARIOS.get(MACHINE_TYPE.get(machine_name, machine_name), [])
     if not scns:
         return None
     scenario = weighted_choice(scns, [s.get("weight", 5) for s in scns])
@@ -1032,6 +1134,9 @@ def generate_record(alarm_id, machine_name, phase=None):
 
     record = {
         "Machine": machine_name,
+        # zone: which plant ZONE (A|B|C|D) this machine belongs to. Additive -
+        # every record now carries its machine's zone for zone-aware routing.
+        "zone": MACHINE_ZONES.get(machine_name),
         "Timestamp": timestamp,
         "Temp": dash_value(machine_name, noisy, "Temp"),
         "Pressure": dash_value(machine_name, noisy, "Pressure"),
@@ -1101,12 +1206,17 @@ def print_live_row(record):
 
 def main():
     global _demo_start_time, _current_phase_index
-    print("Starting LIVE Refinery / Warehouse Monitoring Feed (v3.3 - 16 assets, calm/EEMUA-realistic)")
-    print(f"Monitoring units: {', '.join(MACHINES)}")
+    print(f"Starting LIVE Refinery / Warehouse Monitoring Feed "
+          f"(v4 - {len(MACHINES)} assets across 4 zones, calm/EEMUA-realistic)")
+    _by_zone = {}
+    for _name in MACHINES:
+        _by_zone.setdefault(MACHINE_ZONES[_name], []).append(_name)
+    for _z in sorted(_by_zone):
+        print(f"  Zone {_z} ({len(_by_zone[_z])}): {', '.join(_by_zone[_z])}")
     print("Legend:  State = ACT/ACK/RTN   '*' = predictive early-warning (actionable)   "
           "'~' = nuisance (filterable texture)")
-    print(f"Scale slice: {PROTO_MACHINES} machines / {PROTO_TECHNICIANS} techs (1:2 ratio) - "
-          f"per-machine rates scale linearly to {PITCH_MACHINES} machines / "
+    print(f"Scale slice: {PROTO_MACHINES} machines / {PROTO_TECHNICIANS} techs (~1:1 ratio, "
+          f"~6 per zone) - per-machine rates scale linearly to {PITCH_MACHINES} machines / "
           f"{PITCH_TECHNICIANS} techs (~{PITCH_MACHINES // PROTO_MACHINES}x volume).")
     if ESCALATION_ENABLED:
         print("Demo arc: starts CALM, then escalates to an ALARM FLOOD over time.")
