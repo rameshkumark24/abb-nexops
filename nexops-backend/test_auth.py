@@ -132,7 +132,18 @@ def test_logout_is_stateless_ok():
     assert client.post("/auth/logout").status_code == 200
 
 
-# Existing routes stay reachable WITHOUT a token (no gating in 3a).
-def test_existing_routes_remain_token_free():
-    assert client.get("/").status_code == 200          # health
-    assert client.get("/tasks").status_code == 200     # technician queue
+# Public routes stay reachable WITHOUT a token: health + login (the entry point).
+def test_public_routes_token_free():
+    assert client.get("/").status_code == 200                  # health, unchanged
+    # POST /auth/login is reachable without a prior token and works with valid
+    # demo creds (it's the entry point that MINTS the token).
+    assert _login("plant").status_code == 200
+
+
+# Stage 3b INTENTIONALLY gated the /tasks data + write routes: without a token
+# they now return 401 (this matches the 3b contract-change list exactly —
+# GET /tasks, POST /tasks/{id}/start, POST /tasks/{id}/resolve).
+def test_scoped_routes_require_token():
+    assert client.get("/tasks").status_code == 401                  # was 200 in 3a
+    assert client.post("/tasks/1/start").status_code == 401
+    assert client.post("/tasks/1/resolve").status_code == 401

@@ -130,6 +130,12 @@ class Assignment(Base):
     id = Column(Integer, primary_key=True)
     alarm_id = Column(Integer, nullable=True)
     machine = Column(String, nullable=True)
+    # zone: the MACHINE's plant zone (A-D) at assignment time, snapshotted from
+    # record["zone"]. Stage 3b+ scopes a field_manager to the MACHINE's zone via
+    # THIS column (not the responding engineer's zone), so a cross-zone fallback
+    # task and an unassigned task both stay visible to the machine's zone manager.
+    # nullable=True keeps it ADDITIVE/back-compat: old rows (pre-column) read NULL.
+    zone = Column(String, nullable=True)
     fault_category = Column(String, nullable=False)
     engineer_id = Column(Integer, ForeignKey("engineers.id"), nullable=True)
     # engineer_name: denormalized snapshot so a summary/queue can show who was

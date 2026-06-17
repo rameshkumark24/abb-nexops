@@ -127,11 +127,19 @@ def resolve_task(assignment_id, session) -> dict:
     return summary
 
 
-def get_active_assignments(session, include_resolved: bool = False) -> list:
+def get_active_assignments(session, include_resolved: bool = False,
+                           current_user=None) -> list:
     """Current non-resolved assignments (the technician's open queue), newest
-    first. Pass include_resolved=True to include resolved ones too."""
+    first. Pass include_resolved=True to include resolved ones too.
+
+    Stage 3b: pass `current_user` to apply server-side role+zone SCOPING (the
+    rule lives in scoping.scope_assignment_query). When current_user is None the
+    query is UNSCOPED (backward-compatible for any non-HTTP caller/test)."""
     query = session.query(Assignment)
     if not include_resolved:
         query = query.filter(Assignment.status != "resolved")
+    if current_user is not None:
+        from scoping import scope_assignment_query
+        query = scope_assignment_query(query, current_user)
     query = query.order_by(Assignment.assigned_at.desc())
     return [_summary(a) for a in query.all()]

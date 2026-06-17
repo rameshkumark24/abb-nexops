@@ -49,10 +49,12 @@ from assignment import (
     find_open_assignment,
 )
 from lifecycle import start_task, resolve_task, get_active_assignments
-from db import Engineer, User, get_session, init_db
+from db import Assignment, Engineer, User, get_session, init_db
 from seed import seed
-# Stage 3a auth foundation (additive — gates NOTHING existing yet).
+# Stage 3a auth foundation.
 from auth_jwt import verify_password, create_token, get_current_user, CurrentUser
+# Stage 3b server-side role+zone scoping (the rule lives in scoping.py).
+from scoping import can_write_assignment
 
 app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
 
@@ -535,10 +537,22 @@ async def health():
 # ----------------------------------------------------------------------
 
 @app.post("/tasks/{assignment_id}/start")
-def http_start_task(assignment_id: int):
-    """assigned -> in_progress. Returns the updated task summary."""
+def http_start_task(assignment_id: int,
+                    current: CurrentUser = Depends(get_current_user)):
+    """assigned -> in_progress. Returns the updated task summary.
+
+    Stage 3b: REQUIRES a token. A technician may start ONLY his own task; a
+    field_manager only tasks whose engineer is in his zone; plant any. A
+    scoped-out write returns 403 (distinct from 401 no-token / 404 not-found)."""
     session = get_session()
     try:
+        a = session.get(Assignment, assignment_id)
+        if a is None:
+            return JSONResponse(status_code=404,
+                                content={"error": f"assignment {assignment_id} not found"})
+        if not can_write_assignment(a, current, session):
+            return JSONResponse(status_code=403,
+                                content={"error": "forbidden: task is outside your scope"})
         return start_task(assignment_id, session)
     except LookupError as exc:
         return JSONResponse(status_code=404, content={"error": str(exc)})
@@ -552,12 +566,23 @@ def http_start_task(assignment_id: int):
 
 
 @app.post("/tasks/{assignment_id}/resolve")
-def http_resolve_task(assignment_id: int):
+def http_resolve_task(assignment_id: int,
+                      current: CurrentUser = Depends(get_current_user)):
     """-> resolved. Decrements the engineer's active_tasks (frees capacity) and
     clears the in-memory dedupe entry so the same fault can re-assign if it
-    recurs. Returns the summary incl. engineer_active_tasks (freed capacity)."""
+    recurs. Returns the summary incl. engineer_active_tasks (freed capacity).
+
+    Stage 3b: REQUIRES a token. Same write scope as /start — technician own task
+    only, field_manager in-zone only, plant any; out-of-scope -> 403."""
     session = get_session()
     try:
+        a = session.get(Assignment, assignment_id)
+        if a is None:
+            return JSONResponse(status_code=404,
+                                content={"error": f"assignment {assignment_id} not found"})
+        if not can_write_assignment(a, current, session):
+            return JSONResponse(status_code=403,
+                                content={"error": "forbidden: task is outside your scope"})
         summary = resolve_task(assignment_id, session)
         # Free the dedupe slot for this machine+fault so a recurrence re-assigns.
         cleared = clear_dedupe_for(summary.get("machine"), summary.get("fault_category"))
@@ -575,12 +600,19 @@ def http_resolve_task(assignment_id: int):
 
 
 @app.get("/tasks")
-def http_list_tasks(include_resolved: bool = False):
+def http_list_tasks(include_resolved: bool = False,
+                    current: CurrentUser = Depends(get_current_user)):
     """The technician's open queue (non-resolved). ?include_resolved=true also
-    returns resolved tasks."""
+    returns resolved tasks.
+
+    Stage 3b: REQUIRES a token and SCOPES the result by role+zone —
+    plant_manager sees all zones, field_manager only his zone, technician only
+    his own tasks (rule in scoping.scope_assignment_query)."""
     session = get_session()
     try:
-        return get_active_assignments(session, include_resolved=include_resolved)
+        return get_active_assignments(
+            session, include_resolved=include_resolved, current_user=current
+        )
     except Exception as exc:  # never let a DB error crash the bridge
         print(f"[tasks] list failed: {exc}")
         return JSONResponse(status_code=500, content={"error": "internal error"})
@@ -644,6 +676,15 @@ def auth_logout():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    # STAGE 3b DECISION: the WebSocket feed is left UNSCOPED on purpose. Every
+    # connected client still receives the RAW, full-site record stream and the
+    # frontend filters it per role/zone client-side (the REST endpoints above are
+    # the server-side-enforced surface for 3b). Per-connection WS auth (read a
+    # token from the query string / first message and scope each client's stream
+    # server-side) is a conscious DEFERRAL — it is NOT a blocker for 3b and is
+    # tracked for a later stage.
+    # TODO(Stage 3b+): authenticate the WS handshake (token in query/subprotocol)
+    #   and scope per-connection broadcasts by role+zone server-side.
     await manager.connect(websocket)
     try:
         # We only push to the browser; we don't expect inbound messages, but

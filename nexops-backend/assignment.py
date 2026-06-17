@@ -413,9 +413,15 @@ def record_assignment(record: dict, result: dict, session) -> Assignment:
     be tested without touching the DB. Safe to call with an 'unassigned' result
     (engineer_id None): it records the unassigned fault and increments nobody.
     """
+    # Snapshot the MACHINE's zone (A-D) onto the row so Stage 3b+ can scope a
+    # field_manager by machine zone, independent of who responds. FAIL-SAFE: a
+    # missing/blank zone stores NULL — never crashes, never changes assignment.
+    machine_zone = str(record.get("zone", "") or "").strip() or None
+
     assignment = Assignment(
         alarm_id=record.get("alarm_id"),
         machine=record.get("Machine"),
+        zone=machine_zone,
         fault_category=result.get("fault_category", "general"),
         engineer_id=result.get("engineer_id"),
         engineer_name=result.get("engineer_name"),
