@@ -147,6 +147,31 @@ class Assignment(Base):
     resolution_minutes = Column(Float, nullable=True)
 
 
+class User(Base):
+    """An authenticated console user (Stage 3a auth foundation).
+
+    ADDITIVE auth layer. Reuses the existing engineers as the TECHNICIAN layer:
+    a technician User LINKS to an Engineer row via engineer_id (nullable FK), so
+    the roster stays the single source of truth for field staff and the
+    engineers table is NEVER modified here. Plant / field managers carry no
+    engineer link (engineer_id NULL).
+    """
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String, nullable=False, unique=True)
+    password_hash = Column(String, nullable=False)
+    # role: 'plant_manager' | 'field_manager' | 'technician'
+    role = Column(String, nullable=False)
+    # zone: NULL for plant_manager (whole site); 'A'-'D' for field_manager /
+    # technician. For technicians this mirrors the linked Engineer.zone.
+    zone = Column(String, nullable=True)
+    # engineer_id: FK to engineers.id, set ONLY for technicians (NULL for the
+    # manager roles). Additive link — the engineers table is left untouched.
+    engineer_id = Column(Integer, ForeignKey("engineers.id"), nullable=True)
+
+
 # ----------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------

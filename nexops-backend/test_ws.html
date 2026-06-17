@@ -51,8 +51,13 @@
       const risk = rec.nexops_risk || 'LOW';
       const gw = (rec.alarm_priority || '').toString().toLowerCase();
 
-      // "Early catch": gateway is calm but NexOps risk is MEDIUM+.
-      const isEarly = GATEWAY_CALM.has(gw) && (RISK_RANK[risk] || 0) >= 1;
+      // "Early catch": PREFER the backend's single-source-of-truth is_early flag
+      // so this view shows the SAME EARLY as the React app (incl. the predictive
+      // divergence cases the old priority-only formula missed). Fall back to the
+      // old heuristic only for records that predate the field.
+      const isEarly = (typeof rec.is_early === 'boolean')
+        ? rec.is_early
+        : (GATEWAY_CALM.has(gw) && (RISK_RANK[risk] || 0) >= 1);
       if (isEarly) div.classList.add('early');
 
       const earlyTag = isEarly ? ' <span class="early-tag">⚠ EARLY</span>' : '';

@@ -41,6 +41,33 @@ WINDOW_SIZE = 200      # rolling window of recent feature vectors, per machine
 MIN_TRAIN = 30         # need this many samples before we score at all
 REFIT_EVERY = 20       # refit the forest every N readings (not every reading)
 
+# Score-calibration tunables (the score->[0,1] mapping; see update_and_score).
+# We map the CURRENT reading by its per-machine z-score: how many std it sits
+# BELOW that machine's OWN normal score_samples baseline (z>0 = more anomalous
+# than its normal). A logistic centered at Z0 std with steepness K turns that
+# into 0..1. Chosen so steady-normal (z~0) reads LOW and a 3-std deviation reads
+# HIGH:
+#   z=0 -> 0.047,  z=1 -> 0.182,  z=2 -> 0.500,  z=3 -> 0.818
+CALIB_K = 1.5          # logistic steepness on the z-score
+CALIB_Z0 = 2.5         # z (robust-std below normal) that maps to 0.5.
+                       # Raised 2.0 -> 2.5 to absorb the in-sample center bias
+                       # (+0.75 median z on tight machines) so ordinary normal
+                       # variation no longer crosses into false-CRITICAL.
+CALIB_STD_EPS = 1e-9   # absolute epsilon so the baseline scale never /0
+# Minimum baseline scale (robust-std units). On tight machines the MAD-based
+# scale is UNSTABLE across refits (swings 0.029-0.104); small-scale refits make
+# the z-denominator tiny and inflate ordinary normal variation to z>8 false-
+# CRITICAL. The old 0.02 floor never engaged. Diagnostic sweep proved a fixed
+# stable 0.07 floor clamps destabilizing low dips (0.029 refits) to ~1-3% false-
+# CRITICAL on low-variance warmup, well below desensitizing threshold (0.08+).
+CALIB_SCALE_FLOOR = 0.07
+# Don't TRUST calibration until the (normal-only) window holds at least this many
+# rows; below it we score via the legacy decision_function mapping so a small,
+# unrepresentative early window can't emit false highs. (Warm-up n<MIN_TRAIN=30
+# still returns warming_up; this floor governs the [MIN_TRAIN, CALIB_MIN_SAMPLES)
+# band.)
+CALIB_MIN_SAMPLES = 60
+
 
 class AnomalyEngine:
     """Maintains a per-machine rolling window + Isolation Forest, and scores
@@ -57,6 +84,7 @@ class AnomalyEngine:
         self._keys = {}           # machine -> tuple[str]  (locked feature order)
         self._models = {}         # machine -> fitted IsolationForest | None
         self._since_fit = {}      # machine -> int (readings since last refit)
+        self._calib = {}          # machine -> (baseline_median, baseline_std)
 
     # -- feature extraction --------------------------------------------------
 
@@ -86,8 +114,8 @@ class AnomalyEngine:
 
     # -- main entry point ----------------------------------------------------
 
-    def update_and_score(self, record):
-        """Append this record's features to the machine's window and score it.
+    def update_and_score(self, record, is_training_eligible=None):
+        """Score this reading and (only if eligible) add it to the training window.
 
         Returns a dict:
           {"anomaly_score": float|None, "status": "warming_up"|"scored",
@@ -96,6 +124,15 @@ class AnomalyEngine:
         - anomaly_score is in 0..1 where HIGHER = MORE anomalous, or None while
           warming up.
         - status is "warming_up" until min_train samples exist, then "scored".
+
+        TRAINING-APPEND GATE (is_training_eligible): EVERY reading is still SCORED
+        (faults can and should read HIGH), but only NORMAL readings may ENTER the
+        training window, so a machine's own fault frames can never pollute its
+        model of "normal". The caller passes `not is_fault` (gateway/sim flags
+        only - never anomaly_score, which would be circular). Fail-safe default
+        when the flag is missing/None: eligible ONLY if the record looks normal
+        (Status normal/absent); when uncertain we EXCLUDE (prefer not training on
+        a possibly-fault row) so contamination cannot sneak back in.
         """
         if not _SKLEARN_OK:
             raise RuntimeError(
@@ -109,10 +146,18 @@ class AnomalyEngine:
 
         vec = self._vector(machine, features)
 
+        # Resolve the fail-safe default for a missing/None flag: normal/absent
+        # Status -> eligible; anything else -> EXCLUDE (uncertain == treat as fault).
+        if is_training_eligible is None:
+            status = str(record.get("Status", "") or "").strip().lower()
+            is_training_eligible = status in ("", "normal")
+
         window = self._windows.setdefault(
             machine, deque(maxlen=self.window_size)
         )
-        window.append(vec)
+        # Only NORMAL readings train the model; faults are scored below, not learned.
+        if is_training_eligible:
+            window.append(vec)
 
         n = len(window)
         if n < self.min_train:
@@ -129,31 +174,58 @@ class AnomalyEngine:
                 contamination="auto",
                 random_state=42,
             )
-            model.fit(np.array(window, dtype=float))
+            train = np.array(window, dtype=float)
+            model.fit(train)
             self._models[machine] = model
             self._since_fit[machine] = 0
+            # CALIBRATION CAPTURE - RECOMPUTED every refit (no freeze) from the
+            # current window. The append gate keeps that window normal-only, so it
+            # is already contamination-free; recomputing keeps the baseline MATCHED
+            # to the live, continuously-refit model (the frozen baseline drifted out
+            # of sync with later refits, the residual false-CRITICAL cause). Robust
+            # stats resist a few outlier score_samples: median center + MAD-based
+            # scale (1.4826*MAD ~= std for normal data), floored so a tight window
+            # can't make the denominator tiny. score_samples is higher = more
+            # normal. Fail-safe: if capture errors we drop calib and the score path
+            # uses the legacy decision_function mapping; we never crash.
+            try:
+                raw_train = model.score_samples(train)
+                base_center = float(np.median(raw_train))
+                mad = float(np.median(np.abs(raw_train - base_center)))
+                current_scale = 1.4826 * mad
+                # Plain recompute: no EMA smoothing across refits. EMA carried
+                # small early scales forward and preserved small-denominator bursts
+                # (the 0.029 dips). Fixed stable 0.07 floor alone achieves the goal
+                # (~1-3% false-CRITICAL on low-variance warmup) without the cross-
+                # refit instability of the EMA blend. base_center stays fully
+                # recomputed (tracked to live model); floor clamps destabilizing dips.
+                base_scale = max(current_scale, CALIB_SCALE_FLOOR, CALIB_STD_EPS)
+                self._calib[machine] = (base_center, base_scale)
+            except Exception:
+                self._calib.pop(machine, None)
         else:
             self._since_fit[machine] = since + 1
 
-        # score_samples: higher = MORE normal (less anomalous). It is roughly
-        # the negative mean path length offset; typical values sit around
-        # [-0.5, 0.0] for inliers and go more negative for outliers.
-        #
-        # Normalization to 0..1 where HIGHER = MORE anomalous:
-        #   raw  = score_samples(current)          # higher = more normal
-        #   anomaly_score = sigmoid(-k * raw)      # flips sign, squashes to 0..1
-        # We center the sigmoid near the forest's own decision boundary by
-        # using decision_function (which is score_samples minus the learned
-        # offset, so 0 ≈ boundary, negative ≈ anomalous). This keeps the score
-        # comparable across machines despite different feature scales.
+        # CALIBRATED mapping (per-machine): score by how far BELOW this machine's
+        # OWN normal the current reading sits. score_samples is higher = more
+        # normal, so a reading well under the baseline median is anomalous.
+        #   z = (baseline_median - raw_cur) / baseline_std   # z>0 = anomalous
+        #   anomaly_score = logistic(K * (z - Z0))           # see CALIB_* above
+        # A steady-normal reading has z~0 -> ~0.05; a 3-std deviation -> ~0.82.
         current = np.array([vec], dtype=float)
-        decision = float(model.decision_function(current)[0])  # >0 inlier, <0 outlier
-
-        # Sigmoid on the negated decision value: decision<<0 -> ~1 (anomalous),
-        # decision>>0 -> ~0 (normal), decision==0 -> 0.5 (on the boundary).
-        # k controls steepness; 8 gives a reasonably crisp transition.
-        k = 8.0
-        anomaly_score = 1.0 / (1.0 + np.exp(k * decision))
+        calib = self._calib.get(machine)
+        if calib is not None and n >= CALIB_MIN_SAMPLES:
+            base_center, base_scale = calib
+            raw_cur = float(model.score_samples(current)[0])  # higher = more normal
+            z = (base_center - raw_cur) / base_scale          # >0 = more anomalous
+            anomaly_score = 1.0 / (1.0 + np.exp(-CALIB_K * (z - CALIB_Z0)))
+        else:
+            # SAMPLE-FLOOR / FAIL-SAFE: calibration absent (capture errored) OR the
+            # window still holds < CALIB_MIN_SAMPLES clean rows -> use the legacy
+            # decision_function mapping for this reading. A small/unrepresentative
+            # early window can't emit false highs this way, and we never crash.
+            decision = float(model.decision_function(current)[0])  # >0 inlier, <0 outlier
+            anomaly_score = 1.0 / (1.0 + np.exp(8.0 * decision))
         anomaly_score = float(max(0.0, min(1.0, anomaly_score)))
 
         return {"anomaly_score": anomaly_score, "status": "scored", "samples": n}

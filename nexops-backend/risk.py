@@ -76,6 +76,14 @@ def compute_nexops_risk(record, anomaly_score):
     anom_level = _anomaly_level(anomaly_score)
     is_predictive = bool(record.get("is_predictive"))
 
+    # gateway_calm: the gateway itself sees nothing - Status Normal/absent AND
+    # alarm_priority Low/absent. Reuses the same alarm_priority reading as
+    # _gateway_level (Low/Normal -> LOW) and additionally checks Status. FAIL-SAFE:
+    # MISSING fields read as calm, so an uncertain reading is treated as
+    # anomaly-only and gets CAPPED below (the safe direction).
+    _status = str(record.get("Status", "") or "").strip().lower()
+    gateway_calm = _status in ("", "normal") and gw_level == "LOW"
+
     # Start at the gateway level.
     final_idx = gw_idx
     drivers = []
@@ -97,6 +105,17 @@ def compute_nexops_risk(record, anomaly_score):
     if gw_level == "CRITICAL":
         final_idx = _idx("CRITICAL")
 
+    # ANOMALY-ONLY CAP (guardrail): a pure-anomaly signal (is_predictive not True)
+    # on a CALM gateway must NEVER escalate past MEDIUM, no matter how high
+    # anomaly_score is. It stays an EARLY catch, just a capped one, pending
+    # corroboration. Predictive trends (is_predictive) and real gateway
+    # Warning/Critical events are NOT calm here, so they are left UNCAPPED and may
+    # go HIGH/CRITICAL as before (headline early-catch preserved).
+    anomaly_only_capped = False
+    if (not is_predictive) and gateway_calm and final_idx > _idx("MEDIUM"):
+        final_idx = _idx("MEDIUM")
+        anomaly_only_capped = True
+
     nexops_risk = _LADDER[final_idx]
 
     # Build a short human reason.
@@ -104,6 +123,11 @@ def compute_nexops_risk(record, anomaly_score):
         reasoning = (
             f"model warming up — no anomaly score yet; mirroring gateway "
             f"{gw_level}"
+        )
+    elif anomaly_only_capped:
+        reasoning = (
+            f"anomaly_score {anomaly_score:.2f} while gateway {gw_level} — "
+            f"anomaly-only on calm gateway - capped at MEDIUM pending corroboration"
         )
     elif final_idx > gw_idx:
         # The headline "we caught it early" case.

@@ -71,10 +71,12 @@ function zoneFor(machine: string): string {
 // perf, with the LOW->100 .. CRITICAL->40 ladder requested for the demo.
 // MEDIUM sits right on the perf<80 at-risk line (~80) by design.
 //
-// isEarly is the headline feature: the gateway still considers the machine
-// calm (Status Normal OR alarm_priority Low) yet NexOps's own verdict is
-// elevated (MEDIUM/HIGH/CRITICAL) - i.e. we flagged it BEFORE the static
-// threshold tripped.
+// isEarly is the headline feature, now a DIVERGENCE catch: while a fault is
+// still pre-threshold (is_predictive) and is NOT nuisance, NexOps rates it
+// STRICTLY HIGHER than the gateway's own severity. The gateway under-rates the
+// developing fault as a low Warning; NexOps escalates it higher and EARLIER,
+// before the static limit trips. It fires immediately from is_predictive (no
+// dependency on a warm anomaly score); the anomaly score corroborates later.
 // ----------------------------------------------------------------------
 
 const NEXOPS_PERF: Record<NexopsRisk, number> = {
@@ -84,13 +86,67 @@ const NEXOPS_PERF: Record<NexopsRisk, number> = {
   LOW: 100,
 };
 
-function gatewayIsCalm(raw: TelemetryRecord): boolean {
-  return raw.Status === 'Normal' || raw.alarm_priority === 'Low';
+// Gateway alarm_priority -> 0..3 severity index (Low/Normal -> 0 LOW, Medium ->
+// 1, High -> 2, Critical -> 3). Mirrors the backend risk._gateway_level mapping;
+// anything missing/unrecognized defaults SAFELY to LOW (0).
+const GATEWAY_SEVERITY_INDEX: Record<string, number> = {
+  Critical: 3,
+  High: 2,
+  Medium: 1,
+  Low: 0,
+  Normal: 0,
+};
+
+// NexOps risk -> 0..3 index on the same ladder.
+const RISK_INDEX: Record<NexopsRisk, number> = {
+  LOW: 0,
+  MEDIUM: 1,
+  HIGH: 2,
+  CRITICAL: 3,
+};
+
+function gatewaySeverityIndex(raw: TelemetryRecord): number {
+  return GATEWAY_SEVERITY_INDEX[raw.alarm_priority as string] ?? 0;
 }
 
-export function isEarlyWarning(raw: TelemetryRecord): boolean {
+function gatewayIsCalm(raw: TelemetryRecord): boolean {
+  // Calm = the gateway itself sees nothing: Status Normal/absent AND priority
+  // Low/absent. FAIL-SAFE: MISSING fields read as calm, so an uncertain reading
+  // is treated as anomaly-only and gets CAPPED (the safe direction).
+  const status = String(raw.Status ?? '').toLowerCase();
+  const prio = String(raw.alarm_priority ?? '').toLowerCase();
+  return (status === '' || status === 'normal') && (prio === '' || prio === 'low');
+}
+
+// ANOMALY-ONLY CAP (mirrors backend risk.py): a pure-anomaly signal
+// (is_predictive !== true) on a CALM gateway can never DISPLAY above MEDIUM, no
+// matter how high nexops_risk is. Predictive trends and real gateway
+// Warning/Critical events are returned UNCAPPED (headline early-catch intact).
+// FAIL-SAFE: missing is_predictive -> treated as not predictive (caps).
+export function cappedRisk(raw: TelemetryRecord): NexopsRisk {
   const risk: NexopsRisk = raw.nexops_risk ?? 'LOW';
-  return gatewayIsCalm(raw) && risk !== 'LOW';
+  const anomalyOnly = raw.is_predictive !== true && gatewayIsCalm(raw);
+  if (anomalyOnly && (RISK_INDEX[risk] ?? 0) > RISK_INDEX.MEDIUM) return 'MEDIUM';
+  return risk;
+}
+
+// EARLY = NexOps flags what the gateway does not (never on nuisance). Two cases:
+//   - PREDICTIVE divergence (is_predictive === true): NexOps risk strictly ABOVE
+//     the gateway severity - full strength, may be HIGH/CRITICAL (headline).
+//   - ANOMALY-ONLY on a calm gateway: NexOps elevated to MEDIUM+ while the gateway
+//     is calm - still an EARLY catch, but capped at MEDIUM (see cappedRisk).
+export function isEarlyWarning(raw: TelemetryRecord): boolean {
+  // PREFER the backend's single-source-of-truth flag. The backend now stamps
+  // is_early on the wire (computed from this exact rule), so all views agree.
+  // Fall back to the client-side computation only for OLD records that predate
+  // the field (backward-compat) — do NOT remove the fallback.
+  if (typeof raw.is_early === 'boolean') return raw.is_early;
+  if (raw.is_nuisance === true) return false; // noise is never EARLY
+  const riskIdx = RISK_INDEX[cappedRisk(raw)] ?? 0; // cappedRisk re-cap is idempotent here
+  if (raw.is_predictive === true) {
+    return riskIdx > gatewaySeverityIndex(raw); // predictive divergence
+  }
+  return gatewayIsCalm(raw) && riskIdx >= RISK_INDEX.MEDIUM; // anomaly-only catch
 }
 
 // ----------------------------------------------------------------------
@@ -129,8 +185,9 @@ export function computePerf(raw: TelemetryRecord): number {
   }
   const gatewayPerf = base - penalty;
 
-  // --- NexOps verdict (PRIMARY driver) ---
-  const nexopsPerf = NEXOPS_PERF[raw.nexops_risk ?? 'LOW'];
+  // --- NexOps verdict (PRIMARY driver) --- capped for anomaly-only calm reads so
+  // a residual high anomaly score can't drag perf to HIGH/CRITICAL territory.
+  const nexopsPerf = NEXOPS_PERF[cappedRisk(raw)];
 
   // tiny jitter so healthy bars aren't frozen
   const jitter = Math.random() * 3 - 1.5; // +/- 1.5
@@ -148,7 +205,7 @@ export function mapToMachine(raw: TelemetryRecord): Machine {
     name: raw.Machine,
     zone: zoneFor(raw.Machine),
     perf: computePerf(raw),
-    nexopsRisk: raw.nexops_risk ?? 'LOW',
+    nexopsRisk: cappedRisk(raw),
     anomalyScore: raw.anomaly_score ?? null,
     isEarly: isEarlyWarning(raw),
     reasoning: raw.nexops_reasoning ?? '',
@@ -170,7 +227,7 @@ export function mapToAlarm(raw: TelemetryRecord): Alarm {
     time: formatTime(raw.Timestamp),
     msg: raw.message,
     type: raw.Status === 'Critical' ? 'CRITICAL' : 'WARNING',
-    nexopsRisk: raw.nexops_risk ?? 'LOW',
+    nexopsRisk: cappedRisk(raw),
     anomalyScore: raw.anomaly_score ?? null,
     isEarly: isEarlyWarning(raw),
     reasoning: raw.nexops_reasoning ?? '',
@@ -209,7 +266,7 @@ function dotForPriority(priority: AlarmPriority): string {
 
 export function mapToControlPanelAlarm(raw: TelemetryRecord): ControlPanelAlarm {
   const early = isEarlyWarning(raw);
-  const risk: NexopsRisk = raw.nexops_risk ?? 'LOW';
+  const risk: NexopsRisk = cappedRisk(raw);
   // On an early catch the gateway priority is still Low (a green dot), which
   // understates the risk - colour the dot by NexOps's verdict instead so the
   // control panel reflects what NexOps sees, not just the static threshold.

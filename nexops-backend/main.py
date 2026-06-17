@@ -32,9 +32,10 @@ import threading
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import paho.mqtt.client as mqtt
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 import config
 from adapter import normalize
@@ -45,10 +46,13 @@ from assignment import (
     record_assignment,
     fault_category_for,
     is_safety_critical,
+    find_open_assignment,
 )
 from lifecycle import start_task, resolve_task, get_active_assignments
-from db import Engineer, get_session, init_db
+from db import Engineer, User, get_session, init_db
 from seed import seed
+# Stage 3a auth foundation (additive — gates NOTHING existing yet).
+from auth_jwt import verify_password, create_token, get_current_user, CurrentUser
 
 app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
 
@@ -82,8 +86,65 @@ def clear_dedupe_for(machine, fault_category) -> bool:
         return active_assignments.pop((machine, fault_category), None) is not None
 
 
+# ----------------------------------------------------------------------
+# EARLY — SINGLE SOURCE OF TRUTH.
+# EARLY used to be re-derived in three drifting places (should_assign here,
+# isEarlyWarning in the frontend adapter, and an inline check in test_ws.html).
+# We now compute it ONCE, here, stamp it on the broadcast record as `is_early`,
+# and have both the React app and test_ws READ that boolean. This helper is a
+# faithful port of the frontend's isEarlyWarning (the CORRECT, realistic rule
+# with the is_predictive divergence branch), evaluated on the record AFTER the
+# risk stage — so `nexops_risk` is already the CAPPED value.
+# ----------------------------------------------------------------------
+
+_RISK_INDEX = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
+
+# Gateway alarm_priority -> 0..3 severity index. Mirrors risk._gateway_level and
+# the frontend GATEWAY_SEVERITY_INDEX: Critical3/High2/Medium1/Low0/Normal0, and
+# anything missing/unrecognized defaults SAFELY to 0 (LOW).
+_GATEWAY_SEVERITY_INDEX = {"critical": 3, "high": 2, "medium": 1, "low": 0, "normal": 0}
+
+
+def _gateway_severity_index(record: dict) -> int:
+    prio = str(record.get("alarm_priority", "") or "").strip().lower()
+    return _GATEWAY_SEVERITY_INDEX.get(prio, 0)
+
+
+def _gateway_calm_for_early(record: dict) -> bool:
+    """Calm = the gateway itself sees nothing: Status Normal/absent AND
+    alarm_priority Low/Normal/absent. 'normal' priority is treated as calm too,
+    fixing the latent edge where the backend mapped Normal->LOW (calm) but the
+    old frontend gatewayIsCalm did not. FAIL-SAFE: MISSING fields read as calm."""
+    status = str(record.get("Status", "") or "").strip().lower()
+    prio = str(record.get("alarm_priority", "") or "").strip().lower()
+    return status in ("", "normal") and prio in ("", "low", "normal")
+
+
+def is_early_record(record: dict) -> bool:
+    """Canonical EARLY verdict — ports the frontend isEarlyWarning exactly.
+
+    Evaluated AFTER the risk stage, on the CAPPED nexops_risk already on the
+    record (so anomaly-only is at most MEDIUM, predictive may be HIGH/CRITICAL).
+
+      - is_nuisance is True            -> False (noise is never EARLY)
+      - is_predictive is True          -> RISK_INDEX[nexops_risk] > gateway idx
+                                          (predictive divergence; full strength)
+      - else (anomaly-only)            -> gateway_calm AND RISK_INDEX >= MEDIUM
+
+    FAIL-SAFE: missing is_predictive -> not predictive; missing nexops_risk ->
+    LOW -> not early; missing is_nuisance -> not nuisance.
+    """
+    if record.get("is_nuisance") is True:
+        return False
+    risk_idx = _RISK_INDEX.get(str(record.get("nexops_risk", "") or "").upper(), 0)
+    if record.get("is_predictive") is True:
+        return risk_idx > _gateway_severity_index(record)  # predictive divergence
+    return _gateway_calm_for_early(record) and risk_idx >= _RISK_INDEX["MEDIUM"]
+
+
 def should_assign(record: dict) -> bool:
-    """True only for genuine, actionable faults - never for plain Normal/LOW.
+    """True only for genuine, actionable faults - never for plain Normal/LOW,
+    and NEVER for nuisance/filterable noise (is_nuisance) regardless of Status.
 
     Assign when ANY of:
       - it's a critical/SAFETY event (fire/gas/emergency or Critical) - these
@@ -95,9 +156,28 @@ def should_assign(record: dict) -> bool:
       - it's an "early catch": gateway still calm (Status Normal / priority Low)
         but NexOps already elevated the risk to MEDIUM+ (the isEarly case).
     """
+    # NUISANCE GUARD (must be FIRST): filterable noise (transient/chatter) is
+    # tagged is_nuisance=True at the source and is NEVER an actionable fault, so
+    # it must never be assigned or persisted - even though it carries a gateway
+    # Status="Warning". This sits ABOVE every other branch (incl. the Status and
+    # is_safety_critical checks) so a nuisance "Warning" can't slip through.
+    # Fail-safe: a missing/false flag is treated as NOT nuisance.
+    if record.get("is_nuisance"):
+        return False
+
     # Safety/critical events ALWAYS get the assignment path (capacity is bypassed
     # downstream in assign_engineer), so a site emergency is never skipped here.
     if is_safety_critical(record):
+        return True
+
+    # EARLY catches must ALWAYS be assigned. Share the SAME helper that stamps
+    # the broadcast `is_early` flag so a record badged EARLY can NEVER be left
+    # unassigned (badge => assign). is_early_record's True set is a subset of /
+    # equal to the branches below for the realistic cases, but it also catches
+    # the Status-absent + priority-Normal/absent + risk MEDIUM corner the old
+    # branches missed. The broader checks below still cover real Warning/Critical
+    # faults that are NOT early (those are assigned but not badged EARLY).
+    if is_early_record(record):
         return True
 
     status = record.get("Status")
@@ -223,7 +303,17 @@ def on_message(client, userdata, msg):
     # wrong, we attach a null score + a gateway-mirrored fallback risk and log
     # the error — the live feed must NEVER break because of the ML layer.
     try:
-        result = engine.update_and_score(record)
+        # Gate the anomaly TRAINING append so a machine's OWN fault frames never
+        # pollute its model of "normal". A reading is a fault per the gateway/sim
+        # flags ONLY (never anomaly_score - that would be circular): predictive,
+        # a Warning/Critical status, or High/Critical priority. The reading is
+        # still SCORED; it just doesn't train when it's a fault.
+        is_fault = (
+            record.get("is_predictive") is True
+            or str(record.get("Status", "") or "").lower() in ("warning", "critical")
+            or str(record.get("alarm_priority", "") or "").lower() in ("high", "critical")
+        )
+        result = engine.update_and_score(record, is_training_eligible=not is_fault)
         risk = compute_nexops_risk(record, result["anomaly_score"])
         record["anomaly_score"] = result["anomaly_score"]   # None while warming up
         record["anomaly_status"] = result["status"]         # "warming_up" | "scored"
@@ -237,6 +327,19 @@ def on_message(client, userdata, msg):
         record["nexops_reasoning"] = fb["reasoning"]
         print(f"[anomaly] scoring failed for "
               f"{record.get('Machine', '?')}: {exc} (feed continues)")
+
+    # ---- Stage: EARLY flag — SINGLE SOURCE OF TRUTH (stamped on the wire) --
+    # Compute the EARLY badge ONCE here, on the CAPPED nexops_risk above, and
+    # broadcast it as `is_early`. The React app and test_ws.html both READ this
+    # one boolean instead of re-deriving it (they used to drift). Faithful port
+    # of the frontend isEarlyWarning (see is_early_record). FAIL-SAFE: any error
+    # defaults is_early=False so a bad record never breaks the broadcast.
+    try:
+        record["is_early"] = is_early_record(record)
+    except Exception as exc:
+        record["is_early"] = False
+        print(f"[is_early] flagging failed for {record.get('Machine', '?')}: {exc} "
+              f"(feed continues)")
 
     # ---- Stage: assignment — route genuine faults to an engineer ----------
     # ADDITIVE + FAIL-SAFE. We attach assignment fields to the record; any DB or
@@ -269,11 +372,40 @@ def on_message(client, userdata, msg):
                 # re-increment of load.
                 result = cached
             else:
-                # New fault for this machine+category -> score + persist once.
+                # No in-memory dedupe entry yet (first frame this run, or after a
+                # restart). Before creating a NEW task, check the DB for an already
+                # OPEN task for this exact (machine, fault_category): a developing
+                # fault re-emits every fleet sweep but is ONE physical fault. If one
+                # is open, REUSE it (no duplicate row, no re-score, no re-increment
+                # of load); only a resolved task frees the slot for a fresh
+                # assignment. FAIL-SAFE: if the lookup errors, fall through to the
+                # original assign+persist - we prefer a rare duplicate over DROPPING
+                # a real fault.
                 session = get_session()
                 try:
-                    result = assign_engineer(record, session)
-                    record_assignment(record, result, session)
+                    existing = None
+                    try:
+                        existing = find_open_assignment(session, machine, category)
+                    except Exception as exc:
+                        existing = None
+                        print(f"[assignment] open-task lookup failed for "
+                              f"{machine}/{category}: {exc} (creating task)")
+                    if existing is not None:
+                        # Duplicate suppressed: reuse the open task's engineer. We
+                        # do NOT update the row (kept trivial/safe per de-dup spec).
+                        result = {
+                            "engineer_id": existing.engineer_id,
+                            "engineer_name": existing.engineer_name,
+                            "fault_category": existing.fault_category,
+                            "score": existing.score,
+                            "reasoning": (f"reusing open task #{existing.id} "
+                                          f"(status {existing.status}) - duplicate "
+                                          f"{category} fault on {machine} suppressed"),
+                        }
+                    else:
+                        # New fault for this machine+category -> score + persist once.
+                        result = assign_engineer(record, session)
+                        record_assignment(record, result, session)
                 finally:
                     session.close()
                 with _assign_lock:
@@ -454,6 +586,60 @@ def http_list_tasks(include_resolved: bool = False):
         return JSONResponse(status_code=500, content={"error": "internal error"})
     finally:
         session.close()
+
+
+# ----------------------------------------------------------------------
+# Auth endpoints (Stage 3a foundation). ADDITIVE: these add a login + identity
+# surface but GATE NOTHING — every existing route and the WebSocket feed stay
+# reachable WITHOUT a token. Data scoping by role/zone arrives in Stage 3b.
+# ----------------------------------------------------------------------
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/auth/login")
+def auth_login(body: LoginRequest):
+    """Verify {username, password} -> issue a JWT. 401 on unknown user or bad
+    password (no detail leak about which). Demo: NO rate-limit / lockout — that
+    is future hardening. Never 500s on a bad credential."""
+    session = get_session()
+    try:
+        user = session.query(User).filter(User.username == body.username).first()
+        if user is None or not verify_password(body.password, user.password_hash):
+            return JSONResponse(status_code=401, content={"error": "invalid credentials"})
+        token = create_token(user)
+        return {
+            "token": token,
+            "user": {"username": user.username, "role": user.role, "zone": user.zone},
+        }
+    except Exception as exc:  # never let a DB error crash the bridge
+        print(f"[auth] login failed for {body.username!r}: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
+@app.get("/auth/me")
+def auth_me(current: CurrentUser = Depends(get_current_user)):
+    """Resolve the Bearer token to the current user. This is the Stage 3a
+    verification endpoint. 401 (via get_current_user) on missing/invalid/expired."""
+    return {
+        "id": current.id,
+        "username": current.username,
+        "role": current.role,
+        "zone": current.zone,
+        "engineer_id": current.engineer_id,
+    }
+
+
+@app.post("/auth/logout")
+def auth_logout():
+    """JWT is stateless: there is nothing to invalidate server-side, so the
+    client simply DROPS the token. No server blacklist for the demo (a future
+    hardening step if token revocation is ever needed). Always 200."""
+    return {"status": "ok", "detail": "client should discard the token"}
 
 
 @app.websocket("/ws")

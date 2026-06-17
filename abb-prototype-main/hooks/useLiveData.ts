@@ -277,6 +277,204 @@ function subscribe(
 // cadence changes.
 const SITE_ALERT_PERSIST_MS = 30000;
 
+// ======================================================================
+// LIVE METRICS (additive) - session-scoped prediction/segregation metrics
+// derived ENTIRELY on the frontend from the same WebSocket frames the UI
+// already consumes. No backend, no endpoints, no schema changes. All math is
+// wrapped in try/catch at the call site so a malformed frame can never break
+// the live feed or the panel.
+//
+// Honest framing: lead time is measured vs the static gateway on the SAME
+// events (when NexOps flagged EARLY vs when the gateway's static threshold
+// tripped); corroboration is independent ML agreement. Nothing is graded
+// against synthetic labels.
+// ======================================================================
+
+const TEN_MIN_MS = 600000;     // rolling window for the alarm-reduction metric
+const LEAD_RING_MAX = 20;      // keep the last ~20 completed fault leads
+const CORROB_ANOM_MIN = 0.45;  // MEDIUM anomaly cutoff (mirrors backend risk.py)
+
+// Published, render-ready snapshot the panel consumes (components stay dumb).
+export interface LiveMetrics {
+  earlyCatches: number;             // distinct (machine,fault) flagged EARLY before the gateway tripped
+  completedLeads: number;           // faults with a positive completed lead
+  openEarly: number;                // flagged EARLY, gateway not yet tripped ("still early")
+  avgLeadSeconds: number | null;    // rolling avg over the last ~20 leads
+  maxLeadSeconds: number | null;    // best lead so far
+  leadRing: number[];               // last ~20 lead times (seconds)
+  nuisanceFiltered: number;         // is_nuisance records suppressed (never queued)
+  rawAlarms10m: number;             // gateway Warning/Critical incl. nuisance, last 10 min
+  actionableAlarms10m: number;      // real, non-nuisance, assigned, last 10 min
+  reductionPct: number | null;      // (1 - actionable/raw) * 100
+  corroboratedEarly: number;        // EARLY faults the ML model independently agreed with
+  corroborationRate: number | null; // corroboratedEarly / earlyCatches * 100
+  anomalyWarming: boolean;          // no anomaly_status==='scored' frame seen yet
+  samples: number;                  // frames processed (drives the empty state)
+}
+
+// Mutable accumulator (kept in a ref; never rendered directly).
+interface MetricsAcc {
+  earlyCatches: number;
+  completedLeads: number;
+  corroboratedEarly: number;
+  nuisanceFiltered: number;
+  leadRing: number[];
+  maxLeadSeconds: number;
+  rawAlarmTimes: number[];   // arrival ms of raw gateway alarms (incl. nuisance)
+  actionableTimes: number[]; // arrival ms of actionable alarms
+  scoredSeen: boolean;
+  samples: number;
+}
+
+// Per-machine fault lifecycle used to compute lead time. One "fault" runs from
+// the first non-Normal frame until the machine returns to Normal.
+interface FaultLC {
+  earlyAt: number | null;   // ms when isEarlyWarning first became true
+  trippedAt: number | null; // ms when the static threshold first tripped
+  earlyCounted: boolean;    // counted once into earlyCatches
+  leadRecorded: boolean;    // lead resolved once per fault
+  corroborated: boolean;    // ML agreed at/after the EARLY flag
+}
+
+function freshMetricsAcc(): MetricsAcc {
+  return {
+    earlyCatches: 0, completedLeads: 0, corroboratedEarly: 0, nuisanceFiltered: 0,
+    leadRing: [], maxLeadSeconds: 0, rawAlarmTimes: [], actionableTimes: [],
+    scoredSeen: false, samples: 0,
+  };
+}
+
+function freshLC(): FaultLC {
+  return { earlyAt: null, trippedAt: null, earlyCounted: false, leadRecorded: false, corroborated: false };
+}
+
+const EMPTY_METRICS: LiveMetrics = {
+  earlyCatches: 0, completedLeads: 0, openEarly: 0, avgLeadSeconds: null,
+  maxLeadSeconds: null, leadRing: [], nuisanceFiltered: 0, rawAlarms10m: 0,
+  actionableAlarms10m: 0, reductionPct: null, corroboratedEarly: 0,
+  corroborationRate: null, anomalyWarming: true, samples: 0,
+};
+
+// Drop timestamps older than the rolling 10-min window (front of the array).
+function pruneWindow(times: number[], now: number): void {
+  while (times.length && now - times[0] > TEN_MIN_MS) times.shift();
+}
+
+// Fold ONE frame into the accumulator + per-machine lifecycle map. Mutates in
+// place; the caller wraps it in try/catch so a malformed frame is safely skipped.
+function accumulateMetrics(
+  raw: TelemetryRecord,
+  acc: MetricsAcc,
+  lcMap: Map<string, FaultLC>,
+  now: number,
+): void {
+  acc.samples += 1;
+  if (raw.anomaly_status === 'scored') acc.scoredSeen = true;
+
+  const nuisance = raw.is_nuisance === true;
+  const isGatewayAlarm = raw.Status === 'Warning' || raw.Status === 'Critical';
+  const assigned = !!raw.assigned_engineer && raw.assigned_engineer !== 'Unassigned';
+
+  // (4) ALARM REDUCTION: raw = every gateway alarm (incl. nuisance); actionable
+  // = the real, non-nuisance, dispatched subset. Rolling 10-min window.
+  if (isGatewayAlarm) acc.rawAlarmTimes.push(now);
+  if (isGatewayAlarm && !nuisance && assigned) acc.actionableTimes.push(now);
+  pruneWindow(acc.rawAlarmTimes, now);
+  pruneWindow(acc.actionableTimes, now);
+
+  // (3) NUISANCE SUPPRESSION: count it, and STOP - noise never drives a fault
+  // lifecycle (and the backend already keeps it out of the task queue).
+  if (nuisance) {
+    acc.nuisanceFiltered += 1;
+    return;
+  }
+
+  // Fault lifecycle is per machine. A return to Normal closes the current fault.
+  const machine = raw.Machine;
+  if (raw.Status === 'Normal') {
+    lcMap.delete(machine);
+    return;
+  }
+
+  const lc = lcMap.get(machine) ?? freshLC();
+  const early = isEarlyWarning(raw);
+  // (1) STATIC THRESHOLD TRIP: the gateway's REAL static alarm - a non-predictive
+  // Warning(>Low)/Critical. The incubation window is is_predictive=true (a low
+  // Warning), so excluding it is what makes the early-vs-gateway lead meaningful.
+  const tripped =
+    raw.is_predictive !== true &&
+    ((raw.Status === 'Warning' && raw.alarm_priority !== 'Low') || raw.Status === 'Critical');
+
+  // (2) EARLY first-seen -> count once.
+  if (early && lc.earlyAt === null) {
+    lc.earlyAt = now;
+    if (!lc.earlyCounted) {
+      acc.earlyCatches += 1;
+      lc.earlyCounted = true;
+    }
+  }
+  if (tripped && lc.trippedAt === null) lc.trippedAt = now;
+
+  // (1) Completed LEAD: NexOps flagged EARLY before the gateway tripped. Resolve
+  // once per fault; only positive leads count. A fault that never trips stays an
+  // "open early" (see openEarly) rather than a completed lead.
+  if (lc.earlyAt !== null && lc.trippedAt !== null && !lc.leadRecorded) {
+    lc.leadRecorded = true;
+    const lead = (lc.trippedAt - lc.earlyAt) / 1000;
+    if (lead > 0) {
+      acc.leadRing.push(lead);
+      if (acc.leadRing.length > LEAD_RING_MAX) acc.leadRing.shift();
+      acc.completedLeads += 1;
+      if (lead > acc.maxLeadSeconds) acc.maxLeadSeconds = lead;
+    }
+  }
+
+  // (5) CORROBORATION: of EARLY faults, those the independent ML model agreed
+  // with (scored + anomaly_score >= MEDIUM cutoff) at/after the EARLY flag.
+  if (
+    lc.earlyAt !== null &&
+    !lc.corroborated &&
+    raw.anomaly_status === 'scored' &&
+    (raw.anomaly_score ?? 0) >= CORROB_ANOM_MIN
+  ) {
+    lc.corroborated = true;
+    acc.corroboratedEarly += 1;
+  }
+
+  lcMap.set(machine, lc);
+}
+
+// Build the render-ready snapshot from the accumulator + live lifecycle map.
+function buildMetricsSnapshot(acc: MetricsAcc, lcMap: Map<string, FaultLC>): LiveMetrics {
+  const ring = acc.leadRing;
+  const avg = ring.length ? ring.reduce((a, b) => a + b, 0) / ring.length : null;
+
+  let openEarly = 0;
+  lcMap.forEach((lc) => {
+    if (lc.earlyAt !== null && lc.trippedAt === null) openEarly += 1;
+  });
+
+  const raw = acc.rawAlarmTimes.length;
+  const act = acc.actionableTimes.length;
+
+  return {
+    earlyCatches: acc.earlyCatches,
+    completedLeads: acc.completedLeads,
+    openEarly,
+    avgLeadSeconds: avg,
+    maxLeadSeconds: acc.maxLeadSeconds > 0 ? acc.maxLeadSeconds : null,
+    leadRing: [...ring],
+    nuisanceFiltered: acc.nuisanceFiltered,
+    rawAlarms10m: raw,
+    actionableAlarms10m: act,
+    reductionPct: raw > 0 ? Math.round((1 - act / raw) * 100) : null,
+    corroboratedEarly: acc.corroboratedEarly,
+    corroborationRate: acc.earlyCatches > 0 ? Math.round((acc.corroboratedEarly / acc.earlyCatches) * 100) : null,
+    anomalyWarming: !acc.scoredSeen,
+    samples: acc.samples,
+  };
+}
+
 export function useLiveData() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [alarms, setAlarms] = useState<Alarm[]>([]);
@@ -286,12 +484,18 @@ export function useLiveData() {
   // The active site-wide emergency (or null). Persisted ~30s after the last
   // site_alert record so it doesn't flicker; clears when none arrive.
   const [siteAlert, setSiteAlert] = useState<SiteAlert | null>(null);
+  // Session-scoped live prediction/segregation metrics (rendered snapshot).
+  const [metrics, setMetrics] = useState<LiveMetrics>(EMPTY_METRICS);
 
   // Keyed by machine name so each grid/task entry reflects the machine's
   // latest state instead of growing without bound.
   const machineMap = useRef<Map<string, Machine>>(new Map());
   const taskMap = useRef<Map<string, Task>>(new Map());
   const siteAlertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mutable metrics accumulator + per-machine fault lifecycles (no re-render);
+  // the published snapshot lives in `metrics` state above. Reset on reload.
+  const metricsAcc = useRef<MetricsAcc>(freshMetricsAcc());
+  const faultLC = useRef<Map<string, FaultLC>>(new Map());
 
   useEffect(() => {
     // `connected` is now driven by the socket lifecycle (onopen/onclose),
@@ -341,6 +545,16 @@ export function useLiveData() {
           siteAlertTimer.current = null;
         }, SITE_ALERT_PERSIST_MS);
       }
+
+      // ---- LIVE METRICS (additive, fail-safe) ----------------------------
+      // Fold this frame into the session metrics, then publish a snapshot.
+      // Wrapped so a malformed frame can never break the feed or the panel.
+      try {
+        accumulateMetrics(raw, metricsAcc.current, faultLC.current, Date.now());
+        setMetrics(buildMetricsSnapshot(metricsAcc.current, faultLC.current));
+      } catch (err) {
+        console.error('[useLiveData] metrics accumulation skipped:', err);
+      }
     }, setConnected);
 
     return () => {
@@ -352,5 +566,5 @@ export function useLiveData() {
     };
   }, []);
 
-  return { machines, alarms, tasks, connected, controlAlarms, siteAlert };
+  return { machines, alarms, tasks, connected, controlAlarms, siteAlert, metrics };
 }

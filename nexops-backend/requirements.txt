@@ -13,6 +13,12 @@ SQLAlchemy          # ORM; the SAME models run on both SQLite (default) and Post
 psycopg2-binary     # Postgres driver — ONLY needed if DATABASE_URL points at Postgres.
                     # The default SQLite backend needs nothing extra.
 
+# --- Stage 3a: auth foundation (JWT login + role/zone identity) ---
+PyJWT               # JWT sign/verify (HS256)
+bcrypt              # password hashing — used DIRECTLY (5.0.0 installed & works;
+                    # passlib was dropped: it reads bcrypt.__about__ which 5.x removed)
+httpx               # required by FastAPI's TestClient (test_auth.py import)
+
 # --- NOT needed yet; uncomment as later stages land ---
 # influxdb-client     # Stage: history (time-series storage)
 # anthropic           # Stage: ARIA (explanations)

@@ -46,7 +46,13 @@ assignment.ZONE_WEIGHT), so a skilled other-zone engineer always beats an
 unskilled same-zone one - that is exactly what makes cross-zone fallback work.
 """
 
-from db import Engineer, FaultMTTR, get_session, reset_db
+from db import Engineer, FaultMTTR, User, get_session, reset_db
+
+# DEMO-ONLY shared dev password for EVERY seeded user. Hashed at seed time. This
+# is NOT production-safe (one known password, printed to the console) — it exists
+# so the demo operator can log in as any role instantly. Real deployments must
+# replace this with per-user provisioning.
+DEV_PASSWORD = "nexops123"
 
 
 # (name, role, skills, active_tasks, available, experience_years, max_capacity, zone)
@@ -113,6 +119,76 @@ MTTR = {
 }
 
 
+def seed_users(session=None):
+    """Wipe and re-seed ONLY the `users` table from the CURRENT engineers roster.
+
+    Idempotent: deletes every existing user and rebuilds 1 plant_manager + 4
+    field_managers + one technician per engineer. Does NOT touch the engineers
+    table or any other table — safe to re-run any time.
+
+    Pass an existing `session` (e.g. from seed()) to run inside that transaction;
+    called with no args it opens/commits/closes its own session so it can be run
+    standalone against an already-seeded engineers roster.
+    """
+    # Local import keeps seed.py importable even where auth deps aren't needed
+    # until users are actually seeded.
+    from auth_jwt import hash_password
+
+    owns_session = session is None
+    if owns_session:
+        session = get_session()
+    try:
+        pw = hash_password(DEV_PASSWORD)
+
+        # WIPE users only (additive reseed; engineers/MTTR/assignments untouched).
+        session.query(User).delete()
+        session.flush()
+
+        creds = []  # (username, role, zone) for the printed credentials table
+        used = set()  # collision guard across all usernames
+
+        def add_user(username, role, zone, engineer_id):
+            session.add(User(username=username, password_hash=pw, role=role,
+                             zone=zone, engineer_id=engineer_id))
+            used.add(username)
+            creds.append((username, role, zone))
+
+        # 1 plant manager (whole site -> zone NULL).
+        add_user("plant", "plant_manager", None, None)
+
+        # 4 field managers, one per zone.
+        for z in ("A", "B", "C", "D"):
+            add_user(f"field{z}", "field_manager", z, None)
+
+        # 16 technicians: one per existing engineer. username = lowercased first
+        # name, collision-safe (append zone, then id). zone + engineer_id mirror
+        # the engineer.
+        engineers = session.query(Engineer).order_by(Engineer.id).all()
+        for eng in engineers:
+            base = (eng.name.split()[0] if eng.name else f"eng{eng.id}").lower()
+            uname = base
+            if uname in used:
+                uname = f"{base}{(eng.zone or '').lower()}"
+            if uname in used:
+                uname = f"{base}{eng.id}"
+            add_user(uname, "technician", eng.zone, eng.id)
+
+        if owns_session:
+            session.commit()
+
+        # CREDENTIALS table (demo operator login sheet).
+        print("[seed] users — DEMO credentials (NOT production-safe):")
+        print(f"       password for ALL users: {DEV_PASSWORD!r}")
+        print(f"       {'username':<14}{'role':<16}zone")
+        for uname, role, zone in creds:
+            print(f"       {uname:<14}{role:<16}{zone or '-'}")
+        print(f"[seed] inserted {len(creds)} users "
+              f"(1 plant_manager + 4 field_managers + {len(creds) - 5} technicians).")
+    finally:
+        if owns_session:
+            session.close()
+
+
 def seed():
     """Wipe and re-fill the database with the demo roster + MTTR history."""
     reset_db()
@@ -144,6 +220,10 @@ def seed():
                         mttr_minutes=float(minutes),
                     )
                 )
+
+        # Stage 3a (additive): reseed the auth users from the roster we just
+        # flushed (engineers now have ids). Reuses THIS session/transaction.
+        seed_users(session)
 
         session.commit()
         print(f"[seed] inserted {len(ENGINEERS)} engineers (4 per zone, zones A/B/C/D) and "

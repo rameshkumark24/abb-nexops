@@ -433,3 +433,33 @@ def record_assignment(record: dict, result: dict, session) -> Assignment:
     session.commit()
     session.refresh(assignment)
     return assignment
+
+
+# ----------------------------------------------------------------------
+# De-duplication lookup (read-only).
+# ----------------------------------------------------------------------
+
+# Statuses that count as an OPEN (unresolved) task. A task in either state is
+# still on the technician's queue; only "resolved" frees the (machine, category)
+# slot for a brand-new task. Mirrors lifecycle.get_active_assignments, which
+# lists everything with status != "resolved".
+OPEN_STATUSES = ("assigned", "in_progress")
+
+
+def find_open_assignment(session, machine, fault_category):
+    """Return the most-recent OPEN (unresolved) Assignment for this exact
+    (machine, fault_category), or None.
+
+    Used to DE-DUPLICATE: a developing fault re-emits a Warning every fleet
+    sweep, but it is ONE physical fault, so we must not persist a NEW task while
+    an open one already exists. Once that task is resolved (status 'resolved',
+    which this query excludes), a genuinely recurring fault is free to create a
+    fresh task. Read-only - writes nothing."""
+    return (
+        session.query(Assignment)
+        .filter(Assignment.machine == machine)
+        .filter(Assignment.fault_category == fault_category)
+        .filter(Assignment.status.in_(OPEN_STATUSES))
+        .order_by(Assignment.assigned_at.desc())
+        .first()
+    )

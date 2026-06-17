@@ -100,16 +100,18 @@ NUISANCE_CHANCE = 0.03
 # ======================================================================
 # SCALE CONFIG  (why this zone-structured slice provably scales to the pitch)
 # ======================================================================
-# The pitch is a 500-machine plant with ~250 technicians. This prototype is a
-# faithful SCALED-DOWN SLICE that holds the same RATIOS, so the scaling claim is
-# honest rather than merely asserted. Stage 1 of the ZONE HIERARCHY grows the
-# slice from 16 asset TYPES to ~26 machine INSTANCES across 4 ZONES (A/B/C/D),
-# staffed by ~24 engineers (~6 per zone) - so this slice now runs at roughly a
-# 1:1 tech:machine ratio inside a zone-structured plant:
+# The pitch is a 500-machine plant with ~250 technicians (a 1:2 tech:machine
+# ratio). This prototype is a faithful SCALED-DOWN SLICE that holds a comparable
+# ratio, so the scaling claim is honest rather than merely asserted. Stage 1 of
+# the ZONE HIERARCHY grows the slice from 16 asset TYPES to ~26 machine INSTANCES
+# across 4 ZONES (A/B/C/D), staffed by 16 engineers (4 per zone) - so this slice
+# runs at roughly a 1:1.6 tech:machine ratio, in the same ballpark as the 1:2
+# pitch ratio, inside a zone-structured plant:
 #
 #   Ratios held by this slice:
-#     * technicians : machines ~= 1 : 1   (24 techs / 26 machines, ~6 techs and
-#                                          ~6-7 machines per zone)
+#     * technicians : machines ~= 1 : 1.6  (16 techs / 26 machines, 4 techs and
+#                                          ~6-7 machines per zone), trending toward
+#                                          the 1:2 pitch ratio (250 techs / 500 machines)
 #     * fault / nuisance / sudden rates are defined PER MACHINE PER READING - the
 #       probabilities above are rolled INDEPENDENTLY for each machine - so total
 #       alarm volume = machines x per-machine-rate x readings-per-machine.
@@ -134,7 +136,7 @@ NUISANCE_CHANCE = 0.03
 #   high, the knobs to lower are DEGRADATION_SEED_CHANCE / SUDDEN_EVENT_CHANCE /
 #   NUISANCE_CHANCE; defaults here stay realistic.
 PROTO_MACHINES = 26          # == len(MACHINES) == len(FLEET); this demo slice
-PROTO_TECHNICIANS = 24       # matches the assignment subsystem's seeded roster
+PROTO_TECHNICIANS = 16       # matches the assignment subsystem's seeded roster (4 per zone)
 PITCH_MACHINES = 500         # pitch-scale fleet
 PITCH_TECHNICIANS = 250      # pitch-scale workforce
 
@@ -1215,9 +1217,9 @@ def main():
         print(f"  Zone {_z} ({len(_by_zone[_z])}): {', '.join(_by_zone[_z])}")
     print("Legend:  State = ACT/ACK/RTN   '*' = predictive early-warning (actionable)   "
           "'~' = nuisance (filterable texture)")
-    print(f"Scale slice: {PROTO_MACHINES} machines / {PROTO_TECHNICIANS} techs (~1:1 ratio, "
-          f"~6 per zone) - per-machine rates scale linearly to {PITCH_MACHINES} machines / "
-          f"{PITCH_TECHNICIANS} techs (~{PITCH_MACHINES // PROTO_MACHINES}x volume).")
+    print(f"Scale slice: {PROTO_MACHINES} machines / {PROTO_TECHNICIANS} techs (~1:1.6 ratio, "
+          f"4 per zone) - per-machine rates scale linearly toward {PITCH_MACHINES} machines / "
+          f"{PITCH_TECHNICIANS} techs (1:2 pitch ratio, ~{PITCH_MACHINES // PROTO_MACHINES}x volume).")
     if ESCALATION_ENABLED:
         print("Demo arc: starts CALM, then escalates to an ALARM FLOOD over time.")
     else:

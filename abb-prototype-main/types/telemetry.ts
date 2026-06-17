@@ -49,8 +49,10 @@ export interface TelemetryRecord {
   // --- NexOps anomaly layer (added by the backend, independent of gateway) ---
   anomaly_score: number | null; // 0..1, higher = more anomalous; null while warming up
   anomaly_status: AnomalyStatus; // 'warming_up' | 'scored' | 'error'
-  nexops_risk: NexopsRisk; // NexOps's own risk verdict
+  nexops_risk: NexopsRisk; // NexOps's own risk verdict (CAPPED)
   nexops_reasoning: string; // short human explanation of the verdict
+  is_early?: boolean; // backend's single-source-of-truth EARLY badge (optional
+  // for backward-compat: old records lack it, see isEarlyWarning fallback)
 
   // --- NexOps assignment + site-emergency layer (added by the backend) ---
   assigned_engineer: string; // "Unassigned" if none
