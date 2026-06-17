@@ -1,301 +1,235 @@
 'use client';
 
-import { useState, useRef, useEffect, type FormEvent } from 'react';
-import { NavBar, COLORS, Dot } from '@/components/Shared';
+import { NavBar, Dot, Panel, Badge, MicroLabel, RISK_TOKEN, STATE_TOKEN, type BadgeVariant } from '@/components/Shared';
 import { SiteAlertBanner } from '@/components/SiteAlertBanner';
-import { IconAlertTriangle } from '@/components/Icons';
+import AriaPanel from '@/components/AriaPanel';
 import { useLiveData } from '@/hooks/useLiveData';
+import { useTasks } from '@/hooks/useTasks';
+import { useAuth, RoleGuard } from '@/context/AuthContext';
+import type { Machine, LifecycleTask } from '@/types/telemetry';
 
-const AVAILABLE_TECHS = ['Alice Smith', 'Bob Johnson', 'Charlie Davis', 'Unassigned'];
+// NexOps risk -> badge variant (LOW grey / MEDIUM amber / HIGH orange / CRITICAL
+// red). Red reserved for CRITICAL only. (Same mapping as the Plant dashboard.)
+const RISK_BADGE: Record<string, BadgeVariant> = {
+  LOW: 'nominal',
+  MEDIUM: 'warning',
+  HIGH: 'high',
+  CRITICAL: 'alarm',
+};
 
-const ARIA_RESPONSES = [
-  'Based on vibration RMS data from M-12 Conveyor, the bearing on shaft #2 is showing early-stage degradation. I recommend scheduling a replacement within the next 48 hours to avoid unplanned downtime.',
-  'Coolant flow on T-21 Boiler-A dropped 8% in the last hour. Historical data suggests a valve blockage pattern. Dispatching a technician for physical inspection is the recommended action.',
-  'Cross-referencing alarm patterns: the B-14 Turbine bearing temp spike correlates with M-12 Conveyor vibration increase. Both units share the same coolant loop — the root cause is likely upstream.',
-  'Current risk assessment: 3 machines require attention within the next 2 hours. I suggest prioritizing C-09 Chiller (45% performance) as the highest-impact fix.',
-];
+// Lifecycle status -> badge variant (no new colours: amber=assigned,
+// indigo=in_progress(active), grey=resolved).
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  assigned: 'warning',
+  in_progress: 'early',
+  resolved: 'nominal',
+};
 
-export default function EngineerConsole() {
-  // Live task queue + high-risk buzz + site emergency come from the single seam.
-  const { tasks, alarms, siteAlert } = useLiveData();
-  // Tech reassignment is a UI-local concern, keyed by machine so a choice
-  // sticks across live ticks (task ids change as new records arrive).
-  const [techOverrides, setTechOverrides] = useState<Record<string, string>>({});
-  const [chatHistory, setChatHistory] = useState([
-    { role: 'aria', text: 'ARIA Diagnostics active. I am monitoring all plant units in real-time. Current status: 3 active alerts, 1 critical. How can I assist?' }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const responseIdx = useRef(0);
+// A machine's accent token: critical=red, else early=indigo, else by risk.
+function accentFor(m: Machine): string {
+  if (m.nexopsRisk === 'CRITICAL') return STATE_TOKEN.critical;
+  if (m.isEarly) return STATE_TOKEN.early;
+  return RISK_TOKEN[m.nexopsRisk] ?? STATE_TOKEN.nominal;
+}
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory, isTyping]);
+function FieldManagerConsole() {
+  // All-zones live feed (machines) + the site-wide emergency. We FILTER machines
+  // to the field manager's OWN zone below (the server also scopes /tasks).
+  const { machines, siteAlert } = useLiveData();
+  // Zone-scoped task lifecycle: the /tasks endpoint already returns ONLY this
+  // field_manager's zone (server-side scoping) — we just render it.
+  const { tasks: zoneTasks, loading: tasksLoading } = useTasks();
+  const { user, logout } = useAuth();
 
-  const reallocateTask = (machine: string, newTech: string) => {
-    setTechOverrides(prev => ({ ...prev, [machine]: newTech }));
-  };
+  const zoneLetter = user?.zone ?? '—';
+  const zoneFull = user?.zone ? `Zone ${user.zone}` : null; // machine.zone is 'Zone X'
+  const zoneMachines = zoneFull ? machines.filter((m) => m.zone === zoneFull) : [];
 
-  const handleChatSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-    
-    const newHistory = [...chatHistory, { role: 'user', text: chatInput }];
-    setChatHistory(newHistory);
-    setChatInput('');
-    setIsTyping(true);
-    
-    setTimeout(() => {
-      const response = ARIA_RESPONSES[responseIdx.current % ARIA_RESPONSES.length];
-      responseIdx.current++;
-      setChatHistory([...newHistory, { role: 'aria', text: response }]);
-      setIsTyping(false);
-    }, 1200);
-  };
+  // ---- Zone health summary (single-zone version of UI-2's rollup) ---------
+  const count = zoneMachines.length;
+  const criticals = zoneMachines.filter((m) => m.nexopsRisk === 'CRITICAL').length;
+  const activeAlarms = zoneMachines.filter((m) => m.perf < 80).length;
+  const earlyCount = zoneMachines.filter((m) => m.isEarly).length;
 
-  const cardStyle = {
-    background: COLORS.cardBg,
-    border: `1px solid ${COLORS.borderFaint}`,
-    borderRadius: 6,
-    padding: 24,
-    display: 'flex',
-    flexDirection: 'column' as const,
-  };
+  const stat = (v: number | null) => (v == null ? '—' : `${v}`);
+  const SUMMARY: { value: string; label: string; tone?: string }[] = [
+    { value: stat(count), label: 'MACHINES' },
+    { value: stat(activeAlarms), label: 'ACTIVE ALARMS', tone: activeAlarms > 0 ? STATE_TOKEN.warning : undefined },
+    { value: stat(criticals), label: 'CRITICAL', tone: criticals > 0 ? STATE_TOKEN.critical : undefined },
+    { value: stat(earlyCount), label: 'EARLY CATCHES', tone: earlyCount > 0 ? STATE_TOKEN.early : undefined },
+  ];
 
-  const selectStyle = {
-    background: '#090b10',
-    border: `1px solid ${COLORS.borderSub}`,
-    borderRadius: 4,
-    padding: '6px 10px',
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 11,
-    color: COLORS.textSec,
-    outline: 'none',
-  };
+  // ---- Field team derived from REAL data (no faked roster) ----------------
+  // Primary: distinct engineers on this zone's tasks; supplemented by engineers
+  // currently dispatched to this zone's machines. We do NOT invent names.
+  const team = new Map<string, { tasks: LifecycleTask[]; focus: Set<string> }>();
+  zoneTasks.forEach((t) => {
+    const name = t.engineer_name || 'Unassigned';
+    if (!team.has(name)) team.set(name, { tasks: [], focus: new Set() });
+    const entry = team.get(name)!;
+    entry.tasks.push(t);
+    if (t.fault_category) entry.focus.add(t.fault_category);
+  });
+  zoneMachines.forEach((m) => {
+    if (m.assignedEngineer && m.assignedEngineer !== 'Unassigned' && !team.has(m.assignedEngineer)) {
+      const focus = new Set<string>();
+      if (m.faultCategory) focus.add(m.faultCategory);
+      team.set(m.assignedEngineer, { tasks: [], focus });
+    }
+  });
+  const teamRows = Array.from(team.entries());
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <NavBar onBack={() => window.location.href = '/'} />
+    <div className="abb-page fade-in-up" style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* 1 — SITE EMERGENCY BANNER (site-wide; shown to everyone) */}
       <SiteAlertBanner alert={siteAlert} />
 
-      <div className="fade-in-up" style={{ padding: '40px 56px', maxWidth: 1400, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column', gap: 32 }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 8 }}>Field Engineer Console</h1>
-          <p style={{ color: COLORS.textMuted, fontSize: 13 }}>Priority task queue, high-risk buzz, and ARIA conversational diagnostics.</p>
-        </div>
+      {/* 6 — NavBar + logout (wiring unchanged) */}
+      <NavBar onBack={() => (window.location.href = '/')} onLogout={logout} />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1.1fr', gap: 24, flex: 1 }}>
-          {/* High Risk Buzz */}
-          <div className="card-hover" style={cardStyle}>
-            <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: '#ef4444', letterSpacing: '0.12em', marginBottom: 20 }}>
-              <Dot color="#ef4444" size={7} cls="pulse-fast" />
-              HIGH RISK BUZZ
-            </div>
-
-            <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {alarms.map((buzz, i) => {
-                // NUISANCE = filtered noise. Render it heavily de-emphasised so
-                // real alarms stand out; NexOps has already classified it as not
-                // actionable, so it never gets the EARLY/critical treatment.
-                if (buzz.isNuisance) {
-                  return (
-                    <div
-                      key={i}
-                      className="fade-in-up"
-                      style={{ background: '#0b0d12', border: `1px dashed ${COLORS.borderSub}`, padding: '10px 16px', borderRadius: 6, opacity: 0.55 }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="mono" style={{ fontSize: 9, color: COLORS.textFaint, letterSpacing: '0.08em' }}>
-                          ⊘ NUISANCE — FILTERED
-                        </span>
-                        <span className="mono" style={{ fontSize: 9, color: COLORS.textFaint }}>{buzz.time}</span>
-                      </div>
-                      <div className="mono" style={{ fontSize: 10, color: COLORS.textMuted, marginTop: 6, lineHeight: 1.5 }}>
-                        {buzz.msg}
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                <div
-                  key={i}
-                  className={`fade-in-up ${buzz.type === 'CRITICAL' ? 'glow-critical' : ''}`}
-                  style={{ background: buzz.type === 'CRITICAL' ? '#0f0808' : '#0f0d08', border: `1px solid ${buzz.isEarly ? '#f59e0b' : buzz.type === 'CRITICAL' ? '#3b1515' : '#3b2e15'}`, padding: 16, borderRadius: 6 }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className={`mono ${buzz.type === 'CRITICAL' ? 'blink-critical' : ''}`} style={{ fontSize: 10, color: buzz.type === 'CRITICAL' ? '#ef4444' : '#f59e0b', fontWeight: 600 }}>
-                        ⚠ {buzz.type}
-                      </span>
-                      {buzz.isEarly && (
-                        <span className="mono blink-critical" style={{ fontSize: 9, color: '#f59e0b', background: '#1a1408', border: '1px solid #3b2e15', padding: '1px 6px', borderRadius: 3, letterSpacing: '0.08em', fontWeight: 600 }}>
-                          ⚠ EARLY · NEXOPS {buzz.nexopsRisk}
-                        </span>
-                      )}
-                    </span>
-                    <span className="mono" style={{ fontSize: 9, color: COLORS.textFaint }}>{buzz.time}</span>
-                  </div>
-                  <div style={{ fontSize: 13, color: COLORS.textPrimary, display: 'flex', gap: 8, alignItems: 'flex-start', lineHeight: 1.5 }}>
-                    <IconAlertTriangle size={16} color={buzz.type === 'CRITICAL' ? '#ef4444' : '#f59e0b'} style={{ flexShrink: 0, marginTop: 2 }} />
-                    {/* EARLY items lead with NexOps's angle - the gateway message is
-                        "all parameters normal", which is the whole point and must NOT
-                        be the headline. Non-early items keep the gateway message. */}
-                    {buzz.isEarly
-                      ? buzz.reasoning || 'NexOps early warning — anomaly detected before the static threshold'
-                      : buzz.msg}
-                  </div>
-                  {buzz.isEarly && (
-                    <div className="mono" style={{ fontSize: 9.5, color: COLORS.textFaint, marginTop: 8, lineHeight: 1.5 }}>
-                      gateway: nominal
-                    </div>
-                  )}
-                </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Technician Task View */}
-          <div className="card-hover" style={cardStyle}>
-            <div className="mono" style={{ fontSize: 10, color: COLORS.textFaint, letterSpacing: '0.1em', marginBottom: 20 }}>
-              TECHNICIAN TASK VIEW & ALLOCATION
-            </div>
-
-            <div style={{ border: `1px solid ${COLORS.borderFaint}`, borderRadius: 6, overflow: 'hidden' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 2fr 1.2fr 0.8fr 1.5fr', background: '#090b10', padding: '12px 16px', borderBottom: `1px solid ${COLORS.borderFaint}`, fontSize: 9, color: COLORS.textFaint, letterSpacing: '0.1em' }} className="mono">
-                <span>TASK</span>
-                <span>DESCRIPTION</span>
-                <span>MACHINE</span>
-                <span>PRI</span>
-                <span>ASSIGNED TO</span>
-              </div>
-              
-              {tasks.map(t => {
-                // The dropdown must be able to show the REAL auto-assigned
-                // engineer (from the backend roster, e.g. "Ravi Kumar"), which
-                // usually isn't in the static AVAILABLE_TECHS list - so we fold
-                // it in (deduped) and default the selection to it.
-                const techOptions = Array.from(
-                  new Set([t.assignedEngineer, ...AVAILABLE_TECHS].filter(Boolean))
-                );
-                return (
-                <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '0.8fr 2fr 1.2fr 0.8fr 1.5fr', padding: '14px 16px', borderBottom: `1px solid ${COLORS.borderFaint}`, fontSize: 12, color: COLORS.textSec, alignItems: 'center' }}>
-                  <span className="mono" style={{ color: COLORS.textPrimary, fontWeight: 500 }}>{t.id}</span>
-                  <span style={{ paddingRight: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <span>{t.title}</span>
-                    {/* "why this engineer" - the live assignment reasoning. */}
-                    {t.assignmentReason && (
-                      <span className="mono" style={{ fontSize: 8.5, color: COLORS.textFaint, lineHeight: 1.4 }}>
-                        {t.faultCategory ? `[${t.faultCategory}] ` : ''}{t.assignmentReason}
-                      </span>
-                    )}
-                  </span>
-                  <span className="mono" style={{ fontSize: 10 }}>{t.machine}</span>
-                  <span className={`mono ${t.priority === 'CRITICAL' ? 'blink-critical' : ''}`} style={{ fontSize: 9, color: t.priority === 'CRITICAL' ? '#ef4444' : t.priority === 'WARNING' ? '#f59e0b' : '#22c55e', fontWeight: 600 }}>
-                    {t.priority}
-                  </span>
-                  <select
-                    value={techOverrides[t.machine] ?? t.tech}
-                    onChange={e => reallocateTask(t.machine, e.target.value)}
-                    title={t.assignmentReason ?? 'Auto-assigned by NexOps'}
-                    aria-label={`Assigned engineer for ${t.machine}`}
-                    style={selectStyle}
-                  >
-                    {techOptions.map(tech => (
-                      <option key={tech} value={tech}>{tech}</option>
-                    ))}
-                  </select>
-                </div>
-                );
-              })}
-            </div>
-            <p style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 16, lineHeight: 1.6 }}>
-              Reallocate tasks via dropdown if a technician is unavailable.
+      <div className="abb-shell" style={{ paddingTop: 'clamp(28px,4vw,40px)', paddingBottom: 56, display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* 2 — ZONE HEADER + health summary */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 'clamp(22px,3vw,28px)', fontWeight: 300, color: 'var(--abb-ink-0)', marginBottom: 6 }}>
+              Zone {zoneLetter} — Field Manager
+            </h1>
+            <p className="abb-data" style={{ fontSize: 12, color: 'var(--abb-ink-2)' }}>
+              FIELD MANAGER · {user?.username ?? '—'} · scoped to Zone {zoneLetter}
             </p>
           </div>
+        </div>
 
-          {/* ARIA Chatbot */}
-          <div className="glow-blue card-hover" style={cardStyle}>
-            <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: '#3b82f6', letterSpacing: '0.12em', marginBottom: 16 }}>
-              <Dot color="#3b82f6" size={7} cls="pulse" />
-              ARIA · ADAPTIVE REASONING
-            </div>
-
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', marginBottom: 16, paddingRight: 6, maxHeight: 360 }}>
-              {chatHistory.map((msg, i) => (
-                <div key={i} className="fade-in-up" style={{ alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%' }}>
-                  <div style={{ 
-                    background: msg.role === 'user' ? '#1e293b' : '#0c0e14', 
-                    border: `1px solid ${msg.role === 'user' ? '#334155' : COLORS.borderSub}`,
-                    padding: '12px 14px', 
-                    borderRadius: 8, 
-                    borderBottomRightRadius: msg.role === 'user' ? 2 : 8,
-                    borderTopLeftRadius: msg.role === 'aria' ? 2 : 8,
-                    fontSize: 12, 
-                    color: msg.role === 'user' ? '#f8fafc' : COLORS.textSec,
-                    lineHeight: 1.6
-                  }}>
-                    {msg.text}
-                  </div>
-                  <div className="mono" style={{ fontSize: 8, color: COLORS.textFaint, marginTop: 5, textAlign: msg.role === 'user' ? 'right' : 'left', letterSpacing: '0.08em' }}>
-                    {msg.role === 'user' ? 'FIELD ENGINEER' : 'ARIA · ADAPTIVE REASONING'}
-                  </div>
+        <Panel style={{ padding: 22 }}>
+          <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
+            {SUMMARY.map((s) => (
+              <div key={s.label}>
+                <div className="abb-data" style={{ fontSize: 30, fontWeight: 600, color: s.tone ?? 'var(--abb-ink-0)', letterSpacing: '-0.01em' }}>
+                  {s.value}
                 </div>
-              ))}
-              {isTyping && (
-                <div className="fade-in-up" style={{ alignSelf: 'flex-start' }}>
-                  <div style={{ background: '#0c0e14', border: `1px solid ${COLORS.borderSub}`, padding: '12px 14px', borderRadius: 8, borderTopLeftRadius: 2, display: 'flex', gap: 4 }}>
-                    <Dot color="#3b82f6" size={6} cls="pulse" />
-                    <Dot color="#3b82f6" size={6} cls="pulse-fast" />
-                    <Dot color="#3b82f6" size={6} cls="pulse" />
-                  </div>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            <form onSubmit={handleChatSubmit} style={{ display: 'flex', gap: 8, borderTop: `1px solid ${COLORS.borderFaint}`, paddingTop: 14 }}>
-              <input 
-                type="text" 
-                placeholder="Ask ARIA..." 
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                style={{
-                  flex: 1,
-                  background: '#090b10',
-                  border: `1px solid ${COLORS.borderSub}`,
-                  borderRadius: 6,
-                  padding: '10px 14px',
-                  fontFamily: 'inherit',
-                  fontSize: 12,
-                  color: COLORS.textPrimary,
-                  outline: 'none',
-                  transition: 'border-color 0.2s'
-                }}
-              />
-              <button 
-                type="submit"
-                style={{
-                  background: '#3b82f6',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '0 20px',
-                  borderRadius: 6,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  letterSpacing: '0.05em',
-                  transition: 'background 0.2s'
-                }}
-              >
-                SEND
-              </button>
-            </form>
+                <MicroLabel style={{ marginTop: 4 }}>{s.label}</MicroLabel>
+              </div>
+            ))}
           </div>
+        </Panel>
+
+        {/* 3 — ZONE MACHINE HEALTH (filtered to user.zone) */}
+        <Panel style={{ padding: 22 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+            <MicroLabel>ZONE {zoneLetter} · MACHINE HEALTH &amp; PREDICTION</MicroLabel>
+            <div className="abb-data" style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 9, color: 'var(--abb-ink-3)', letterSpacing: '0.06em' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Dot color={STATE_TOKEN.nominal} size={6} cls="" />NOMINAL</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Dot color={STATE_TOKEN.warning} size={6} cls="" />WARNING</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Dot color={STATE_TOKEN.early} size={6} cls="" />EARLY</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><Dot color={STATE_TOKEN.critical} size={6} cls="" />CRITICAL</span>
+            </div>
+          </div>
+
+          {count === 0 ? (
+            <div className="abb-data" style={{ padding: '28px 0', textAlign: 'center', fontSize: 12, color: 'var(--abb-ink-3)', letterSpacing: '0.06em' }}>
+              {zoneFull ? `AWAITING LIVE STREAM FOR ZONE ${zoneLetter}…` : 'NO ZONE ASSIGNED'}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto', paddingRight: 6 }}>
+              {zoneMachines.map((m, i) => {
+                const accent = accentFor(m);
+                const isCrit = m.nexopsRisk === 'CRITICAL';
+                return (
+                  <div
+                    key={`${m.name}-${i}`}
+                    style={{
+                      padding: '11px 14px',
+                      background: isCrit ? 'var(--abb-alarm-soft)' : 'var(--abb-surface-1)',
+                      border: `1px solid ${isCrit ? 'var(--abb-alarm-line)' : 'var(--abb-line-faint)'}`,
+                      borderLeft: `3px solid ${accent}`,
+                      borderRadius: 'var(--abb-radius-sm)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                        <Dot color={accent} size={7} cls={isCrit ? 'pulse-fast' : ''} />
+                        <span className="abb-data" style={{ fontSize: 12, color: 'var(--abb-ink-0)', fontWeight: 600 }}>{m.name}</span>
+                        {m.isEarly && <Badge variant="early" title={m.reasoning}>⚠ EARLY</Badge>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {m.anomalyScore != null && (
+                          <span className="abb-data" style={{ fontSize: 9, color: 'var(--abb-ink-3)' }}>a={m.anomalyScore.toFixed(2)}</span>
+                        )}
+                        <Badge variant={RISK_BADGE[m.nexopsRisk] ?? 'nominal'} title={m.reasoning}>NEXOPS {m.nexopsRisk}</Badge>
+                        <span className="abb-data" style={{ fontSize: 13, color: accent, fontWeight: 700, minWidth: 42, textAlign: 'right' }}>{m.perf}%</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 6, background: 'var(--abb-surface-3)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${m.perf}%`, height: '100%', background: accent, borderRadius: 3, transition: 'width 0.4s ease' }} />
+                    </div>
+                    {m.assignedEngineer && m.assignedEngineer !== 'Unassigned' && (
+                      <div className="abb-data" style={{ fontSize: 9, color: 'var(--abb-ink-2)', marginTop: 6 }}>
+                        ▸ {m.assignedEngineer}{m.faultCategory ? ` · ${m.faultCategory}` : ''}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Panel>
+
+        {/* 4 (team+tasks) + 5 (ARIA) — side by side on wide, stacked on narrow */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, alignItems: 'start' }}>
+          {/* 4 — ZONE FIELD TEAM + TASK ASSIGNMENTS (from zone-scoped useTasks) */}
+          <Panel style={{ padding: 22 }}>
+            <MicroLabel style={{ marginBottom: 16 }}>ZONE {zoneLetter} · FIELD TEAM &amp; TASKS</MicroLabel>
+            {tasksLoading && teamRows.length === 0 ? (
+              <div className="abb-data" style={{ padding: '20px 0', textAlign: 'center', fontSize: 11, color: 'var(--abb-ink-3)', letterSpacing: '0.06em' }}>LOADING ZONE TASKS…</div>
+            ) : teamRows.length === 0 ? (
+              <div className="abb-data" style={{ padding: '20px 0', textAlign: 'center', fontSize: 11, color: 'var(--abb-ink-3)', letterSpacing: '0.06em' }}>NO ACTIVE TASKS IN THIS ZONE</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {teamRows.map(([name, info]) => (
+                  <div key={name} style={{ border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius-sm)', padding: 14, background: 'var(--abb-surface-1)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                      <span className="abb-data" style={{ fontSize: 12, fontWeight: 700, color: 'var(--abb-ink-0)' }}>{name}</span>
+                      {info.focus.size > 0 && (
+                        <span className="abb-data" style={{ fontSize: 9, color: 'var(--abb-ink-3)', letterSpacing: '0.04em' }}>
+                          FOCUS · {Array.from(info.focus).join(' · ')}
+                        </span>
+                      )}
+                    </div>
+                    {info.tasks.length === 0 ? (
+                      <div className="abb-data" style={{ fontSize: 9.5, color: 'var(--abb-ink-3)' }}>dispatched to a zone machine · no lifecycle task open</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {info.tasks.map((t) => (
+                          <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            <span className="abb-data" style={{ fontSize: 10.5, color: 'var(--abb-ink-1)' }}>
+                              <span style={{ color: 'var(--abb-ink-3)' }}>T-{t.id} ·</span> {t.fault_category ?? 'general'} <span style={{ color: 'var(--abb-ink-3)' }}>· {t.machine}</span>
+                            </span>
+                            <Badge variant={STATUS_BADGE[t.status] ?? 'nominal'}>{t.status.replace('_', ' ')}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* 5 — ARIA HELPER (docked, zone-scoped, canned with swap-seam) */}
+          <AriaPanel zone={zoneLetter} />
         </div>
       </div>
     </div>
+  );
+}
+
+// Route guard: this is the Field Manager / zone console. Only a field_manager
+// renders it; others are redirected (no token -> /login, wrong role -> their own
+// dashboard). Server-side scoping still enforces; this is defense in depth.
+export default function EngineerPage() {
+  return (
+    <RoleGuard role="field_manager">
+      <FieldManagerConsole />
+    </RoleGuard>
   );
 }

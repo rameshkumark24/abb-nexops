@@ -14,30 +14,15 @@ export function SiteAlertBanner({ alert }: { alert: SiteAlert | null }) {
       ? `Engineer ${alert.engineer} dispatched`
       : 'Dispatching engineer…';
 
+  // Restyled to the ABB alarm token (Stage UI-1): flat industrial red — the ONE
+  // place red is allowed to dominate — instead of the old gradient. Prop + data
+  // shape unchanged. A soft pulse keeps the eye without consumer flourish.
   return (
-    <div
-      role="alert"
-      className="glow-critical blink-critical"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-        background: 'linear-gradient(90deg, #7f1d1d, #ef4444, #7f1d1d)',
-        color: '#ffffff',
-        padding: '14px 24px',
-        borderBottom: '2px solid #ef4444',
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: 14,
-        fontWeight: 700,
-        letterSpacing: '0.06em',
-        textAlign: 'center',
-      }}
-    >
-      <span>🚨 SITE EMERGENCY: {alert.label}</span>
-      <span style={{ opacity: 0.85, fontWeight: 600 }}>— {alert.machine} —</span>
-      <span>{dispatched}</span>
-      <span style={{ opacity: 0.7, fontWeight: 500, fontSize: 11 }}>{alert.time}</span>
+    <div role="alert" className="abb-banner-alarm pulse-fast">
+      <span style={{ fontSize: 15 }}>■ SITE EMERGENCY: {alert.label}</span>
+      <span style={{ opacity: 0.9, fontWeight: 600 }}>— {alert.machine} —</span>
+      <span style={{ fontWeight: 600 }}>{dispatched}</span>
+      <span className="abb-data" style={{ opacity: 0.8, fontWeight: 500, fontSize: 11 }}>{alert.time}</span>
     </div>
   );
 }

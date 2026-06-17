@@ -6,6 +6,7 @@ import { SiteAlertBanner } from '@/components/SiteAlertBanner';
 import { IconAlertTriangle, IconWrench } from '@/components/Icons';
 import { useLiveData } from '@/hooks/useLiveData';
 import { useTasks } from '@/hooks/useTasks';
+import { useAuth, RoleGuard } from '@/context/AuthContext';
 import type { TaskStatus } from '@/types/telemetry';
 
 // Visual treatment per lifecycle status (drives the small status pill).
@@ -23,12 +24,13 @@ function clockOf(iso: string | null): string {
   return t ? t.slice(0, 8) : iso;
 }
 
-export default function TechnicianConsole() {
+function TechnicianConsole() {
   // Same live seam as the other roles so the site-wide RED ZONE banner reaches
   // the technician too. The task QUEUE itself is driven by the HTTP lifecycle
   // endpoints via useTasks (separate from the WebSocket telemetry stream).
   const { siteAlert } = useLiveData();
   const { tasks, loading, error, start, resolve } = useTasks();
+  const { logout } = useAuth();
 
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -230,8 +232,11 @@ export default function TechnicianConsole() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <NavBar onBack={() => (window.location.href = '/')} />
+    // Keeps its own DARK body styling on the now-light root layout (UI-2). This
+    // page is restyled to the light tokens in its own pass; the explicit dark
+    // background here just prevents white-on-white until then.
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0b0d', color: '#e2e8f0' }}>
+      <NavBar onBack={() => (window.location.href = '/')} onLogout={logout} />
       <SiteAlertBanner alert={siteAlert} />
 
       <div className="fade-in-up" style={{ padding: '40px 56px', flex: 1 }}>
@@ -287,5 +292,16 @@ export default function TechnicianConsole() {
         {body}
       </div>
     </div>
+  );
+}
+
+// Route guard: only a technician renders the technician console; others are
+// redirected (no token -> /login, wrong role -> their own dashboard). The server
+// still scopes /tasks to the technician's own assignments — this is defense in depth.
+export default function TechnicianPage() {
+  return (
+    <RoleGuard role="technician">
+      <TechnicianConsole />
+    </RoleGuard>
   );
 }

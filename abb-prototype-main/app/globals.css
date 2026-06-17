@@ -291,3 +291,260 @@
     @apply font-sans;
   }
 }
+
+/* ====================================================================== */
+/* ABB CONTROL-SYSTEM DESIGN TOKENS (Stage UI-1) — ISA-101 high-perf HMI  */
+/* LIGHT theme. Single source of truth: every later page imports          */
+/* globals.css and references these CSS variables (var(--abb-*)). Defined  */
+/* in a plain :root with NO dark override, so the control surface stays    */
+/* light regardless of OS colour scheme. Restyled primitives + Home/Login  */
+/* consume these; Plant/Field/Technician inherit them in the next pass.    */
+/*                                                                         */
+/* COLOUR DISCIPLINE: "fine" is QUIET grey (never green-everywhere). RED   */
+/* (--abb-alarm) is reserved for CRITICAL/alarm ONLY — never headers,      */
+/* logo, buttons or brand — so red always carries genuine alarm meaning.   */
+/* EARLY/predictive uses a distinct NON-red treatment (indigo).            */
+/*                                                                         */
+/* RESPONSIVE BREAKPOINTS: sm 640 · md 768 · lg 1024 · xl 1280px.          */
+/* ====================================================================== */
+:root {
+  /* Surfaces — off-white / light-grey */
+  --abb-surface-0: #f3f4f6; /* page background */
+  --abb-surface-1: #ffffff; /* cards / panels */
+  --abb-surface-2: #e9ebef; /* insets, table header, hover */
+  --abb-surface-3: #dfe2e8; /* deeper inset */
+
+  /* Ink — dark grey text */
+  --abb-ink-0: #1c2230; /* primary text / headings */
+  --abb-ink-1: #39414f; /* secondary */
+  --abb-ink-2: #5a6473; /* muted */
+  --abb-ink-3: #8b94a3; /* faint / uppercase micro-labels */
+
+  /* Borders */
+  --abb-line-faint: #e6e8ec;
+  --abb-line: #d3d8df;
+  --abb-line-strong: #b7bec9;
+
+  /* State / risk palette — ISA-101 discipline */
+  --abb-nominal: #6c7480; /* LOW / nominal — QUIET grey */
+  --abb-nominal-soft: #eef0f3;
+  --abb-warning: #b07313; /* MEDIUM / warning — amber / ochre */
+  --abb-warning-soft: #fbf3e2;
+  --abb-warning-line: #e6cf95;
+  --abb-high: #c04a1b; /* HIGH — deep orange (between amber and alarm, NOT red) */
+  --abb-high-soft: #fbeee6;
+  --abb-high-line: #ecc3ad;
+  --abb-early: #4338ca; /* EARLY / predictive — indigo (deliberately NON-red) */
+  --abb-early-soft: #ecedfb;
+  --abb-early-line: #c3c5f0;
+  --abb-alarm: #c1121f; /* CRITICAL / alarm — RED, used NOWHERE else */
+  --abb-alarm-strong: #a30d18;
+  --abb-alarm-soft: #fae9ea;
+  --abb-alarm-line: #e9aab0;
+  --abb-nuisance: #98a1b0; /* nuisance-filtered — muted / de-emphasised */
+  --abb-nuisance-soft: #eef0f2;
+
+  /* Typography — brand identity lives in TYPE, not colour */
+  --abb-font-ui: 'Inter', var(--font-geist-sans), system-ui, sans-serif;
+  --abb-font-data: 'JetBrains Mono', var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Radii — crisp, small (control-panel convention) */
+  --abb-radius: 4px;
+  --abb-radius-sm: 3px;
+  --abb-radius-pill: 999px;
+
+  /* Elevation — flat; a hairline + faint shadow only */
+  --abb-shadow-1: 0 1px 2px rgba(20, 26, 38, 0.06);
+  --abb-shadow-2: 0 4px 14px rgba(20, 26, 38, 0.08);
+}
+
+/* ---- Layout containers (responsive) -------------------------------- */
+/* Opaque light surface that COVERS the root layout's dark background, so
+   Home/Login render light without touching layout.tsx (dashboards keep
+   their current background until they adopt these tokens next pass). */
+.abb-page {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--abb-surface-0);
+  color: var(--abb-ink-1);
+  font-family: var(--abb-font-ui);
+}
+.abb-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  padding-left: clamp(16px, 4vw, 56px);
+  padding-right: clamp(16px, 4vw, 56px);
+}
+.abb-data {
+  font-family: var(--abb-font-data);
+}
+.abb-micro {
+  font-family: var(--abb-font-data);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 9px;
+  color: var(--abb-ink-3);
+}
+
+/* Hero: 2-col on desktop, stacks under lg (1024). */
+.abb-hero {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: clamp(28px, 4vw, 56px);
+  align-items: center;
+  padding-top: clamp(32px, 5vw, 64px);
+  padding-bottom: clamp(28px, 4vw, 48px);
+}
+@media (max-width: 1024px) {
+  .abb-hero { grid-template-columns: 1fr; }
+}
+
+/* Role cards: auto-fit, collapse to single column on small screens. */
+.abb-roles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .abb-roles-grid { grid-template-columns: 1fr; }
+}
+
+/* Login: form + side panel, stacks under md (860). */
+.abb-login-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.05fr;
+  gap: clamp(24px, 4vw, 48px);
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .abb-login-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Primitives ----------------------------------------------------- */
+.abb-card {
+  background: var(--abb-surface-1);
+  border: 1px solid var(--abb-line);
+  border-radius: var(--abb-radius);
+  box-shadow: var(--abb-shadow-1);
+}
+.abb-card--interactive {
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+.abb-card--interactive:hover {
+  border-color: var(--abb-line-strong);
+  box-shadow: var(--abb-shadow-2);
+  transform: translateY(-1px);
+}
+
+.abb-input {
+  width: 100%;
+  background: var(--abb-surface-1);
+  border: 1px solid var(--abb-line);
+  border-radius: var(--abb-radius-sm);
+  padding: 10px 12px;
+  font-family: var(--abb-font-data);
+  font-size: 13px;
+  color: var(--abb-ink-0);
+  outline: none;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.abb-input:focus {
+  border-color: var(--abb-ink-2);
+  box-shadow: 0 0 0 3px rgba(57, 65, 79, 0.10);
+}
+
+.abb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--abb-radius-sm);
+  font-family: var(--abb-font-data);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 11px 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.abb-btn--primary {
+  background: var(--abb-ink-0);
+  color: #ffffff;
+  border-color: var(--abb-ink-0);
+}
+.abb-btn--primary:hover { background: #2a3142; }
+.abb-btn--ghost {
+  background: transparent;
+  color: var(--abb-ink-1);
+  border-color: var(--abb-line);
+}
+.abb-btn--ghost:hover { background: var(--abb-surface-2); }
+.abb-btn[disabled] { opacity: 0.6; cursor: wait; }
+
+/* Badges — uppercase micro pills. EARLY=indigo, NUISANCE=muted grey,
+   WARNING=amber, ALARM=red. */
+.abb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--abb-font-data);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--abb-radius-sm);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.abb-badge--nominal { color: var(--abb-nominal); background: var(--abb-nominal-soft); border-color: var(--abb-line); }
+.abb-badge--warning { color: var(--abb-warning); background: var(--abb-warning-soft); border-color: var(--abb-warning-line); }
+.abb-badge--high    { color: var(--abb-high);    background: var(--abb-high-soft);    border-color: var(--abb-high-line); }
+.abb-badge--early   { color: var(--abb-early);   background: var(--abb-early-soft);   border-color: var(--abb-early-line); }
+.abb-badge--alarm   { color: var(--abb-alarm);   background: var(--abb-alarm-soft);   border-color: var(--abb-alarm-line); }
+.abb-badge--nuisance{ color: var(--abb-nuisance);background: var(--abb-nuisance-soft);border-color: var(--abb-line); }
+
+/* Data table */
+.abb-table { width: 100%; border-collapse: collapse; }
+.abb-table thead th {
+  font-family: var(--abb-font-data);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 9px;
+  color: var(--abb-ink-3);
+  text-align: left;
+  background: var(--abb-surface-2);
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--abb-line);
+}
+.abb-table tbody td {
+  font-size: 12px;
+  color: var(--abb-ink-1);
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--abb-line-faint);
+}
+
+/* Site-wide CRITICAL banner — the ONE place red is allowed to dominate. */
+.abb-banner-alarm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--abb-alarm);
+  color: #ffffff;
+  padding: 13px 24px;
+  border-bottom: 2px solid var(--abb-alarm-strong);
+  font-family: var(--abb-font-data);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+@media (max-width: 640px) {
+  .abb-banner-alarm { font-size: 11px; padding: 10px 14px; }
+}

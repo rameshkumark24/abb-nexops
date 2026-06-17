@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
+import { AuthProvider } from '@/context/AuthContext'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({
@@ -46,27 +47,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} bg-[#0a0b0d]`} suppressHydrationWarning>
-      <body className="font-sans antialiased bg-[#0a0b0d] text-[#e2e8f0]" suppressHydrationWarning>
-        <div className="min-h-screen bg-[#0a0b0d] text-[#e2e8f0]">
-          {/* Grid background */}
-          <div className="fixed inset-0 z-0 pointer-events-none bg-[#0a0b0d] bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:44px_44px]" />
-          
-          {/* Red glow effect */}
-          <div
-            className="fixed pointer-events-none z-0"
-            style={{
-              bottom: '-100px',
-              right: '-100px',
-              width: '480px',
-              height: '480px',
-              background: 'radial-gradient(circle, rgba(185,28,28,0.18) 0%, transparent 70%)',
-            }}
-          />
-          
-          <div className="relative z-10">
-            {children}
-          </div>
+    // Stage UI-2: root flipped to the LIGHT ABB control-system surface. Home/Login
+    // already paint their own opaque .abb-page (light), so they're unaffected.
+    // Restyled dashboards (Plant) inherit this light base; Field/Technician keep
+    // their own dark body styling (set on their page roots) until their passes.
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+      <body
+        className="font-sans antialiased"
+        style={{ background: 'var(--abb-surface-0)', color: 'var(--abb-ink-1)' }}
+        suppressHydrationWarning
+      >
+        <div style={{ minHeight: '100vh', background: 'var(--abb-surface-0)', color: 'var(--abb-ink-1)' }}>
+          <AuthProvider>{children}</AuthProvider>
         </div>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
