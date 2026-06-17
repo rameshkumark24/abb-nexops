@@ -50,11 +50,11 @@ from assignment import (
 )
 from lifecycle import start_task, resolve_task, get_active_assignments
 from db import Assignment, Engineer, User, get_session, init_db
-from seed import seed
+from seed import seed, DEV_PASSWORD
 # Stage 3a auth foundation.
-from auth_jwt import verify_password, create_token, get_current_user, CurrentUser
+from auth_jwt import verify_password, create_token, get_current_user, CurrentUser, hash_password
 # Stage 3b server-side role+zone scoping (the rule lives in scoping.py).
-from scoping import can_write_assignment
+from scoping import can_write_assignment, scope_engineer_query
 
 app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
 
@@ -222,14 +222,21 @@ def emergency_type_for(record: dict):
         return "emergency_stop"
     return None
 
-# CORS: allow all origins for the demo so the Next.js app on :3000 can hit
-# the HTTP/WS endpoints on :8000 without preflight headaches.
+# CORS: the Next.js app on :3000 makes AUTHED cross-origin calls
+# (Authorization: Bearer ...). A wildcard origin "*" is INVALID together with
+# allow_credentials=True — browsers reject it — so we name the dev origins
+# EXPLICITLY and explicitly allow the Authorization + Content-Type request
+# headers. Without the Authorization header allowed, every authed fetch from
+# React fails with an opaque CORS error. (Stage 3c)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -618,6 +625,255 @@ def http_list_tasks(include_resolved: bool = False,
         return JSONResponse(status_code=500, content={"error": "internal error"})
     finally:
         session.close()
+
+
+@app.get("/engineers/{engineer_id}/stats")
+def http_engineer_stats(engineer_id: int,
+                        current: CurrentUser = Depends(get_current_user)):
+    """HONEST per-engineer stats for the technician console — only metrics the DB
+    actually supports, never fabricated.
+
+    Returns: { engineer_id, name, zone, resolved_count, active_count,
+               avg_resolution_minutes }.
+      - resolved_count : assignments with status='resolved' (the terminal state).
+      - active_count   : assignments with status in ('assigned','in_progress').
+      - avg_resolution_minutes : the mean of Assignment.resolution_minutes over
+        this engineer's RESOLVED tasks (a REAL stored timestamp delta computed by
+        lifecycle.resolve_task from resolved_at - assigned_at). It is null when
+        the engineer has no resolved task yet — NOT faked.
+
+    SCOPING reuses scoping.scope_engineer_query (NOT a new rule): plant any,
+    field_manager only engineers in his zone, technician only HIMSELF. We look the
+    engineer up unscoped first (404 if truly absent), then through the scoped
+    query (403 if it exists but is outside the caller's scope). REQUIRES a token
+    (get_current_user -> 401). Fail-safe: any error -> clean 500 body, no leak."""
+    session = get_session()
+    try:
+        # 404 ONLY when the engineer genuinely does not exist.
+        engineer = session.get(Engineer, engineer_id)
+        if engineer is None:
+            return JSONResponse(status_code=404,
+                                content={"error": f"engineer {engineer_id} not found"})
+
+        # SAME role/zone rule as everywhere else: reuse scope_engineer_query. If the
+        # engineer exists but the scoped query can't see it -> out of scope (403).
+        visible = (
+            scope_engineer_query(
+                session.query(Engineer).filter(Engineer.id == engineer_id), current
+            ).first()
+            is not None
+        )
+        if not visible:
+            return JSONResponse(status_code=403,
+                                content={"error": "forbidden: engineer outside your scope"})
+
+        rows = (
+            session.query(Assignment)
+            .filter(Assignment.engineer_id == engineer_id)
+            .all()
+        )
+        resolved = [a for a in rows if a.status == "resolved"]
+        active_count = sum(1 for a in rows if a.status in ("assigned", "in_progress"))
+        mins = [a.resolution_minutes for a in resolved if a.resolution_minutes is not None]
+        avg_resolution_minutes = round(sum(mins) / len(mins), 2) if mins else None
+
+        return {
+            "engineer_id": engineer.id,
+            "name": engineer.name,
+            "zone": engineer.zone,
+            "resolved_count": len(resolved),
+            "active_count": active_count,
+            "avg_resolution_minutes": avg_resolution_minutes,
+        }
+    except Exception as exc:  # never let a DB error crash the bridge
+        print(f"[stats] engineer {engineer_id} failed: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
+# ----------------------------------------------------------------------
+# Employee management (Stage 3d) — PLANT MANAGER ONLY for the mutating routes.
+# Add a technician (Engineer + linked User in ONE transaction) and SOFT-DELETE
+# (deactivate/activate) without touching assignment history. GET /engineers
+# REUSES scope_engineer_query (no new rule). Fail-safe throughout.
+# ----------------------------------------------------------------------
+
+_VALID_ZONES = ("A", "B", "C", "D")
+
+
+class CreateEngineerRequest(BaseModel):
+    name: str
+    zone: str
+    skills: list[str] = []
+    max_capacity: int | None = None
+    role: str | None = None
+    username: str | None = None
+    password: str | None = None
+
+
+def _require_plant(current):
+    """Plant-manager-only gate for mutating employee routes. Returns a 403
+    JSONResponse when the caller is not a plant_manager, else None."""
+    if getattr(current, "role", None) != "plant_manager":
+        return JSONResponse(status_code=403, content={"error": "forbidden: plant manager only"})
+    return None
+
+
+def _unique_username(session, base, zone, engineer_id):
+    """seed.py-style collision-safe username: lowercased first name, then +zone,
+    then +id. Checks existing User.username rows so it never collides."""
+    def taken(u):
+        return session.query(User).filter(User.username == u).first() is not None
+    cand = base
+    if taken(cand):
+        cand = f"{base}{(zone or '').lower()}"
+    if taken(cand):
+        cand = f"{base}{engineer_id}"
+    return cand
+
+
+@app.get("/engineers")
+def http_list_engineers(current: CurrentUser = Depends(get_current_user)):
+    """Roster source for the UI. SCOPED via scope_engineer_query (NOT a new rule):
+    plant sees all, field_manager his zone, technician himself. Includes `active`."""
+    session = get_session()
+    try:
+        q = scope_engineer_query(session.query(Engineer), current)
+        return [
+            {
+                "id": e.id, "name": e.name, "zone": e.zone, "role": e.role,
+                "skills": e.skills or [], "max_capacity": e.max_capacity,
+                "active_tasks": e.active_tasks, "available": e.available,
+                "active": e.active,
+            }
+            for e in q.order_by(Engineer.id).all()
+        ]
+    except Exception as exc:  # never let a DB error crash the bridge
+        print(f"[engineers] list failed: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
+@app.post("/engineers", status_code=201)
+def http_create_engineer(body: CreateEngineerRequest,
+                         current: CurrentUser = Depends(get_current_user)):
+    """PLANT ONLY. Create an Engineer (active=True) AND a linked technician User
+    in ONE transaction — rollback on any error so a half-created pair never
+    persists. 400 on bad zone / duplicate username; 403 non-plant; 401 no token."""
+    denied = _require_plant(current)
+    if denied is not None:
+        return denied
+
+    name = (body.name or "").strip()
+    if not name:
+        return JSONResponse(status_code=400, content={"error": "name is required"})
+    zone = (body.zone or "").strip().upper()
+    if zone not in _VALID_ZONES:
+        return JSONResponse(status_code=400, content={"error": f"zone must be one of {list(_VALID_ZONES)}"})
+    if not isinstance(body.skills, list):
+        return JSONResponse(status_code=400, content={"error": "skills must be a list"})
+
+    session = get_session()
+    try:
+        # Explicit username: reject a duplicate up front with a clear 400.
+        uname = None
+        if body.username:
+            uname = body.username.strip().lower()
+            if not uname:
+                return JSONResponse(status_code=400, content={"error": "username is empty"})
+            if session.query(User).filter(User.username == uname).first() is not None:
+                return JSONResponse(status_code=400, content={"error": f"username '{uname}' already exists"})
+
+        engineer = Engineer(
+            name=name,
+            role=(body.role or "Field Technician"),
+            skills=list(body.skills),
+            zone=zone,
+            max_capacity=(body.max_capacity if body.max_capacity is not None else 6),
+            active_tasks=0,
+            available=True,
+            experience_years=0,
+            active=True,
+        )
+        session.add(engineer)
+        session.flush()  # assign engineer.id within the SAME transaction
+
+        if uname is None:
+            base = (name.split()[0] if name.split() else f"eng{engineer.id}").lower()
+            uname = _unique_username(session, base, zone, engineer.id)
+
+        pw = body.password if body.password else DEV_PASSWORD
+        user = User(
+            username=uname,
+            password_hash=hash_password(pw),
+            role="technician",
+            zone=zone,
+            engineer_id=engineer.id,
+            active=True,
+        )
+        session.add(user)
+        session.commit()
+
+        return {
+            "engineer": {
+                "id": engineer.id, "name": engineer.name, "zone": engineer.zone,
+                "role": engineer.role, "skills": engineer.skills,
+                "max_capacity": engineer.max_capacity, "active": engineer.active,
+            },
+            "user": {
+                "username": user.username, "role": user.role, "zone": user.zone,
+                "engineer_id": user.engineer_id, "active": user.active,
+            },
+            "password_is_default": body.password is None,
+        }
+    except Exception as exc:
+        session.rollback()  # never persist a half-created engineer+user pair
+        print(f"[engineers] create failed: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
+def _set_engineer_active(engineer_id, active, current):
+    """Shared body for activate/deactivate (PLANT ONLY). Sets Engineer.active and
+    mirrors it onto the linked user(s). Idempotent. 404 if the engineer is missing.
+    Soft only — no rows deleted, so assignment history is preserved."""
+    denied = _require_plant(current)
+    if denied is not None:
+        return denied
+    session = get_session()
+    try:
+        engineer = session.get(Engineer, engineer_id)
+        if engineer is None:
+            return JSONResponse(status_code=404, content={"error": f"engineer {engineer_id} not found"})
+        engineer.active = active
+        for u in session.query(User).filter(User.engineer_id == engineer_id).all():
+            u.active = active
+        session.commit()
+        return {"engineer_id": engineer.id, "name": engineer.name, "active": engineer.active}
+    except Exception as exc:
+        session.rollback()
+        print(f"[engineers] set-active({active}) {engineer_id} failed: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
+@app.post("/engineers/{engineer_id}/deactivate")
+def http_deactivate_engineer(engineer_id: int,
+                             current: CurrentUser = Depends(get_current_user)):
+    """PLANT ONLY. Soft-delete: Engineer.active=False (excluded from assignment
+    eligibility), rows preserved. Idempotent. 404 if missing."""
+    return _set_engineer_active(engineer_id, False, current)
+
+
+@app.post("/engineers/{engineer_id}/activate")
+def http_activate_engineer(engineer_id: int,
+                           current: CurrentUser = Depends(get_current_user)):
+    """PLANT ONLY. Reverse of deactivate (demo reset). Idempotent. 404 if missing."""
+    return _set_engineer_active(engineer_id, True, current)
 
 
 # ----------------------------------------------------------------------

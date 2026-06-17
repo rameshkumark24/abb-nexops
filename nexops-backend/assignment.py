@@ -269,8 +269,16 @@ def assign_engineer(record: dict, session) -> dict:
     # preference, so the engine behaves exactly as it did before zones existed.
     machine_zone = str(record.get("zone", "") or "").strip() or None
 
-    # Skip UNAVAILABLE / off-shift engineers for everyone.
-    available = session.query(Engineer).filter(Engineer.available.is_(True)).all()
+    # Skip UNAVAILABLE / off-shift engineers for everyone. Also skip SOFT-DELETED
+    # (active=False) engineers — same eligibility step, NO scoring change. We use
+    # isnot(False) so only an EXPLICIT deactivation excludes; missing/NULL active
+    # (e.g. an un-reseeded row) is treated as active (safe, behaviour-preserving).
+    available = (
+        session.query(Engineer)
+        .filter(Engineer.available.is_(True))
+        .filter(Engineer.active.isnot(False))
+        .all()
+    )
     if not available:
         # Nobody on shift at all. For a safety event this is a STAFFING
         # ESCALATION (a people problem), explicitly NOT a routine 'at capacity'.

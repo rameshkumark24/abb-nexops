@@ -93,6 +93,12 @@ class Engineer(Base):
     # column purely ADDITIVE: pre-existing rows / records without a zone still
     # load, and the engine treats a missing zone as "no zone preference".
     zone = Column(String, nullable=True)
+    # active: SOFT-DELETE flag (Stage 3d). An inactive engineer is EXCLUDED from
+    # assignment eligibility but its rows (and assignment history allocation
+    # depends on) are NEVER deleted. Defaulted True so it is additive; an existing
+    # SQLite DB must be RESEEDED (python seed.py / reset_db) for the column to
+    # exist, since create_all does not ALTER an existing table.
+    active = Column(Boolean, nullable=False, default=True)
 
     mttr = relationship(
         "FaultMTTR", back_populates="engineer", cascade="all, delete-orphan"
@@ -176,6 +182,10 @@ class User(Base):
     # engineer_id: FK to engineers.id, set ONLY for technicians (NULL for the
     # manager roles). Additive link — the engineers table is left untouched.
     engineer_id = Column(Integer, ForeignKey("engineers.id"), nullable=True)
+    # active: mirrors the linked Engineer's soft-delete flag (Stage 3d). Set
+    # False when the technician is deactivated. NOT enforced in login here (auth
+    # logic is unchanged); assignment eligibility keys off Engineer.active.
+    active = Column(Boolean, nullable=False, default=True)
 
 
 # ----------------------------------------------------------------------
