@@ -217,7 +217,7 @@ export default function AriaPanel({ zone }: { zone: string }) {
                     lineHeight: 1.55,
                   }}
                 >
-                  <div>{m.text}</div>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{m.text}</div>
                   {m.role === 'aria' && m.evidence && (
                     <EvidenceGrounding evidence={m.evidence} source={m.source} />
                   )}
