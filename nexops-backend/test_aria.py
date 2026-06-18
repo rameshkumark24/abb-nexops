@@ -139,6 +139,58 @@ class TestAriaChatbot(unittest.TestCase):
         self.assertIn("mechanical", answer)
         self.assertIn("Inspect alignment, bearings", answer)
 
+    def test_out_of_domain_detection(self):
+        # General OOD queries
+        self.assertTrue(aria.is_out_of_domain("who is ms dhoni"))
+        self.assertTrue(aria.is_out_of_domain("What is the capital of France?"))
+        self.assertTrue(aria.is_out_of_domain("tell me a joke"))
+        
+        # In-domain queries containing words that look OOD but contain plant terms
+        self.assertFalse(aria.is_out_of_domain("who is assigned to Compressor A1?"))
+        self.assertFalse(aria.is_out_of_domain("what is the vibration level of Pump A2?"))
+
+    def test_targeted_fallback_templates(self):
+        # Setup mock context
+        ctx = {
+            "query": "Highest risk in my zone?",
+            "role": "technician",
+            "scope_zone": "A",
+            "top_machines": [
+                {"name": "Compressor A1", "zone": "A", "nexops_risk": "HIGH", "status": "Warning", "alert": "High vibration"},
+                {"name": "Pump A2", "zone": "A", "nexops_risk": "LOW", "status": "Normal", "alert": "None"}
+            ],
+            "open_task_count": 1,
+            "personal_tasks": [
+                {"id": 4, "machine": "Compressor A1", "zone": "A", "fault_category": "mechanical", "status": "assigned"}
+            ],
+            "scoped_engineers": [
+                {"name": "Ravi Kumar", "active_tasks": 0, "max_capacity": 6, "available": True},
+                {"name": "Lena Vogel", "active_tasks": 3, "max_capacity": 6, "available": True}
+            ]
+        }
+        
+        # Test ALERTS_RISK template
+        res_risk = aria.render_fallback_answer(ctx, key_failed=True)
+        self.assertIn("Active warnings and alerts:", res_risk)
+        self.assertIn("Compressor A1", res_risk)
+        
+        # Test MY_TASKS template
+        ctx["query"] = "how many tasks for me?"
+        res_my = aria.render_fallback_answer(ctx, key_failed=True)
+        self.assertIn("You have 1 active task(s) assigned to you in Zone A:", res_my)
+        self.assertIn("Task #4", res_my)
+        
+        # Test ROSTER_LOAD template
+        ctx["query"] = "who is assigned more?"
+        res_roster = aria.render_fallback_answer(ctx, key_failed=True)
+        self.assertIn("Lena Vogel: 3 / 6 active task(s)", res_roster)
+        self.assertIn("Lena Vogel is currently assigned the most work", res_roster)
+        
+        # Test OOD template within fallback
+        ctx["query"] = "who is MS Dhoni?"
+        res_ood = aria.render_fallback_answer(ctx, key_failed=True)
+        self.assertIn("out-of-domain topics", res_ood)
+
 
 class TestAriaEndpoint(unittest.TestCase):
     @classmethod
@@ -184,6 +236,30 @@ class TestAriaEndpoint(unittest.TestCase):
         self.assertEqual(r_plant.status_code, 200)
         data_plant = r_plant.json()
         self.assertEqual(data_plant["evidence"]["focus_machine"], "Compressor A1") # Allowed for plant manager!
+
+    def test_aria_ask_endpoint_out_of_domain(self):
+        tok = self._login("plant")
+        r = client.post("/aria/ask", json={"query": "who is ms dhoni?"}, headers=self._auth(tok))
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertIn("out-of-domain topics", data["answer"])
+        self.assertEqual(data["source"], "unavailable")
+
+    def test_aria_ask_endpoint_personal_tasks(self):
+        # Login as ravi (technician from Zone A)
+        tok_ravi = self._login("ravi")
+        
+        # Query: "how many tasks for me"
+        r = client.post("/aria/ask", json={"query": "how many tasks for me?"}, headers=self._auth(tok_ravi))
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        
+        if data["source"] == "fallback_template":
+            self.assertTrue(
+                "no active tasks" in data["answer"].lower() or "active task(s) assigned to you" in data["answer"].lower()
+            )
+        else:
+            self.assertTrue(len(data["answer"]) > 0)
 
 
 if __name__ == "__main__":

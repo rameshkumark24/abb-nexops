@@ -10,6 +10,35 @@ import httpx
 # Models and DB access
 from db import Assignment, Engineer
 
+def is_out_of_domain(query: str) -> bool:
+    """Detect if query is asking for general knowledge, sports, celebrities, or definitions unrelated to NexOps."""
+    q = query.lower().strip()
+    if not q:
+        return False
+        
+    ood_keywords = [
+        "who is", "who was", "what is a", "definition of", "how do i cook",
+        "dhoni", "sachin", "kohli", "cricket", "football", "sports", "movie",
+        "weather", "capital of", "president", "tell me about yourself", "how are you",
+        "joke", "story", "song", "lyrics", "sing", "dance", "actor", "actress",
+        "celebrity", "history of"
+    ]
+    
+    plant_terms = [
+        "compressor", "pump", "boiler", "reactor", "hx", "heat exchanger", "zone",
+        "early", "warning", "task", "assignment", "assigned", "assign", "engineer",
+        "ravi", "sam", "lena", "diego", "fault", "vibration", "temp", "pressure", "flow",
+        "level", "telemetry", "alarm", "alert", "mcc panel", "work", "workload", "roster"
+    ]
+    
+    for k in ood_keywords:
+        if k in q:
+            if any(term in q for term in plant_terms):
+                return False
+            return True
+            
+    return False
+
 # Primary Gemini & Secondary Groq API Keys (as provided)
 GEMINI_API_KEY = "AQ.Ab8RN6Jhp5dl6_iw1CCBKxqnyOIuDggN8BvRRcy-n8VlhxMWOw"
 GROQ_API_KEY = "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"
@@ -178,7 +207,7 @@ def find_worst_moving_sensor(trend: list[dict], features: list[str]) -> dict | N
     projections.sort(key=lambda p: p["eta_minutes_low"])
     return projections[0]
 
-def build_context(query: str, role: str, scope_zone: str | None, latest: dict[str, dict], history: dict[str, list[dict]], session) -> dict:
+def build_context(query: str, role: str, scope_zone: str | None, latest: dict[str, dict], history: dict[str, list[dict]], session, username: str | None = None, engineer_id: int | None = None) -> dict:
     """Builds the structured AriaContext object containing scoped live states, trends, database metrics, and team rosters."""
     machines = list(latest.keys())
     focus_machine = resolve_focus_machine(query, machines)
@@ -192,9 +221,34 @@ def build_context(query: str, role: str, scope_zone: str | None, latest: dict[st
                 scope_violation = True
                 focus_machine = None # drop focus
                 
+    # Personal tasks query if technician
+    personal_tasks = []
+    if role == "technician" and engineer_id is not None:
+        try:
+            tasks = session.query(Assignment).filter(
+                Assignment.engineer_id == engineer_id,
+                Assignment.status.in_(("assigned", "in_progress"))
+            ).all()
+            personal_tasks = [
+                {
+                    "id": t.id,
+                    "machine": t.machine,
+                    "zone": t.zone,
+                    "fault_category": t.fault_category,
+                    "status": t.status,
+                    "assigned_at": t.assigned_at.isoformat() if t.assigned_at else None
+                }
+                for t in tasks
+            ]
+        except Exception as e:
+            print(f"[aria-context] failed to load personal tasks: {e}")
+
     context = {
+        "query": query,
         "role": role,
         "scope_zone": scope_zone,
+        "username": username,
+        "engineer_id": engineer_id,
         "scope_violation": scope_violation,
         "focus_machine": focus_machine,
         "time_to_threshold": None,
@@ -203,7 +257,8 @@ def build_context(query: str, role: str, scope_zone: str | None, latest: dict[st
         "scoped_engineers": [],
         "top_machines": [],
         "open_task_count": 0,
-        "trend_len": 0
+        "trend_len": 0,
+        "personal_tasks": personal_tasks
     }
     
     # Always-on attachment: scoped engineers
@@ -340,8 +395,66 @@ def render_fallback_answer(ctx: dict, key_failed: bool = False) -> str:
     focus = ctx.get("focus_machine")
     prefix = "(Offline Fallback Mode — please check API key configuration)\n\n" if key_failed else ""
     
+    query = (ctx.get("query") or "").lower()
+    
+    # 1. OUT-OF-DOMAIN CHECK
+    if is_out_of_domain(query):
+        return "I am ARIA, an AI assistant trained only for NexOps refinery telemetry and dispatch. I cannot assist with out-of-domain topics."
+        
     if not focus:
         zone = ctx.get("scope_zone") or "ALL"
+        role = ctx.get("role")
+        
+        # Intent A: MY_TASKS
+        if any(k in query for k in ("my task", "tasks for me", "my assignment", "my work")):
+            personal = ctx.get("personal_tasks") or []
+            if role != "technician":
+                return prefix + "Only technicians have personal task queues. As a manager, you can query overall zone dispatches."
+            if not personal:
+                return prefix + "You currently have no active tasks assigned to you in the queue."
+            
+            lines = [f"You have {len(personal)} active task(s) assigned to you in Zone {zone}:"]
+            for t in personal:
+                lines.append(f"- Task #{t['id']}: {t['machine']} ({t['fault_category']}, status: {t['status']})")
+            return prefix + "\n".join(lines)
+            
+        # Intent B: ROSTER_LOAD / WORKLOAD
+        if any(k in query for k in ("workload", "assigned more", "most busy", "who is assigned", "staff", "roster")):
+            engineers = ctx.get("scoped_engineers") or []
+            if not engineers:
+                return prefix + f"No engineers registered in Zone {zone}."
+                
+            lines = [f"Engineer workload summary for Zone {zone}:"]
+            sorted_engs = sorted(engineers, key=lambda e: e.get("active_tasks") or 0, reverse=True)
+            for e in sorted_engs:
+                lines.append(f"- {e['name']}: {e.get('active_tasks', 0)} / {e.get('max_capacity', 6)} active task(s) (avail: {e['available']})")
+                
+            busy_eng = sorted_engs[0]
+            if busy_eng.get("active_tasks", 0) > 0:
+                lines.append(f"\n{busy_eng['name']} is currently assigned the most work ({busy_eng['active_tasks']} active task(s)).")
+            else:
+                lines.append("\nAll engineers are currently free.")
+            return prefix + "\n".join(lines)
+            
+        # Intent C: ALERTS_RISK
+        if any(k in query for k in ("alert", "alarm", "risk", "highest risk", "warning", "critical")):
+            top = ctx.get("top_machines") or []
+            tasks_count = ctx.get("open_task_count", 0)
+            
+            lines = [
+                f"Zone {zone} Telemetry & Alert Summary:",
+                f"- Open lifecycle dispatches: {tasks_count}"
+            ]
+            at_risk = [m for m in top if m.get("nexops_risk") in ("HIGH", "CRITICAL") or m.get("status") != "Normal"]
+            if at_risk:
+                lines.append("- Active warnings and alerts:")
+                for m in at_risk:
+                    lines.append(f"  * {m['name']}: risk {m['nexops_risk']} (status {m['status']}, alert {m['alert']})")
+            else:
+                lines.append("- No warning or critical machines detected in this zone.")
+            return prefix + "\n".join(lines)
+            
+        # Default General Summary
         top = ctx.get("top_machines", [])
         tasks_count = ctx.get("open_task_count", 0)
         
@@ -420,7 +533,13 @@ def format_system_prompt(query: str, ctx: dict) -> str:
     else:
         role_clause = "ROLE: plant_manager. You have a plant-wide view across all zones (A, B, C, D) and oversee all machines, engineers, and incidents."
         
-    grounding_clause = "Answer ONLY from the SYSTEM STATE block below. Never invent sensor values, engineer names, risk levels, fault categories, or timings. If the context lacks the answer, say so plainly. Distinguish the gateway's static threshold from NexOps's predictive risk. Do not call yourself the anomaly model or the assignment engine — you report what they produced."
+    grounding_clause = (
+        "Answer ONLY from the SYSTEM STATE block below. Never invent sensor values, engineer names, risk levels, fault categories, or timings. "
+        "If the context lacks the answer, say so plainly. Distinguish the gateway's static threshold from NexOps's predictive risk. "
+        "Do not call yourself the anomaly model or the assignment engine — you report what they produced. "
+        "If the query is completely unrelated to the NexOps plant, telemetry, engineers, or tasks (e.g. asking about celebrities, sports, general knowledge, movies, etc.), "
+        "do NOT use the system state. Instead, refuse to answer by stating: 'I am ARIA, an AI assistant trained only for NexOps telemetry and dispatch. I cannot assist with out-of-domain topics.'"
+    )
     
     focus = ctx.get("focus_machine")
     if focus:
@@ -438,7 +557,8 @@ def format_system_prompt(query: str, ctx: dict) -> str:
         "scoped_engineers": ctx.get("scoped_engineers"),
         "top_machines": ctx.get("top_machines"),
         "open_task_count": ctx.get("open_task_count"),
-        "scope_violation": ctx.get("scope_violation")
+        "scope_violation": ctx.get("scope_violation"),
+        "personal_tasks": ctx.get("personal_tasks")
     }
     
     return f"""{role_clause}
@@ -460,7 +580,7 @@ async def call_llm(query: str, ctx: dict) -> tuple[str, str]:
     
     # 1. Primary: Gemini API
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
         body = {
             "contents": [{
                 "parts": [{"text": prompt}]
@@ -487,7 +607,7 @@ async def call_llm(query: str, ctx: dict) -> tuple[str, str]:
             "Content-Type": "application/json"
         }
         body = {
-            "model": "llama3-70b-8192",
+            "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.2,
             "max_tokens": 600
@@ -503,13 +623,28 @@ async def call_llm(query: str, ctx: dict) -> tuple[str, str]:
         
     raise AriaLLMUnavailable("Both Gemini and Groq API pipelines failed.")
 
-async def answer(query: str, role: str, scope_zone: str | None, latest: dict, history: dict, session) -> dict:
+async def answer(query: str, role: str, scope_zone: str | None, latest: dict, history: dict, session, username: str | None = None, engineer_id: int | None = None) -> dict:
     """The central orchestrator driving the context assembly, LLM/fallback rendering, and evidence footer binding."""
     # Ensure zone is cleaned
     if scope_zone == "ALL" or not scope_zone:
         scope_zone = None
         
-    ctx = build_context(query, role, scope_zone, latest, history, session)
+    if is_out_of_domain(query):
+        return {
+            "answer": "I am ARIA, an AI assistant trained only for NexOps refinery telemetry and dispatch. I cannot assist with out-of-domain topics.",
+            "source": "unavailable",
+            "evidence": {
+                "focus_machine": None,
+                "nexops_risk": "LOW",
+                "anomaly_status": None,
+                "time_to_threshold": None,
+                "assigned_engineer": "Unassigned",
+                "assignment_reason": None,
+                "incident_matches": 0
+            }
+        }
+
+    ctx = build_context(query, role, scope_zone, latest, history, session, username=username, engineer_id=engineer_id)
     
     try:
         text, source = await call_llm(query, ctx)

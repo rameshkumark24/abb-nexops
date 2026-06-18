@@ -1199,7 +1199,9 @@ async def http_aria_ask(body: AriaAskRequest, current: CurrentUser = Depends(get
             scope_zone=current.zone,
             latest=latest,
             history=history,
-            session=session
+            session=session,
+            username=current.username,
+            engineer_id=current.engineer_id
         )
         return res
     except Exception as exc:
