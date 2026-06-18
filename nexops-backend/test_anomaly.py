@@ -132,7 +132,7 @@ def _low_variance_then_typical(seed=1):
         s = eng.update_and_score(
             {"Machine": m, "features": _normal_features(rng)}, is_training_eligible=True
         )["anomaly_score"]
-        if s is not None:
+        if s is not None and len(eng._windows[m]) >= CALIB_MIN_SAMPLES:
             scores.append(s)
     return scores
 

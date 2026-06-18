@@ -87,9 +87,23 @@ export function startTask(id: number): Promise<ApiResult<LifecycleTask>> {
 }
 
 // POST /tasks/{id}/resolve -> resolved, frees engineer capacity, returns the
+// POST /tasks/{id}/resolve -> resolved, frees engineer capacity, returns the
 // summary incl. resolution_minutes + engineer_active_tasks.
 export function resolveTask(id: number): Promise<ApiResult<ResolvedTask>> {
   return request<ResolvedTask>(`/tasks/${id}/resolve`, { method: 'POST' });
+}
+
+export interface EngineerStats {
+  engineer_id: number;
+  name: string;
+  zone: string | null;
+  resolved_count: number;
+  active_count: number;
+  avg_resolution_minutes: number | null;
+}
+
+export function fetchEngineerStats(id: number): Promise<ApiResult<EngineerStats>> {
+  return request<EngineerStats>(`/engineers/${id}/stats`, { method: 'GET' });
 }
 
 // ----------------------------------------------------------------------
@@ -110,6 +124,8 @@ export interface Engineer {
   skills: string[];
   active: boolean;
   stats?: { assigned_tasks?: number; resolved_tasks?: number };
+  max_capacity?: number;
+  active_tasks?: number;
 }
 
 export function getEngineers(): Promise<ApiResult<Engineer[]>> {
@@ -134,3 +150,15 @@ export function deactivateEngineer(id: number): Promise<ApiResult<Engineer>> {
 export function activateEngineer(id: number): Promise<ApiResult<Engineer>> {
   return request<Engineer>(`/engineers/${id}/activate`, { method: 'POST' });
 }
+
+export function deleteEngineer(id: number): Promise<ApiResult<{ deleted: boolean; engineer_id: number }>> {
+  return request<{ deleted: boolean; engineer_id: number }>(`/engineers/${id}`, { method: 'DELETE' });
+}
+
+export function assignTask(taskId: number, engineerId: number): Promise<ApiResult<LifecycleTask>> {
+  return request<LifecycleTask>(`/tasks/${taskId}/assign`, {
+    method: 'POST',
+    body: JSON.stringify({ engineer_id: engineerId }),
+  });
+}
+

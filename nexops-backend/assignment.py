@@ -18,24 +18,24 @@ from db import Assignment, Engineer, FaultMTTR
 # is in 0..1.
 # ----------------------------------------------------------------------
 SKILL_WEIGHT = 0.50   # having the matching skill is still the biggest driver
-LOAD_WEIGHT = 0.18    # prefer engineers with spare capacity (a SOFT nudge)
-MTTR_WEIGHT = 0.18    # prefer engineers historically fast at THIS category
-EXP_WEIGHT = 0.14     # prefer more experienced engineers
-# (0.50 + 0.18 + 0.18 + 0.14 = 1.00)
+LOAD_WEIGHT = 0.28    # prefer engineers with spare capacity (a SOFT nudge)
+MTTR_WEIGHT = 0.10    # prefer engineers historically fast at THIS category
+EXP_WEIGHT = 0.12     # prefer more experienced engineers
+# (0.50 + 0.28 + 0.10 + 0.12 = 1.00)
 
 # ZONE PREFERENCE (Stage 1 of the zone hierarchy). A small ADDITIVE bonus given
 # to an engineer whose zone == the machine's zone (read from record["zone"]).
 # It is a TIEBREAKER, never an override: it is deliberately far smaller than the
 # skill gap. Having vs lacking the category skill is worth
-# SKILL_WEIGHT * (1.0 - SKILL_BASE) = 0.50 * 0.85 = 0.425, so a 0.08 same-zone
+# SKILL_WEIGHT * (1.0 - SKILL_BASE) = 0.50 * 0.85 = 0.425, so a 0.15 same-zone
 # bonus can NEVER make an unskilled local beat a skilled engineer in another
 # zone. That is precisely what gives us cross-zone FALLBACK: when no skilled
 # engineer exists in the machine's zone, a skilled OTHER-zone engineer still wins
-# (skill 0.425 >> zone 0.08). Like CRIT_EXP_MULTIPLIER, this can push a winning
+# (skill 0.425 >> zone 0.15). Like CRIT_EXP_MULTIPLIER, this can push a winning
 # score slightly above 1.0; only the RANKING matters, since every candidate for
 # the same fault is scored with identical weights. When a record has NO "zone"
 # (or an engineer has no zone), the term is 0 and behaviour is exactly as before.
-ZONE_WEIGHT = 0.08
+ZONE_WEIGHT = 0.15
 
 # CRITICAL faults weigh experience heavier: the experience term is multiplied by
 # this factor (effective EXP weight = EXP_WEIGHT * CRIT_EXP_MULTIPLIER = 0.28 for
@@ -320,9 +320,15 @@ def assign_engineer(record: dict, session) -> dict:
         # they hold the only matching skill. If that leaves nobody, it's a
         # routine 'at capacity' (NOT a staffing escalation).
         pool = [e for e in available if e.active_tasks < e.max_capacity]
+
+        # STRICT SKILL MATCHING: for non-critical faults of specific categories,
+        # only engineers with that specific skill are eligible for auto-assignment.
+        if category != "general":
+            pool = [e for e in pool if category in (e.skills or [])]
+
         if not pool:
             result = _unassigned(
-                category, "All qualified engineers are at capacity - left UNASSIGNED."
+                category, f"No available engineer with {category} skill has free capacity - left UNASSIGNED."
             )
             result["excluded_at_capacity"] = excluded_at_capacity
             return result

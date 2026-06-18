@@ -36,6 +36,7 @@ from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import func
 
 import config
 from adapter import normalize
@@ -235,7 +236,7 @@ app.add_middleware(
         "http://127.0.0.1:3000",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -839,7 +840,12 @@ def http_create_engineer(body: CreateEngineerRequest,
 def _set_engineer_active(engineer_id, active, current):
     """Shared body for activate/deactivate (PLANT ONLY). Sets Engineer.active and
     mirrors it onto the linked user(s). Idempotent. 404 if the engineer is missing.
-    Soft only — no rows deleted, so assignment history is preserved."""
+    Soft only — no rows deleted, so assignment history is preserved.
+
+    DEACTIVATION: when active=False, all OPEN tasks (assigned/in_progress) for
+    this engineer are UNASSIGNED (engineer_id set to NULL, engineer_name to
+    'Unassigned') so they enter the unassigned pool for field managers to
+    manually reassign. active_tasks is zeroed out."""
     denied = _require_plant(current)
     if denied is not None:
         return denied
@@ -851,8 +857,61 @@ def _set_engineer_active(engineer_id, active, current):
         engineer.active = active
         for u in session.query(User).filter(User.engineer_id == engineer_id).all():
             u.active = active
+
+        session.flush()
+
+        unassigned_count = 0
+        if not active:
+            # Reassign all open tasks from this engineer.
+            # If a suitable engineer has capacity, auto-reassign it.
+            # Otherwise, unassign it so it goes to the unassigned pool.
+            open_tasks = (
+                session.query(Assignment)
+                .filter(Assignment.engineer_id == engineer_id)
+                .filter(Assignment.status.in_(("assigned", "in_progress")))
+                .all()
+            )
+            for task in open_tasks:
+                try:
+                    record = {
+                        "Machine": task.machine,
+                        "zone": task.zone,
+                        "alarm_id": task.alarm_id,
+                        "alarm_type": task.fault_category,
+                        "Alert": task.fault_category,
+                        "message": task.fault_category,
+                    }
+                    res = assign_engineer(record, session)
+                    if res.get("assigned"):
+                        task.engineer_id = res["engineer_id"]
+                        task.engineer_name = res["engineer_name"]
+                        task.status = "assigned"
+                        task.started_at = None
+                        task.score = res.get("score")
+                        new_eng = session.get(Engineer, res["engineer_id"])
+                        if new_eng:
+                            new_eng.active_tasks = (new_eng.active_tasks or 0) + 1
+                    else:
+                        task.engineer_id = None
+                        task.engineer_name = "Unassigned"
+                        task.status = "assigned"
+                        task.started_at = None
+                        unassigned_count += 1
+                except Exception as exc:
+                    print(f"[deactivation-rotation] failed for task #{task.id}: {exc}")
+                    task.engineer_id = None
+                    task.engineer_name = "Unassigned"
+                    task.status = "assigned"
+                    task.started_at = None
+                    unassigned_count += 1
+            # Zero out active_tasks since all open tasks are now reassigned or unassigned
+            engineer.active_tasks = 0
+
         session.commit()
-        return {"engineer_id": engineer.id, "name": engineer.name, "active": engineer.active}
+        result = {"engineer_id": engineer.id, "name": engineer.name, "active": engineer.active}
+        if not active:
+            result["tasks_unassigned"] = unassigned_count
+        return result
     except Exception as exc:
         session.rollback()
         print(f"[engineers] set-active({active}) {engineer_id} failed: {exc}")
@@ -876,6 +935,106 @@ def http_activate_engineer(engineer_id: int,
     return _set_engineer_active(engineer_id, True, current)
 
 
+@app.delete("/engineers/{engineer_id}")
+def http_delete_engineer(engineer_id: int,
+                         current: CurrentUser = Depends(get_current_user)):
+    """PLANT ONLY. Hard-delete: permanently removes the Engineer and linked User
+    rows from the database. Assignment history (Assignment rows) referencing this
+    engineer is also removed. Use deactivate for temporary absences instead."""
+    denied = _require_plant(current)
+    if denied is not None:
+        return denied
+    session = get_session()
+    try:
+        engineer = session.get(Engineer, engineer_id)
+        if engineer is None:
+            return JSONResponse(status_code=404, content={"error": f"engineer {engineer_id} not found"})
+        # Remove linked User rows first (FK constraint)
+        session.query(User).filter(User.engineer_id == engineer_id).delete()
+        # Remove assignment rows referencing this engineer
+        session.query(Assignment).filter(Assignment.engineer_id == engineer_id).delete()
+        session.delete(engineer)
+        session.commit()
+        return {"deleted": True, "engineer_id": engineer_id}
+    except Exception as exc:
+        session.rollback()
+        print(f"[engineers] delete {engineer_id} failed: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
+
+class AssignTaskRequest(BaseModel):
+    engineer_id: int
+
+
+@app.post("/tasks/{assignment_id}/assign")
+def http_assign_task(assignment_id: int, body: AssignTaskRequest,
+                    current: CurrentUser = Depends(get_current_user)):
+    """Manually assign an unassigned task to an engineer. Allowed for
+    plant_manager (any) and field_manager (zone-scoped). The task must be
+    unassigned (engineer_id is NULL). The target engineer must be active and
+    in the caller's zone (for field_manager). Increments the engineer's
+    active_tasks."""
+    role = getattr(current, "role", None)
+    if role not in ("plant_manager", "field_manager"):
+        return JSONResponse(status_code=403, content={"error": "forbidden: managers only"})
+
+    session = get_session()
+    try:
+        task = session.get(Assignment, assignment_id)
+        if task is None:
+            return JSONResponse(status_code=404, content={"error": f"task {assignment_id} not found"})
+
+        # Only unassigned tasks can be manually assigned
+        if task.engineer_id is not None:
+            return JSONResponse(status_code=409, content={"error": "task is already assigned to an engineer"})
+
+        engineer = session.get(Engineer, body.engineer_id)
+        if engineer is None:
+            return JSONResponse(status_code=404, content={"error": f"engineer {body.engineer_id} not found"})
+        if not engineer.active:
+            return JSONResponse(status_code=400, content={"error": "cannot assign to a deactivated engineer"})
+
+        # Zone scoping for field_manager
+        if role == "field_manager":
+            caller_zone = getattr(current, "zone", None)
+            if not caller_zone:
+                return JSONResponse(status_code=403, content={"error": "field manager has no zone"})
+            # The task must be in the field manager's zone
+            if task.zone and task.zone != caller_zone:
+                return JSONResponse(status_code=403, content={"error": "task is not in your zone"})
+            # The engineer must be in the field manager's zone
+            if engineer.zone != caller_zone:
+                return JSONResponse(status_code=403, content={"error": "engineer is not in your zone"})
+
+        # Assign the task
+        task.engineer_id = engineer.id
+        task.engineer_name = engineer.name
+        task.status = "assigned"
+        engineer.active_tasks = (engineer.active_tasks or 0) + 1
+
+        session.commit()
+        session.refresh(task)
+
+        return {
+            "id": task.id,
+            "machine": task.machine,
+            "zone": task.zone,
+            "fault_category": task.fault_category,
+            "engineer_id": task.engineer_id,
+            "engineer_name": task.engineer_name,
+            "status": task.status,
+        }
+    except Exception as exc:
+        session.rollback()
+        print(f"[tasks] assign {assignment_id} failed: {exc}")
+        return JSONResponse(status_code=500, content={"error": "internal error"})
+    finally:
+        session.close()
+
+
 # ----------------------------------------------------------------------
 # Auth endpoints (Stage 3a foundation). ADDITIVE: these add a login + identity
 # surface but GATE NOTHING — every existing route and the WebSocket feed stay
@@ -894,13 +1053,19 @@ def auth_login(body: LoginRequest):
     is future hardening. Never 500s on a bad credential."""
     session = get_session()
     try:
-        user = session.query(User).filter(User.username == body.username).first()
+        uname = (body.username or "").strip().lower()
+        user = session.query(User).filter(func.lower(User.username) == uname).first()
         if user is None or not verify_password(body.password, user.password_hash):
             return JSONResponse(status_code=401, content={"error": "invalid credentials"})
         token = create_token(user)
         return {
             "token": token,
-            "user": {"username": user.username, "role": user.role, "zone": user.zone},
+            "user": {
+                "username": user.username,
+                "role": user.role,
+                "zone": user.zone,
+                "engineer_id": user.engineer_id,
+            },
         }
     except Exception as exc:  # never let a DB error crash the bridge
         print(f"[auth] login failed for {body.username!r}: {exc}")

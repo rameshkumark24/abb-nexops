@@ -60,25 +60,25 @@ DEV_PASSWORD = "nexops123"
 # electrical / thermal coverage (the 4th slot is a generalist or extra specialist).
 ENGINEERS = [
     # ---------------- Zone A ----------------
-    ("Ravi Kumar", "Senior Mechanical / Bearing Specialist", ["mechanical"], 1, True, 15, 6, "A"),
-    ("Sam Okafor", "Thermal / Process Engineer (part-time)", ["thermal"], 1, True, 7, 3, "A"),
-    ("Lena Vogel", "Generalist", ["mechanical", "electrical", "thermal", "general"], 2, True, 6, 6, "A"),
+    ("Ravi Kumar", "Senior Mechanical / Bearing Specialist", ["mechanical"], 0, True, 15, 6, "A"),
+    ("Sam Okafor", "Thermal / Process Engineer (part-time)", ["thermal"], 0, True, 7, 3, "A"),
+    ("Lena Vogel", "Generalist", ["mechanical", "electrical", "thermal", "general"], 0, True, 6, 6, "A"),
     ("Diego Santos", "Electrical Specialist (off shift)", ["electrical"], 0, False, 12, 6, "A"),
     # ---------------- Zone B ----------------
-    ("Boris Petrov", "Senior Mechanical Specialist", ["mechanical"], 1, True, 15, 6, "B"),
+    ("Boris Petrov", "Senior Mechanical Specialist", ["mechanical"], 0, True, 15, 6, "B"),
     ("Priya Nair", "Electrical Engineer (junior, fast)", ["electrical"], 0, True, 4, 6, "B"),
-    ("Hassan Ali", "Senior Electrical Lead", ["electrical"], 4, True, 18, 6, "B"),
-    ("Omar Farah", "Thermal / Process Engineer", ["thermal"], 1, True, 7, 6, "B"),
+    ("Hassan Ali", "Senior Electrical Lead", ["electrical"], 0, True, 18, 6, "B"),
+    ("Omar Farah", "Thermal / Process Engineer", ["thermal"], 0, True, 7, 6, "B"),
     # ---------------- Zone C ----------------
-    ("Chen Wei", "Mechanical Engineer (at capacity)", ["mechanical"], 6, True, 3, 6, "C"),
-    ("Yuki Tanaka", "Mechanical Engineer", ["mechanical"], 1, True, 11, 6, "C"),
-    ("Carlos Mendez", "Electrical Engineer", ["electrical"], 1, True, 9, 6, "C"),
-    ("Fatima Noor", "Thermal Engineer", ["thermal"], 1, True, 10, 6, "C"),
+    ("Chen Wei", "Mechanical Engineer (at capacity)", ["mechanical"], 0, True, 3, 6, "C"),
+    ("Yuki Tanaka", "Mechanical Engineer", ["mechanical"], 0, True, 11, 6, "C"),
+    ("Carlos Mendez", "Electrical Engineer", ["electrical"], 0, True, 9, 6, "C"),
+    ("Fatima Noor", "Thermal Engineer", ["thermal"], 0, True, 10, 6, "C"),
     # ---------------- Zone D ----------------
-    ("Mara Singh", "Hydraulics Specialist (only one on site)", ["hydraulic"], 1, True, 10, 6, "D"),
-    ("Liam O'Brien", "Mechanical Engineer", ["mechanical"], 1, True, 12, 6, "D"),
-    ("Wei Zhang", "Electrical Engineer", ["electrical"], 1, True, 9, 6, "D"),
-    ("Hana Kim", "Thermal Engineer", ["thermal"], 1, True, 8, 6, "D"),
+    ("Mara Singh", "Hydraulics Specialist (only one on site)", ["hydraulic"], 0, True, 10, 6, "D"),
+    ("Liam O'Brien", "Mechanical Engineer", ["mechanical"], 0, True, 12, 6, "D"),
+    ("Wei Zhang", "Electrical Engineer", ["electrical"], 0, True, 9, 6, "D"),
+    ("Hana Kim", "Thermal Engineer", ["thermal"], 0, True, 8, 6, "D"),
 ]
 
 

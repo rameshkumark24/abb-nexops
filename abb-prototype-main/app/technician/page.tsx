@@ -7,35 +7,70 @@ import { IconAlertTriangle, IconWrench } from '@/components/Icons';
 import { useLiveData } from '@/hooks/useLiveData';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth, RoleGuard } from '@/context/AuthContext';
+import { fetchEngineerStats, getEngineers, type EngineerStats } from '@/lib/tasksApi';
 import type { TaskStatus } from '@/types/telemetry';
 
-// Visual treatment per lifecycle status (drives the small status pill).
+// Visual configuration for each status
 const STATUS_META: Record<TaskStatus, { label: string; color: string }> = {
-  assigned: { label: 'ASSIGNED', color: '#f59e0b' },
-  in_progress: { label: 'IN PROGRESS', color: '#3b82f6' },
-  resolved: { label: 'RESOLVED', color: '#22c55e' },
+  assigned: { label: 'Assigned', color: '#f59e0b' },
+  in_progress: { label: 'In Progress', color: '#3b82f6' },
+  resolved: { label: 'Resolved', color: '#22c55e' },
 };
 
-// Extract the HH:MM:SS clock from an ISO timestamp without Date parsing, so
-// there are no timezone surprises (shows exactly what the backend recorded).
 function clockOf(iso: string | null): string {
   if (!iso) return '—';
   const t = iso.split('T')[1];
   return t ? t.slice(0, 8) : iso;
 }
 
+function getSeverityColor(t: { score?: number | null; fault_category?: string | null; status: string }): string {
+  if (t.status === 'resolved') return '#10b981'; // Green
+  if ((t.score != null && t.score >= 1.10) || t.fault_category === 'hydraulic') return '#ef4444'; // Red
+  return '#f59e0b'; // Amber
+}
+
+function getSeverityLabel(t: { score?: number | null; fault_category?: string | null; status: string }): string {
+  if (t.status === 'resolved') return 'Low';
+  if ((t.score != null && t.score >= 1.10) || t.fault_category === 'hydraulic') return 'Critical';
+  return 'Medium';
+}
+
 function TechnicianConsole() {
-  // Same live seam as the other roles so the site-wide RED ZONE banner reaches
-  // the technician too. The task QUEUE itself is driven by the HTTP lifecycle
-  // endpoints via useTasks (separate from the WebSocket telemetry stream).
-  const { siteAlert } = useLiveData();
+  const { user, logout } = useAuth();
+  const { siteAlert } = useLiveData(user?.zone || undefined);
   const { tasks, loading, error, start, resolve } = useTasks();
-  const { logout } = useAuth();
 
   const [busyId, setBusyId] = useState<number | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [stats, setStats] = useState<EngineerStats | null>(null);
+  const [active, setActive] = useState<boolean | null>(null);
 
-  // Auto-dismiss the "capacity freed" confirmation after a few seconds.
+  // Load engineer stats (resolved count, average resolution time) from the backend
+  useEffect(() => {
+    if (user && user.engineer_id != null) {
+      fetchEngineerStats(user.engineer_id).then((res) => {
+        if (res.ok) {
+          setStats(res.data);
+        }
+      });
+    }
+  }, [user, tasks]);
+
+  // Load engineer details to find active status
+  useEffect(() => {
+    if (user && user.engineer_id != null) {
+      getEngineers().then((res) => {
+        if (res.ok) {
+          const selfEng = res.data.find((e) => e.id === user.engineer_id);
+          if (selfEng) {
+            setActive(selfEng.active);
+          }
+        }
+      });
+    }
+  }, [user, tasks]);
+
+  // Auto-dismiss confirmation banner
   useEffect(() => {
     if (!confirmation) return;
     const t = setTimeout(() => setConfirmation(null), 6000);
@@ -66,45 +101,21 @@ function TechnicianConsole() {
 
   const containerStyle = { maxWidth: 720, margin: '0 auto' } as const;
 
-  const cardStyle = {
-    background: COLORS.cardBg,
-    border: `1px solid ${COLORS.borderFaint}`,
-    borderRadius: 8,
-    padding: 22,
-  };
-
-  const actionBtn = (variant: 'primary' | 'success', disabled: boolean) => ({
-    background: variant === 'success' ? '#22c55e' : COLORS.textPrimary,
-    color: '#0a0b0d',
-    border: 'none',
-    padding: '10px 18px',
-    borderRadius: 6,
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 11,
-    fontWeight: 600,
-    cursor: disabled ? 'default' : 'pointer',
-    letterSpacing: '0.06em',
-    opacity: disabled ? 0.5 : 1,
-    whiteSpace: 'nowrap' as const,
-    transition: 'all 0.2s ease',
-  });
-
   const pill = (status: TaskStatus) => {
     const m = STATUS_META[status] ?? STATUS_META.assigned;
     return (
       <span
-        className="mono"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
           gap: 6,
-          fontSize: 9,
-          letterSpacing: '0.1em',
+          fontSize: '11px',
+          fontWeight: 600,
           color: m.color,
-          border: `1px solid ${m.color}55`,
-          background: `${m.color}14`,
-          padding: '4px 10px',
-          borderRadius: 999,
+          border: `1px solid ${m.color}44`,
+          background: `${m.color}0f`,
+          padding: '4px 12px',
+          borderRadius: '20px',
         }}
       >
         <Dot color={m.color} size={6} cls={status === 'assigned' ? 'pulse-fast' : 'pulse'} />
@@ -113,19 +124,18 @@ function TechnicianConsole() {
     );
   };
 
-  // The main panel: loading -> error (no data) -> empty -> the live list.
   let body: React.ReactNode;
   if (loading && tasks.length === 0) {
     body = (
-      <div style={{ ...containerStyle, ...cardStyle, textAlign: 'center', padding: '56px 36px' }}>
-        <div className="mono" style={{ fontSize: 11, color: COLORS.textMuted, letterSpacing: '0.1em' }}>
-          LOADING TASK QUEUE…
+      <div style={{ ...containerStyle, background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, textAlign: 'center', padding: '56px 36px' }}>
+        <div className="mono" style={{ fontSize: 12, color: '#94a3b8', letterSpacing: '0.1em' }}>
+          LOADING ASSIGNED TASKS...
         </div>
       </div>
     );
   } else if (error && tasks.length === 0) {
     body = (
-      <div style={{ ...containerStyle, ...cardStyle, textAlign: 'center', padding: '56px 36px' }}>
+      <div style={{ ...containerStyle, background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, textAlign: 'center', padding: '56px 36px' }}>
         <div
           style={{
             width: 64,
@@ -141,10 +151,10 @@ function TechnicianConsole() {
         >
           <IconAlertTriangle size={28} color="#ef4444" />
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 10 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 500, color: '#f8fafc', marginBottom: 10 }}>
           Cannot reach task service
         </h2>
-        <p style={{ color: COLORS.textMuted, fontSize: 13, lineHeight: 1.7, margin: 0 }}>
+        <p style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
           The NexOps task endpoint isn’t responding. The queue will refresh automatically once it’s back.
         </p>
       </div>
@@ -153,74 +163,205 @@ function TechnicianConsole() {
     body = (
       <div
         className="glow-success"
-        style={{ ...containerStyle, ...cardStyle, textAlign: 'center', padding: '56px 36px' }}
+        style={{ ...containerStyle, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 12, textAlign: 'center', padding: '56px 36px' }}
       >
         <div
           style={{
             width: 64,
             height: 64,
-            background: 'rgba(34,197,94,0.1)',
+            background: 'rgba(16,185,129,0.1)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 24px',
-            border: '1px solid rgba(34,197,94,0.2)',
+            border: '1px solid rgba(16,185,129,0.2)',
           }}
         >
-          <IconWrench size={28} color="#22c55e" />
+          <IconWrench size={28} color="#10b981" />
         </div>
-        <h2 style={{ fontSize: 22, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 10 }}>
-          No open tasks — all clear
+        <h2 style={{ fontSize: 22, fontWeight: 500, color: '#f8fafc', marginBottom: 10 }}>
+          All Clear — No Open Tasks
         </h2>
-        <p style={{ color: COLORS.textMuted, fontSize: 13, lineHeight: 1.7, margin: 0 }}>
-          Every assignment is resolved. New tasks appear here automatically as NexOps dispatches them.
+        <p style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+          You have no tasks assigned to you right now. New assignments will appear here automatically.
         </p>
       </div>
     );
   } else {
     body = (
-      <div style={{ ...containerStyle, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ ...containerStyle, display: 'flex', flexDirection: 'column', gap: 18 }}>
         {tasks.map((t) => {
           const busy = busyId === t.id;
+          const statusMeta = STATUS_META[t.status] ?? STATUS_META.assigned;
+          const sevColor = getSeverityColor(t);
+          const sevLabel = getSeverityLabel(t);
+          const isCritical = sevLabel === 'Critical';
+
           return (
-            <div key={t.id} className="card-hover fade-in-up" style={cardStyle}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: 18,
-                }}
-              >
+            <div key={t.id} className={`fade-in-up ${isCritical ? 'glow-critical' : ''}`} style={{
+              background: 'rgba(15, 23, 42, 0.6)',
+              backdropFilter: 'blur(16px)',
+              border: `1px solid ${isCritical ? '#ef4444aa' : t.status === 'in_progress' ? '#3b82f6aa' : 'rgba(255, 255, 255, 0.08)'}`,
+              borderRadius: '12px',
+              padding: '24px',
+              boxShadow: isCritical 
+                ? '0 0 20px rgba(239, 68, 68, 0.15), 0 4px 30px rgba(0, 0, 0, 0.4)'
+                : t.status === 'in_progress' 
+                  ? '0 0 20px rgba(59, 130, 246, 0.15), 0 4px 30px rgba(0, 0, 0, 0.4)'
+                  : '0 4px 30px rgba(0, 0, 0, 0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              position: 'relative',
+              overflow: 'hidden',
+              transition: 'all 0.25s ease'
+            }}>
+              {/* Left vertical status indicator */}
+              <div style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: '4px',
+                background: sevColor
+              }} />
+
+              {/* Card Header & Controls */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
                     {pill(t.status)}
-                    <span className="mono" style={{ fontSize: 10, color: COLORS.textFaint }}>
-                      #{t.id} · {clockOf(t.assigned_at)}
+                    {t.zone && (
+                      <span style={{
+                        fontSize: '11px',
+                        color: '#60a5fa',
+                        background: 'rgba(59, 130, 246, 0.12)',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontWeight: 600
+                      }}>
+                        Zone {t.zone}
+                      </span>
+                    )}
+                    <span style={{
+                      fontSize: '11px',
+                      color: sevColor,
+                      background: `${sevColor}12`,
+                      border: `1px solid ${sevColor}33`,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontWeight: 600
+                    }}>
+                      {sevLabel}
                     </span>
                   </div>
-                  <h2 style={{ fontSize: 18, fontWeight: 400, color: COLORS.textPrimary, margin: '0 0 6px' }}>
-                    {t.machine ?? 'Unknown unit'}
+                  <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#f8fafc', margin: '0 0 4px 0', letterSpacing: '-0.02em' }}>
+                    {t.machine ?? 'Unknown Unit'}
                   </h2>
-                  <div className="mono" style={{ fontSize: 11, color: COLORS.textMuted, marginBottom: 4 }}>
-                    FAULT · {(t.fault_category ?? 'uncategorized').toUpperCase()}
-                  </div>
-                  <div className="mono" style={{ fontSize: 11, color: COLORS.textSec }}>
-                    ENGINEER · {t.engineer_name ?? 'Unassigned'}
-                  </div>
                 </div>
 
                 <div style={{ flexShrink: 0 }}>
                   {t.status === 'assigned' && (
-                    <button onClick={() => handleStart(t.id)} disabled={busy} style={actionBtn('primary', busy)}>
-                      {busy ? 'STARTING…' : 'START'}
+                    <button 
+                      onClick={() => handleStart(t.id)} 
+                      disabled={busy} 
+                      style={{
+                        background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '12px 24px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: busy ? 'default' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                        opacity: busy ? 0.6 : 1
+                      }}
+                    >
+                      {busy ? 'Starting...' : 'Start Work'}
                     </button>
                   )}
                   {t.status === 'in_progress' && (
-                    <button onClick={() => handleResolve(t.id)} disabled={busy} style={actionBtn('success', busy)}>
-                      {busy ? 'RESOLVING…' : '✓ MARK RESOLVED'}
+                    <button 
+                      onClick={() => handleResolve(t.id)} 
+                      disabled={busy} 
+                      style={{
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '12px 24px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: busy ? 'default' : 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
+                        opacity: busy ? 0.6 : 1
+                      }}
+                    >
+                      {busy ? 'Resolving...' : 'Complete & Resolve'}
                     </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Simplified Professional Instruction */}
+              <div style={{
+                fontSize: '13px',
+                color: '#cbd5e1',
+                padding: '12px 16px',
+                background: 'rgba(255, 255, 255, 0.02)',
+                borderRadius: '8px',
+                borderLeft: '3px solid #3b82f6'
+              }}>
+                <strong>Instruction:</strong> Go to the machine location and update task status above.
+              </div>
+
+              {/* Backend Data Surfaced (Clean Table Layout) */}
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                  Task Specifications
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '12px',
+                  background: 'rgba(255, 255, 255, 0.01)',
+                  border: '1px solid rgba(255, 255, 255, 0.04)',
+                  borderRadius: '8px',
+                  padding: '16px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <span style={{ color: '#94a3b8' }}>Task ID</span>
+                    <span className="mono" style={{ color: '#e2e8f0', fontWeight: 500 }}>#{t.id}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <span style={{ color: '#94a3b8' }}>Alarm ID</span>
+                    <span className="mono" style={{ color: '#e2e8f0', fontWeight: 500 }}>#{t.alarm_id ?? '—'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <span style={{ color: '#94a3b8' }}>Location Zone</span>
+                    <span style={{ color: '#e2e8f0', fontWeight: 500 }}>Zone {t.zone ?? '—'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <span style={{ color: '#94a3b8' }}>Classification</span>
+                    <span style={{ color: '#e2e8f0', fontWeight: 500, textTransform: 'capitalize' }}>{t.fault_category ?? 'general'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <span style={{ color: '#94a3b8' }}>Dispatch Match Score</span>
+                    <span className="mono" style={{ color: '#60a5fa', fontWeight: 600 }}>{t.score != null ? t.score.toFixed(3) : '—'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <span style={{ color: '#94a3b8' }}>Assigned At</span>
+                    <span className="mono" style={{ color: '#e2e8f0' }}>{clockOf(t.assigned_at)}</span>
+                  </div>
+                  {t.started_at && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <span style={{ color: '#94a3b8' }}>Work Started</span>
+                      <span className="mono" style={{ color: '#e2e8f0' }}>{clockOf(t.started_at)}</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -232,59 +373,133 @@ function TechnicianConsole() {
   }
 
   return (
-    // Keeps its own DARK body styling on the now-light root layout (UI-2). This
-    // page is restyled to the light tokens in its own pass; the explicit dark
-    // background here just prevents white-on-white until then.
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0b0d', color: '#e2e8f0' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0b0d', color: '#e2e8f0', fontFamily: 'Inter, sans-serif' }}>
       <NavBar onBack={() => (window.location.href = '/')} onLogout={logout} />
       <SiteAlertBanner alert={siteAlert} />
 
-      <div className="fade-in-up" style={{ padding: '40px 56px', flex: 1 }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 300, color: COLORS.textPrimary, marginBottom: 8 }}>
-            Technician Console
-          </h1>
-          <p style={{ color: COLORS.textMuted, fontSize: 13 }}>
-            Live task queue — start and resolve assignments as NexOps dispatches them.
-          </p>
+      <div className="fade-in-up" style={{ padding: '40px max(16px, 4vw)', flex: 1 }}>
+        <div style={{ ...containerStyle }}>
+          
+          {/* Header & Stats Banner */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            marginBottom: '32px',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            <div>
+              <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#f8fafc', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
+                Technician Console
+              </h1>
+              <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
+                Welcome back, <strong style={{ color: '#f1f5f9' }}>{user ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : 'Operator'}</strong> • Status: <span style={{ color: active === false ? '#ef4444' : '#4ade80', fontWeight: 600 }}>{active === false ? 'Off Duty (Deactivated)' : 'On Duty'}</span> {user?.zone ? `• Zone ${user.zone}` : ''}
+              </p>
+            </div>
+
+            {/* Backend-driven stats panels */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{
+                background: 'rgba(30, 41, 59, 0.5)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                padding: '10px 16px',
+                textAlign: 'center',
+                minWidth: '90px'
+              }}>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: '#f59e0b' }}>
+                  {tasks.filter((t) => t.status === 'assigned').length}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>To Do</div>
+              </div>
+              <div style={{
+                background: 'rgba(30, 41, 59, 0.5)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                padding: '10px 16px',
+                textAlign: 'center',
+                minWidth: '90px'
+              }}>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: '#3b82f6' }}>
+                  {tasks.filter((t) => t.status === 'in_progress').length}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Active</div>
+              </div>
+              {stats && (
+                <>
+                  <div style={{
+                    background: 'rgba(30, 41, 59, 0.5)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '8px',
+                    padding: '10px 16px',
+                    textAlign: 'center',
+                    minWidth: '90px'
+                  }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#10b981' }}>
+                      {stats.resolved_count}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Resolved</div>
+                  </div>
+                  {stats.avg_resolution_minutes != null && (
+                    <div style={{
+                      background: 'rgba(30, 41, 59, 0.5)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: '8px',
+                      padding: '10px 16px',
+                      textAlign: 'center',
+                      minWidth: '90px'
+                    }}>
+                      <div style={{ fontSize: '18px', fontWeight: 700, color: '#60a5fa' }}>
+                        {stats.avg_resolution_minutes.toFixed(1)}m
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Avg Speed</div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Resolve confirmation (capacity freed) — auto-dismisses. */}
+        {/* Confirmation banner */}
         {confirmation && (
-          <div style={{ ...containerStyle, marginBottom: 16 }}>
+          <div style={{ ...containerStyle, marginBottom: 18 }}>
             <div
               className="mono fade-in-up"
               style={{
-                background: 'rgba(34,197,94,0.08)',
-                border: '1px solid rgba(34,197,94,0.3)',
-                borderRadius: 6,
-                padding: '10px 14px',
-                fontSize: 11,
-                color: '#22c55e',
-                letterSpacing: '0.04em',
+                background: 'rgba(16,185,129,0.08)',
+                border: '1px solid rgba(16,185,129,0.3)',
+                borderRadius: 8,
+                padding: '12px 16px',
+                fontSize: 12,
+                color: '#10b981',
+                letterSpacing: '0.02em',
+                fontWeight: 500
               }}
             >
-              ✓ {confirmation}
+              Task resolution completed: {confirmation}
             </div>
           </div>
         )}
 
-        {/* Backend unreachable but we still have a last-known queue: warn softly. */}
+        {/* Error notification */}
         {error && tasks.length > 0 && (
-          <div style={{ ...containerStyle, marginBottom: 16 }}>
+          <div style={{ ...containerStyle, marginBottom: 18 }}>
             <div
               className="mono"
               style={{
                 background: 'rgba(245,158,11,0.08)',
                 border: '1px solid rgba(245,158,11,0.3)',
-                borderRadius: 6,
-                padding: '10px 14px',
-                fontSize: 11,
+                borderRadius: 8,
+                padding: '12px 16px',
+                fontSize: 12,
                 color: '#f59e0b',
-                letterSpacing: '0.04em',
+                letterSpacing: '0.02em',
+                fontWeight: 500
               }}
             >
-              ⚠ Cannot reach task service — showing last known queue
+              Cannot reach task service — showing last known queue
             </div>
           </div>
         )}
@@ -295,9 +510,6 @@ function TechnicianConsole() {
   );
 }
 
-// Route guard: only a technician renders the technician console; others are
-// redirected (no token -> /login, wrong role -> their own dashboard). The server
-// still scopes /tasks to the technician's own assignments — this is defense in depth.
 export default function TechnicianPage() {
   return (
     <RoleGuard role="technician">

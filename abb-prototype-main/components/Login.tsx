@@ -46,7 +46,7 @@ export default function Login({
     if (submitting) return;
     setError(null);
     setSubmitting(true);
-    const res = await login(opId.trim(), opPw);
+    const res = await login(opId.trim().toLowerCase(), opPw);
     setSubmitting(false);
     if (res.ok) {
       router.push(ROLE_ROUTE[res.user.role] ?? '/');

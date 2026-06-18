@@ -89,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           username: data?.user?.username ?? username,
           role: data?.user?.role ?? '',
           zone: data?.user?.zone ?? null,
+          engineer_id: data?.user?.engineer_id ?? null,
         };
         setSession(data.token, u);
         setToken(data.token);

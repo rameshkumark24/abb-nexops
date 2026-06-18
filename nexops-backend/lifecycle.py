@@ -49,6 +49,7 @@ def _summary(a: Assignment) -> dict:
         "id": a.id,
         "alarm_id": a.alarm_id,
         "machine": a.machine,
+        "zone": a.zone,
         "fault_category": a.fault_category,
         "engineer_id": a.engineer_id,
         "engineer_name": a.engineer_name,

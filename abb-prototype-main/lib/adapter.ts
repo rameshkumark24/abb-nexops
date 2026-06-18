@@ -56,7 +56,13 @@ const ZONE_MAP: Record<string, string> = {
 
 const ZONE_FALLBACK = ['Zone A', 'Zone B', 'Zone C', 'Zone D'];
 
-function zoneFor(machine: string): string {
+export function zoneFor(machine: string): string {
+  const lower = machine.toLowerCase();
+  for (const key of Object.keys(ZONE_MAP)) {
+    if (lower.includes(key.toLowerCase())) {
+      return ZONE_MAP[key];
+    }
+  }
   if (ZONE_MAP[machine]) return ZONE_MAP[machine];
   // deterministic bucket from the name so it's stable across renders
   let h = 0;
@@ -201,9 +207,10 @@ export function computePerf(raw: TelemetryRecord): number {
 // ----------------------------------------------------------------------
 
 export function mapToMachine(raw: TelemetryRecord): Machine {
+  const rawZone = raw.zone ? `Zone ${raw.zone}` : null;
   return {
     name: raw.Machine,
-    zone: zoneFor(raw.Machine),
+    zone: rawZone || zoneFor(raw.Machine),
     perf: computePerf(raw),
     nexopsRisk: cappedRisk(raw),
     anomalyScore: raw.anomaly_score ?? null,

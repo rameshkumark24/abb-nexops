@@ -180,3 +180,90 @@ def test_get_engineers_scoped():
 
     # no token -> 401
     assert client.get("/engineers").status_code == 401
+
+
+def test_deactivate_rotates_tasks():
+    # Setup test DB state w/ clean seeding.
+    seed()
+    tok = _token("plant")
+    session = get_session()
+    try:
+        from db import Assignment
+        # Create a mechanical task assigned to Ravi Kumar (id=1)
+        t1 = Assignment(
+            alarm_id=9999,
+            machine="Test Pump A",
+            zone="A",
+            fault_category="mechanical",
+            engineer_id=1,
+            engineer_name="Ravi Kumar",
+            status="assigned"
+        )
+        session.add(t1)
+        session.commit()
+    finally:
+        session.close()
+
+    # Deactivate Ravi (id=1)
+    res = client.post("/engineers/1/deactivate", headers=_auth(tok))
+    assert res.status_code == 200, res.text
+
+    session = get_session()
+    try:
+        t = session.query(Assignment).filter(Assignment.alarm_id == 9999).first()
+        assert t is not None
+        # Should rotate to another mechanical engineer, not Ravi, and not Unassigned
+        assert t.engineer_id is not None
+        assert t.engineer_id != 1
+        assert t.engineer_name != "Ravi Kumar"
+        assert t.engineer_name != "Unassigned"
+        # Verify the new engineer has the mechanical skill
+        new_eng = session.get(Engineer, t.engineer_id)
+        assert "mechanical" in (new_eng.skills or [])
+    finally:
+        session.close()
+
+
+def test_deactivate_fallback_to_unassigned():
+    seed()
+    tok = _token("plant")
+    session = get_session()
+    try:
+        from db import Assignment
+        # Deactivate all mechanical engineers except Ravi
+        for eid in (5, 9, 10, 14):
+            eng = session.get(Engineer, eid)
+            eng.active = False
+        # Lena Vogel (id=3, generalist) has mechanical skill too, deactivate her
+        eng3 = session.get(Engineer, 3)
+        eng3.active = False
+
+        # Create a mechanical task for Ravi Kumar
+        t1 = Assignment(
+            alarm_id=9998,
+            machine="Test Pump A",
+            zone="A",
+            fault_category="mechanical",
+            engineer_id=1,
+            engineer_name="Ravi Kumar",
+            status="assigned"
+        )
+        session.add(t1)
+        session.commit()
+    finally:
+        session.close()
+
+    # Deactivate Ravi (id=1)
+    res = client.post("/engineers/1/deactivate", headers=_auth(tok))
+    assert res.status_code == 200, res.text
+
+    session = get_session()
+    try:
+        t = session.query(Assignment).filter(Assignment.alarm_id == 9998).first()
+        assert t is not None
+        # Should fall back to Unassigned
+        assert t.engineer_id is None
+        assert t.engineer_name == "Unassigned"
+    finally:
+        session.close()
+

@@ -21,6 +21,7 @@ import {
   mapToControlPanelAlarm,
   mapToSiteAlert,
   isEarlyWarning,
+  zoneFor,
 } from '@/lib/adapter';
 
 // ======================================================================
@@ -334,6 +335,7 @@ interface FaultLC {
   earlyCounted: boolean;    // counted once into earlyCatches
   leadRecorded: boolean;    // lead resolved once per fault
   corroborated: boolean;    // ML agreed at/after the EARLY flag
+  lastActiveAt?: number;    // ms of last non-Normal frame
 }
 
 function freshMetricsAcc(): MetricsAcc {
@@ -345,7 +347,7 @@ function freshMetricsAcc(): MetricsAcc {
 }
 
 function freshLC(): FaultLC {
-  return { earlyAt: null, trippedAt: null, earlyCounted: false, leadRecorded: false, corroborated: false };
+  return { earlyAt: null, trippedAt: null, earlyCounted: false, leadRecorded: false, corroborated: false, lastActiveAt: 0 };
 }
 
 const EMPTY_METRICS: LiveMetrics = {
@@ -392,11 +394,18 @@ function accumulateMetrics(
   // Fault lifecycle is per machine. A return to Normal closes the current fault.
   const machine = raw.Machine;
   if (raw.Status === 'Normal') {
-    lcMap.delete(machine);
+    const lc = lcMap.get(machine);
+    // 15-second debounce window to prevent sensor flickering from resetting the fault too quickly
+    if (lc && lc.lastActiveAt && now - lc.lastActiveAt < 15000) {
+      // Keep it open in lcMap for hysteresis/debounce
+    } else {
+      lcMap.delete(machine);
+    }
     return;
   }
 
   const lc = lcMap.get(machine) ?? freshLC();
+  lc.lastActiveAt = now; // update active timestamp on any warning/alert tick
   const early = isEarlyWarning(raw);
   // (1) STATIC THRESHOLD TRIP: the gateway's REAL static alarm - a non-predictive
   // Warning(>Low)/Critical. The incubation window is is_predictive=true (a low
@@ -475,7 +484,7 @@ function buildMetricsSnapshot(acc: MetricsAcc, lcMap: Map<string, FaultLC>): Liv
   };
 }
 
-export function useLiveData() {
+export function useLiveData(zoneFilter?: string) {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -498,9 +507,36 @@ export function useLiveData() {
   const faultLC = useRef<Map<string, FaultLC>>(new Map());
 
   useEffect(() => {
+    // Clear maps and accumulators when subscription filter changes to prevent leakage
+    machineMap.current.clear();
+    taskMap.current.clear();
+    metricsAcc.current = freshMetricsAcc();
+    faultLC.current.clear();
+    setMachines([]);
+    setAlarms([]);
+    setTasks([]);
+    setControlAlarms([]);
+    setMetrics(EMPTY_METRICS);
+
     // `connected` is now driven by the socket lifecycle (onopen/onclose),
     // reported via the second subscribe() argument.
     const unsubscribe = subscribe((raw) => {
+      const recordZone = raw.zone || zoneFor(raw.Machine).replace('Zone ', '');
+      const isSiteEmergency = raw.site_alert === true && raw.alert_scope === 'site';
+
+      if (zoneFilter && recordZone !== zoneFilter) {
+        // If it's a site-wide emergency, propagate the site alert so the banner lights up red
+        if (isSiteEmergency && raw.is_nuisance !== true) {
+          setSiteAlert(mapToSiteAlert(raw));
+          if (siteAlertTimer.current) clearTimeout(siteAlertTimer.current);
+          siteAlertTimer.current = setTimeout(() => {
+            setSiteAlert(null);
+            siteAlertTimer.current = null;
+          }, SITE_ALERT_PERSIST_MS);
+        }
+        return;
+      }
+
       // machines: newest state per machine
       machineMap.current.set(raw.Machine, mapToMachine(raw));
       setMachines(Array.from(machineMap.current.values()));
@@ -564,7 +600,7 @@ export function useLiveData() {
         siteAlertTimer.current = null;
       }
     };
-  }, []);
+  }, [zoneFilter]);
 
   return { machines, alarms, tasks, connected, controlAlarms, siteAlert, metrics };
 }

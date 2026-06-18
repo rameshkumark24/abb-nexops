@@ -64,6 +64,7 @@ export interface TelemetryRecord {
   emergency_type: EmergencyType; // 'fire' | 'gas_leak' | 'emergency_stop' | null
   is_nuisance: boolean; // true = filterable noise, not a real fault
   nuisance_type: NuisanceType; // 'chatter' | 'transient' | null
+  zone?: string; // Machine zone, e.g. "A" | "B" | "C" | "D"
 }
 
 // ----------------------------------------------------------------------
@@ -146,6 +147,7 @@ export interface LifecycleTask {
   id: number;
   alarm_id: number | null;
   machine: string | null;
+  zone: string | null;
   fault_category: string | null;
   engineer_id: number | null;
   engineer_name: string | null;

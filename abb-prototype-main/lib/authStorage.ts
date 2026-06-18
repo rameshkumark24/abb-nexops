@@ -16,6 +16,7 @@ export interface AuthUser {
   username: string;
   role: string; // 'plant_manager' | 'field_manager' | 'technician'
   zone: string | null; // null for plant_manager, 'A'-'D' otherwise
+  engineer_id: number | null;
 }
 
 export function getToken(): string | null {
