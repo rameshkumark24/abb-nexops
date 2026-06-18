@@ -1,2 +1,14 @@
 # Root level gitignore for monorepo
 # Individual folders have their own .gitignore files
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# SQLite test databases
+test_*.db
+test_tmp.db
+*_tmp.db
+
+# Diagnostic / local report files
+repository_intelligence_report.md
+
