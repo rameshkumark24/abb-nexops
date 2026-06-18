@@ -193,6 +193,28 @@ class TestAriaChatbot(unittest.TestCase):
         res_ood = aria.render_fallback_answer(ctx, key_failed=True)
         self.assertIn("out-of-domain topics", res_ood)
 
+        # Test ML_CORROBORATION template
+        ctx["query"] = "what is the ml corroboration rate?"
+        ctx["live_metrics"] = {
+            "early_warning_catches": 2,
+            "nuisance_alarms_filtered": 5,
+            "nuisance_machines": ["Pump A1"],
+            "ml_corroboration_rate": "85%"
+        }
+        res_corrob = aria.render_fallback_answer(ctx, key_failed=True)
+        self.assertIn("ML Corroboration Rate for Zone A is 85%", res_corrob)
+
+        # Test NUISANCE_ALARMS template
+        ctx["query"] = "which machine cause nuisance alarm?"
+        res_nuisance = aria.render_fallback_answer(ctx, key_failed=True)
+        self.assertIn("filtered 5 transient/nuisance alarm ticks", res_nuisance)
+        self.assertIn("Pump A1", res_nuisance)
+
+        # Test EARLY_WARNINGS template
+        ctx["query"] = "early prediction how much"
+        res_early = aria.render_fallback_answer(ctx, key_failed=True)
+        self.assertIn("currently 2 distinct early warning prediction catches", res_early)
+
 
 class TestAriaEndpoint(unittest.TestCase):
     @classmethod

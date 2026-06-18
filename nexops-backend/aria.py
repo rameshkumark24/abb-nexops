@@ -395,6 +395,46 @@ def build_context(query: str, role: str, scope_zone: str | None, latest: dict[st
         except Exception as e:
             print(f"[aria-context] failed to load open task count: {e}")
             
+    # Compute live metrics from history
+    early_catches = 0
+    corroborated_early = 0
+    nuisance_filtered = 0
+    nuisance_machines = set()
+    
+    for m_name, m_history in history.items():
+        m_zone = latest.get(m_name, {}).get("zone") or zone_for_machine(m_name)
+        if role in ("field_manager", "technician") and scope_zone:
+            if m_zone != scope_zone:
+                continue
+        
+        has_early = False
+        has_corroborated = False
+        for r in m_history:
+            if r.get("is_nuisance") is True:
+                nuisance_filtered += 1
+                nuisance_machines.add(m_name)
+            if r.get("is_early") is True:
+                has_early = True
+                anom_score = r.get("anomaly_score")
+                if r.get("anomaly_status") == "scored" and anom_score is not None and anom_score >= 0.45:
+                    has_corroborated = True
+                    
+        if has_early:
+            early_catches += 1
+            if has_corroborated:
+                corroborated_early += 1
+                
+    corroboration_rate = None
+    if early_catches > 0:
+        corroboration_rate = round((corroborated_early / early_catches) * 100)
+        
+    context["live_metrics"] = {
+        "early_warning_catches": early_catches,
+        "nuisance_alarms_filtered": nuisance_filtered,
+        "nuisance_machines": list(nuisance_machines),
+        "ml_corroboration_rate": f"{corroboration_rate}%" if corroboration_rate is not None else "0% (no early warning alerts recorded yet)"
+    }
+            
     return context
 
 def render_fallback_answer(ctx: dict, key_failed: bool = False) -> str:
@@ -412,6 +452,25 @@ def render_fallback_answer(ctx: dict, key_failed: bool = False) -> str:
         zone = ctx.get("scope_zone") or "ALL"
         role = ctx.get("role")
         
+        # Intent D: ML_CORROBORATION
+        if any(k in query for k in ("corroboration rate", "corroboration")):
+            rate = ctx.get("live_metrics", {}).get("ml_corroboration_rate", "0%")
+            return prefix + f"The current ML Corroboration Rate for Zone {zone} is {rate}."
+
+        # Intent E: NUISANCE_ALARMS
+        if any(k in query for k in ("nuisance alarm", "nuisance")):
+            metrics = ctx.get("live_metrics", {})
+            count = metrics.get("nuisance_alarms_filtered", 0)
+            machines = metrics.get("nuisance_machines", [])
+            mach_str = ", ".join(machines) if machines else "none"
+            return prefix + f"In the recent telemetry window for Zone {zone}, we filtered {count} transient/nuisance alarm ticks. Affected machines: {mach_str}."
+
+        # Intent F: EARLY_WARNINGS
+        if "early" in query:
+            metrics = ctx.get("live_metrics", {})
+            catches = metrics.get("early_warning_catches", 0)
+            return prefix + f"There are currently {catches} distinct early warning prediction catches in Zone {zone}."
+
         # Intent A: MY_TASKS
         if any(k in query for k in ("my task", "tasks for me", "my assignment", "my work")):
             personal = ctx.get("personal_tasks") or []
@@ -565,7 +624,8 @@ def format_system_prompt(query: str, ctx: dict) -> str:
         "top_machines": ctx.get("top_machines"),
         "open_task_count": ctx.get("open_task_count"),
         "scope_violation": ctx.get("scope_violation"),
-        "personal_tasks": ctx.get("personal_tasks")
+        "personal_tasks": ctx.get("personal_tasks"),
+        "live_metrics": ctx.get("live_metrics")
     }
     
     return f"""{role_clause}
