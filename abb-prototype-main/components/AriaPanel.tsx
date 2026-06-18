@@ -2,51 +2,114 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Dot, MicroLabel } from './Shared';
+import { askAria, type AriaEvidence } from '@/lib/tasksApi';
+import { useAuth } from '@/context/AuthContext';
 
-// ===========================================================================
-// ARIA — RESPONSE SWAP SEAM
-// ---------------------------------------------------------------------------
-// ALL response logic lives behind this ONE function. A teammate later replaces
-// ONLY this function body with the real ARIA RAG call; the signature, the
-// AriaPanel props, and the whole UI stay identical.
-//
-//   async function getAriaResponse(message: string, zone: string): Promise<string>
-//
-// CANNED — replace this function body with the real ARIA RAG call. UI/props
-// stay the same.
-// ===========================================================================
-const CANNED: ((zone: string) => string)[] = [
-  (z) =>
-    `Zone ${z}: I'm watching every unit in your zone in real time. Ask about the highest-risk machine, open EARLY warnings, or a recommended next action.`,
-  (z) =>
-    `In Zone ${z}, prioritise the unit with the lowest performance and an elevated NexOps risk — confirm the anomaly against the gateway reading before dispatching.`,
-  (z) =>
-    `Zone ${z}: EARLY-flagged units are pre-threshold — the gateway still reads nominal. A quick inspection now banks the lead time before the static limit trips.`,
-  (z) =>
-    `Zone ${z} tip: nuisance chatter is already filtered out of your queue. Action the corroborated EARLY catches first — those have independent ML agreement.`,
-];
+function EvidenceGrounding({ evidence, source }: { evidence: AriaEvidence; source?: string }) {
+  if (!evidence.focus_machine) {
+    return (
+      <div style={{ marginTop: 8, padding: 8, background: 'var(--abb-surface-1)', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius-sm)', fontSize: 10, color: 'var(--abb-ink-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--abb-ink-1)', marginBottom: 4 }}>
+          <span>🔍 GROUNDING EVIDENCE</span>
+          {source && (
+            <span style={{ marginLeft: 'auto', fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'var(--abb-surface-2)', border: '1px solid var(--abb-line)' }}>
+              Source: {source.toUpperCase()}
+            </span>
+          )}
+        </div>
+        <div>No single focus unit resolved. Answering from general zone states.</div>
+      </div>
+    );
+  }
 
-let _ariaTurn = 0;
+  const { focus_machine, nexops_risk, anomaly_status, time_to_threshold, assigned_engineer, assignment_reason, incident_matches } = evidence;
 
-// CANNED — replace this function body with the real ARIA RAG call. UI/props stay the same.
-export async function getAriaResponse(message: string, zone: string): Promise<string> {
-  const reply = CANNED[_ariaTurn % CANNED.length](zone);
-  _ariaTurn += 1;
-  // Simulated latency so swapping in a real awaited RAG call is seamless.
-  await new Promise((r) => setTimeout(r, 550));
-  return reply;
+  const riskColor = nexops_risk === 'CRITICAL' ? '#ef4444' : nexops_risk === 'HIGH' ? '#f97316' : nexops_risk === 'MEDIUM' ? '#f59e0b' : '#94a3b8';
+
+  return (
+    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* Projection Pill */}
+      {time_to_threshold && (
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 10px',
+          background: 'rgba(249, 115, 22, 0.08)',
+          border: '1px solid rgba(249, 115, 22, 0.3)',
+          borderRadius: '12px',
+          fontSize: '11px',
+          fontWeight: 600,
+          color: '#f97316',
+          alignSelf: 'flex-start',
+        }}>
+          <span>⏱️</span>
+          <span>Projected failure in {time_to_threshold.eta_minutes_low.toFixed(0)}-{time_to_threshold.eta_minutes_high.toFixed(0)} mins ({time_to_threshold.sensor})</span>
+        </div>
+      )}
+
+      {/* Grounding Footer */}
+      <div style={{
+        padding: '8px 12px',
+        background: 'var(--abb-surface-3, var(--abb-surface-1))',
+        border: '1px solid var(--abb-line)',
+        borderRadius: 'var(--abb-radius-sm)',
+        fontSize: '10.5px',
+        color: 'var(--abb-ink-2)',
+        lineHeight: 1.4
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, color: 'var(--abb-ink-1)', marginBottom: 6, borderBottom: '1px solid var(--abb-line)', paddingBottom: 4 }}>
+          <span>🎯 SYSTEM TELEMETRY CORROBORATION</span>
+          {source && (
+            <span style={{ marginLeft: 'auto', fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'var(--abb-surface-2)', border: '1px solid var(--abb-line)' }}>
+              Source: {source.toUpperCase()}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '6px 12px' }}>
+          <div>
+            <span style={{ color: 'var(--abb-ink-3)' }}>Unit: </span>
+            <strong style={{ color: 'var(--abb-ink-0)' }}>{focus_machine}</strong>
+          </div>
+          <div>
+            <span style={{ color: 'var(--abb-ink-3)' }}>Risk: </span>
+            <span style={{ color: riskColor, fontWeight: 700 }}>{nexops_risk}</span>
+          </div>
+          <div>
+            <span style={{ color: 'var(--abb-ink-3)' }}>ML Status: </span>
+            <span style={{ textTransform: 'capitalize' }}>{anomaly_status ?? 'No score'}</span>
+          </div>
+          <div>
+            <span style={{ color: 'var(--abb-ink-3)' }}>Staff: </span>
+            <span>{assigned_engineer}</span>
+          </div>
+          {assignment_reason && (
+            <div style={{ gridColumn: 'span 2' }}>
+              <span style={{ color: 'var(--abb-ink-3)' }}>Dispatch: </span>
+              <span style={{ fontStyle: 'italic' }}>{assignment_reason}</span>
+            </div>
+          )}
+          <div>
+            <span style={{ color: 'var(--abb-ink-3)' }}>History: </span>
+            <span>{incident_matches} matching incident(s)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface Msg {
   role: 'aria' | 'user';
   text: string;
+  evidence?: AriaEvidence;
+  source?: 'llm' | 'fallback_template' | 'unavailable';
 }
 
 const SUGGESTED = ['Highest risk in my zone?', 'Any EARLY warnings?', 'Recommended next action?'];
 
-// Docked control-room helper card (NOT a floating/open chatbot): a collapsible
-// assistant with a few suggested questions, a message list, and an input.
 export default function AriaPanel({ zone }: { zone: string }) {
+  const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([
     { role: 'aria', text: `ARIA online for Zone ${zone}. Ask about your zone's machines, EARLY warnings, or next actions.` },
@@ -65,8 +128,28 @@ export default function AriaPanel({ zone }: { zone: string }) {
     setInput('');
     setMessages((m) => [...m, { role: 'user', text: q }]);
     setBusy(true);
-    const reply = await getAriaResponse(q, zone); // <-- the only swap point
-    setMessages((m) => [...m, { role: 'aria', text: reply }]);
+
+    const res = await askAria(q);
+    if (res.ok) {
+      setMessages((m) => [
+        ...m,
+        {
+          role: 'aria',
+          text: res.data.answer,
+          evidence: res.data.evidence,
+          source: res.data.source,
+        },
+      ]);
+    } else {
+      setMessages((m) => [
+        ...m,
+        {
+          role: 'aria',
+          text: `Unable to process request: ${res.error}`,
+          source: 'unavailable',
+        },
+      ]);
+    }
     setBusy(false);
   }
 
@@ -134,10 +217,19 @@ export default function AriaPanel({ zone }: { zone: string }) {
                     lineHeight: 1.55,
                   }}
                 >
-                  {m.text}
+                  <div>{m.text}</div>
+                  {m.role === 'aria' && m.evidence && (
+                    <EvidenceGrounding evidence={m.evidence} source={m.source} />
+                  )}
                 </div>
                 <MicroLabel style={{ marginTop: 4, textAlign: m.role === 'user' ? 'right' : 'left' }}>
-                  {m.role === 'user' ? 'FIELD MANAGER' : 'ARIA'}
+                  {m.role === 'user'
+                    ? user?.role === 'field_manager'
+                      ? 'FIELD MANAGER'
+                      : user?.role === 'technician'
+                      ? 'TECHNICIAN'
+                      : 'USER'
+                    : 'ARIA'}
                 </MicroLabel>
               </div>
             ))}
@@ -173,3 +265,4 @@ export default function AriaPanel({ zone }: { zone: string }) {
     </div>
   );
 }
+

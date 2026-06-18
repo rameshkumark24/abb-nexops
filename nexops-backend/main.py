@@ -21,6 +21,7 @@ state is touched across threads except via this scheduling call.
 """
 
 import asyncio
+from collections import deque
 import json
 import os
 import sys
@@ -56,6 +57,8 @@ from seed import seed, DEV_PASSWORD
 from auth_jwt import verify_password, create_token, get_current_user, CurrentUser, hash_password
 # Stage 3b server-side role+zone scoping (the rule lives in scoping.py).
 from scoping import can_write_assignment, scope_engineer_query
+# ARIA system logic helper
+import aria
 
 app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
 
@@ -76,6 +79,8 @@ _assign_lock = threading.Lock()
 # Latest telemetry record received for each machine, keyed by machine name.
 # Tracks the current state of the plant to bootstrap new frontend clients on login.
 latest_machine_states: dict[str, dict] = {}
+# Thread-safe cache containing history of records per machine for linear extrapolation.
+history_machine_states: dict[str, deque] = {}
 _states_lock = threading.Lock()
 
 
@@ -487,6 +492,9 @@ def on_message(client, userdata, msg):
     if "Machine" in record:
         with _states_lock:
             latest_machine_states[record["Machine"]] = record
+            if record["Machine"] not in history_machine_states:
+                history_machine_states[record["Machine"]] = deque(maxlen=50)
+            history_machine_states[record["Machine"]].append(record.copy())
 
     # Hand off from this sync MQTT thread to the asyncio event loop.
     if event_loop is not None:
@@ -1150,6 +1158,67 @@ def auth_logout():
     client simply DROPS the token. No server blacklist for the demo (a future
     hardening step if token revocation is ever needed). Always 200."""
     return {"status": "ok", "detail": "client should discard the token"}
+
+
+class AriaAskRequest(BaseModel):
+    query: str
+
+
+class AriaResponseEvidence(BaseModel):
+    focus_machine: str | None = None
+    nexops_risk: str = "LOW"
+    anomaly_status: str | None = None
+    time_to_threshold: dict | None = None
+    assigned_engineer: str = "Unassigned"
+    assignment_reason: str | None = None
+    incident_matches: int = 0
+
+
+class AriaResponse(BaseModel):
+    answer: str
+    source: str
+    evidence: AriaResponseEvidence
+
+
+@app.post("/aria/ask", response_model=AriaResponse)
+async def http_aria_ask(body: AriaAskRequest, current: CurrentUser = Depends(get_current_user)):
+    """
+    ARIA Chatbot endpoint. Enforces zone-based scoping for technicians and field managers.
+    """
+    session = get_session()
+    try:
+        # Obtain latest states and history
+        with _states_lock:
+            latest = dict(latest_machine_states)
+            history = {m: list(h) for m, h in history_machine_states.items()}
+        
+        # Call the aria helper
+        res = await aria.answer(
+            query=body.query,
+            role=current.role,
+            scope_zone=current.zone,
+            latest=latest,
+            history=history,
+            session=session
+        )
+        return res
+    except Exception as exc:
+        print(f"[aria] ask failed: {exc}")
+        return {
+            "answer": "(Offline Fallback Mode — please check API key configuration)\n\nAn unexpected error occurred in the ARIA pipeline. Please try again later.",
+            "source": "unavailable",
+            "evidence": {
+                "focus_machine": None,
+                "nexops_risk": "LOW",
+                "anomaly_status": None,
+                "time_to_threshold": None,
+                "assigned_engineer": "Unassigned",
+                "assignment_reason": None,
+                "incident_matches": 0
+            }
+        }
+    finally:
+        session.close()
 
 
 @app.websocket("/ws")

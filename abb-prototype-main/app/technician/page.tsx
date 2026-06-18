@@ -8,6 +8,7 @@ import { useLiveData } from '@/hooks/useLiveData';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth, RoleGuard } from '@/context/AuthContext';
 import { fetchEngineerStats, getEngineers, type EngineerStats } from '@/lib/tasksApi';
+import AriaPanel from '@/components/AriaPanel';
 import type { TaskStatus } from '@/types/telemetry';
 
 // Visual configuration for each status
@@ -490,6 +491,11 @@ function TechnicianConsole() {
         )}
 
         {body}
+        {user?.zone && (
+          <div style={{ marginTop: 28 }}>
+            <AriaPanel zone={user.zone} />
+          </div>
+        )}
       </div>
     </div>
   );

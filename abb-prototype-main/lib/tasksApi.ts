@@ -166,3 +166,31 @@ export function fetchTelemetrySnapshot(): Promise<ApiResult<TelemetryRecord[]>> 
   return request<TelemetryRecord[]>('/telemetry/snapshot', { method: 'GET' });
 }
 
+export interface AriaEvidence {
+  focus_machine: string | null;
+  nexops_risk: string;
+  anomaly_status: string | null;
+  time_to_threshold: {
+    sensor: string;
+    eta_minutes_low: number;
+    eta_minutes_high: number;
+  } | null;
+  assigned_engineer: string;
+  assignment_reason: string | null;
+  incident_matches: number;
+}
+
+export interface AriaResponse {
+  answer: string;
+  source: 'llm' | 'fallback_template' | 'unavailable';
+  evidence: AriaEvidence;
+}
+
+export function askAria(query: string): Promise<ApiResult<AriaResponse>> {
+  return request<AriaResponse>('/aria/ask', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+  });
+}
+
+
