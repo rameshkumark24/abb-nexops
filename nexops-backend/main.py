@@ -24,6 +24,7 @@ import asyncio
 from collections import deque
 import json
 import os
+import re
 import sys
 import threading
 
@@ -580,18 +581,23 @@ def get_telemetry_snapshot(current: CurrentUser = Depends(get_current_user)):
     for r in records:
         rz = r.get("zone")
         if not rz:
-            mach = str(r.get("Machine", "")).lower()
-            if any(k in mach for k in ("compressor", "pump", "motor")):
-                rz = "A"
-            elif any(k in mach for k in ("distillation", "heat exchanger", "storage tank", "separator")):
-                rz = "B"
-            elif any(k in mach for k in ("boiler", "generator", "control valve", "mcc panel")):
-                rz = "C"
-            elif any(k in mach for k in ("reactor", "fired heater", "cooling tower", "flare")):
-                rz = "D"
+            mach_name = r.get("Machine", "")
+            match = re.search(r'\b([A-D])[0-9]+\b', mach_name, re.IGNORECASE)
+            if match:
+                rz = match.group(1).upper()
             else:
-                h = sum(ord(c) for c in r.get("Machine", "")) % 4
-                rz = ["A", "B", "C", "D"][h]
+                mach = str(mach_name).lower()
+                if any(k in mach for k in ("compressor", "pump", "motor")):
+                    rz = "A"
+                elif any(k in mach for k in ("distillation", "heat exchanger", "storage tank", "separator")):
+                    rz = "B"
+                elif any(k in mach for k in ("boiler", "generator", "control valve", "mcc panel")):
+                    rz = "C"
+                elif any(k in mach for k in ("reactor", "fired heater", "cooling tower", "flare")):
+                    rz = "D"
+                else:
+                    h = sum(ord(c) for c in mach_name) % 4
+                    rz = ["A", "B", "C", "D"][h]
 
         if rz == current.zone:
             scoped_records.append(r)

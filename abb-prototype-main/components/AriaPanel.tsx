@@ -10,7 +10,7 @@ function EvidenceGrounding({ evidence, source }: { evidence: AriaEvidence; sourc
     return (
       <div style={{ marginTop: 8, padding: 8, background: 'var(--abb-surface-1)', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius-sm)', fontSize: 10, color: 'var(--abb-ink-2)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--abb-ink-1)', marginBottom: 4 }}>
-          <span>🔍 GROUNDING EVIDENCE</span>
+          <span>GROUNDING EVIDENCE</span>
           {source && (
             <span style={{ marginLeft: 'auto', fontSize: 8, padding: '1px 4px', borderRadius: 3, background: 'var(--abb-surface-2)', border: '1px solid var(--abb-line)' }}>
               Source: {source.toUpperCase()}

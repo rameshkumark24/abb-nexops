@@ -88,6 +88,12 @@ THRESHOLDS = {
 
 def zone_for_machine(machine_name: str) -> str:
     """Return the plant zone (A-D) for a machine based on its name."""
+    # Attempt to extract the zone letter (A, B, C, or D) followed by a digit
+    # from the machine name (e.g., "Compressor C1" -> "C").
+    match = re.search(r'\b([A-D])[0-9]+\b', machine_name, re.IGNORECASE)
+    if match:
+        return match.group(1).upper()
+
     mach = machine_name.lower()
     if any(k in mach for k in ("compressor", "pump", "motor")):
         return "A"
@@ -214,7 +220,8 @@ def build_context(query: str, role: str, scope_zone: str | None, latest: dict[st
     
     scope_violation = False
     if focus_machine:
-        m_zone = zone_for_machine(focus_machine)
+        rec = latest.get(focus_machine)
+        m_zone = (rec.get("zone") if rec else None) or zone_for_machine(focus_machine)
         if role in ("field_manager", "technician") and scope_zone:
             # Scoped check: focus machine zone must match scope zone
             if m_zone != scope_zone:
@@ -350,7 +357,7 @@ def build_context(query: str, role: str, scope_zone: str | None, latest: dict[st
         try:
             scoped_records = []
             for name, rec in latest.items():
-                m_zone = zone_for_machine(name)
+                m_zone = rec.get("zone") or zone_for_machine(name)
                 if role in ("field_manager", "technician") and scope_zone:
                     if m_zone == scope_zone:
                         scoped_records.append(rec)
@@ -364,12 +371,12 @@ def build_context(query: str, role: str, scope_zone: str | None, latest: dict[st
                 return (-RISK_INDEX.get(risk, 0), p_level, r.get("Machine", ""))
                 
             scoped_records.sort(key=sort_key)
-            top_machines = scoped_records[:5]
+            top_machines = scoped_records[:30]
             
             context["top_machines"] = [
                 {
                     "name": r.get("Machine"),
-                    "zone": zone_for_machine(r.get("Machine")),
+                    "zone": r.get("zone") or zone_for_machine(r.get("Machine")),
                     "nexops_risk": r.get("nexops_risk", "LOW"),
                     "status": r.get("Status", "Normal"),
                     "alert": r.get("Alert", "None")
@@ -469,7 +476,7 @@ def render_fallback_answer(ctx: dict, key_failed: bool = False) -> str:
         return prefix + "\n".join(lines)
         
     snapshot = ctx.get("machine_snapshot") or {}
-    m_zone = zone_for_machine(focus)
+    m_zone = snapshot.get("zone") or zone_for_machine(focus)
     risk = snapshot.get("nexops_risk", "LOW")
     
     parts = []

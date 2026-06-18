@@ -36,6 +36,8 @@ class TestAriaChatbot(unittest.TestCase):
         self.assertEqual(aria.zone_for_machine("Distillation Column B1"), "B")
         self.assertEqual(aria.zone_for_machine("Boiler C1"), "C")
         self.assertEqual(aria.zone_for_machine("Reactor D1"), "D")
+        self.assertEqual(aria.zone_for_machine("Compressor C1"), "C")
+        self.assertEqual(aria.zone_for_machine("Pump B1"), "B")
 
     def test_zone_scoping(self):
         # Setup mock states
