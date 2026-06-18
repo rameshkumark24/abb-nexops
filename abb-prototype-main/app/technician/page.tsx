@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { NavBar, COLORS, Dot } from '@/components/Shared';
+import { NavBar, Dot } from '@/components/Shared';
 import { SiteAlertBanner } from '@/components/SiteAlertBanner';
 import { IconAlertTriangle, IconWrench } from '@/components/Icons';
 import { useLiveData } from '@/hooks/useLiveData';
@@ -12,8 +12,8 @@ import type { TaskStatus } from '@/types/telemetry';
 
 // Visual configuration for each status
 const STATUS_META: Record<TaskStatus, { label: string; color: string }> = {
-  assigned: { label: 'Assigned', color: '#f59e0b' },
-  in_progress: { label: 'In Progress', color: '#3b82f6' },
+  assigned: { label: 'Assigned', color: 'var(--abb-warning, #f59e0b)' },
+  in_progress: { label: 'In Progress', color: 'var(--abb-early, #4338ca)' },
   resolved: { label: 'Resolved', color: '#22c55e' },
 };
 
@@ -127,34 +127,34 @@ function TechnicianConsole() {
   let body: React.ReactNode;
   if (loading && tasks.length === 0) {
     body = (
-      <div style={{ ...containerStyle, background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, textAlign: 'center', padding: '56px 36px' }}>
-        <div className="mono" style={{ fontSize: 12, color: '#94a3b8', letterSpacing: '0.1em' }}>
+      <div style={{ ...containerStyle, background: 'var(--abb-surface-1)', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius)', textAlign: 'center', padding: '56px 36px', boxShadow: 'var(--abb-shadow-1)' }}>
+        <div className="abb-data" style={{ fontSize: 11, color: 'var(--abb-ink-3)', letterSpacing: '0.1em' }}>
           LOADING ASSIGNED TASKS...
         </div>
       </div>
     );
   } else if (error && tasks.length === 0) {
     body = (
-      <div style={{ ...containerStyle, background: 'rgba(15,23,42,0.4)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, textAlign: 'center', padding: '56px 36px' }}>
+      <div style={{ ...containerStyle, background: 'var(--abb-surface-1)', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius)', textAlign: 'center', padding: '56px 36px', boxShadow: 'var(--abb-shadow-1)' }}>
         <div
           style={{
             width: 64,
             height: 64,
-            background: 'rgba(239,68,68,0.1)',
+            background: 'var(--abb-alarm-soft)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 24px',
-            border: '1px solid rgba(239,68,68,0.2)',
+            border: '1px solid var(--abb-alarm-line)',
           }}
         >
-          <IconAlertTriangle size={28} color="#ef4444" />
+          <IconAlertTriangle size={28} color="var(--abb-alarm)" />
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 500, color: '#f8fafc', marginBottom: 10 }}>
+        <h2 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 20, fontWeight: 800, color: 'var(--abb-ink-0)', textTransform: 'uppercase', marginBottom: 10 }}>
           Cannot reach task service
         </h2>
-        <p style={{ color: '#94a3b8', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
+        <p style={{ color: 'var(--abb-ink-2)', fontSize: 13, lineHeight: 1.7, margin: 0 }}>
           The NexOps task endpoint isn’t responding. The queue will refresh automatically once it’s back.
         </p>
       </div>
@@ -163,27 +163,27 @@ function TechnicianConsole() {
     body = (
       <div
         className="glow-success"
-        style={{ ...containerStyle, background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 12, textAlign: 'center', padding: '56px 36px' }}
+        style={{ ...containerStyle, background: 'var(--abb-surface-1)', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius)', textAlign: 'center', padding: '56px 36px', boxShadow: 'var(--abb-shadow-1)' }}
       >
         <div
           style={{
             width: 64,
             height: 64,
-            background: 'rgba(16,185,129,0.1)',
+            background: 'rgba(34,197,94,0.1)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 24px',
-            border: '1px solid rgba(16,185,129,0.2)',
+            border: '1px solid rgba(34,197,94,0.2)',
           }}
         >
-          <IconWrench size={28} color="#10b981" />
+          <IconWrench size={28} color="#22c55e" />
         </div>
-        <h2 style={{ fontSize: 22, fontWeight: 500, color: '#f8fafc', marginBottom: 10 }}>
+        <h2 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 22, fontWeight: 800, color: 'var(--abb-ink-0)', textTransform: 'uppercase', marginBottom: 10 }}>
           All Clear — No Open Tasks
         </h2>
-        <p style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+        <p style={{ color: 'var(--abb-ink-2)', fontSize: 14, lineHeight: 1.7, margin: 0 }}>
           You have no tasks assigned to you right now. New assignments will appear here automatically.
         </p>
       </div>
@@ -193,23 +193,20 @@ function TechnicianConsole() {
       <div style={{ ...containerStyle, display: 'flex', flexDirection: 'column', gap: 18 }}>
         {tasks.map((t) => {
           const busy = busyId === t.id;
-          const statusMeta = STATUS_META[t.status] ?? STATUS_META.assigned;
           const sevColor = getSeverityColor(t);
           const sevLabel = getSeverityLabel(t);
           const isCritical = sevLabel === 'Critical';
 
           return (
             <div key={t.id} className={`fade-in-up ${isCritical ? 'glow-critical' : ''}`} style={{
-              background: 'rgba(15, 23, 42, 0.6)',
-              backdropFilter: 'blur(16px)',
-              border: `1px solid ${isCritical ? '#ef4444aa' : t.status === 'in_progress' ? '#3b82f6aa' : 'rgba(255, 255, 255, 0.08)'}`,
-              borderRadius: '12px',
+              background: 'var(--abb-surface-1)',
+              borderTop: `1px solid ${isCritical ? 'var(--abb-alarm-line)' : t.status === 'in_progress' ? 'var(--abb-early-line)' : 'var(--abb-line)'}`,
+              borderRight: `1px solid ${isCritical ? 'var(--abb-alarm-line)' : t.status === 'in_progress' ? 'var(--abb-early-line)' : 'var(--abb-line)'}`,
+              borderBottom: `1px solid ${isCritical ? 'var(--abb-alarm-line)' : t.status === 'in_progress' ? 'var(--abb-early-line)' : 'var(--abb-line)'}`,
+              borderLeft: `3px solid ${sevColor}`,
+              borderRadius: 'var(--abb-radius)',
               padding: '24px',
-              boxShadow: isCritical 
-                ? '0 0 20px rgba(239, 68, 68, 0.15), 0 4px 30px rgba(0, 0, 0, 0.4)'
-                : t.status === 'in_progress' 
-                  ? '0 0 20px rgba(59, 130, 246, 0.15), 0 4px 30px rgba(0, 0, 0, 0.4)'
-                  : '0 4px 30px rgba(0, 0, 0, 0.3)',
+              boxShadow: 'var(--abb-shadow-1)',
               display: 'flex',
               flexDirection: 'column',
               gap: '20px',
@@ -217,16 +214,6 @@ function TechnicianConsole() {
               overflow: 'hidden',
               transition: 'all 0.25s ease'
             }}>
-              {/* Left vertical status indicator */}
-              <div style={{
-                position: 'absolute',
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: '4px',
-                background: sevColor
-              }} />
-
               {/* Card Header & Controls */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
                 <div style={{ minWidth: 0 }}>
@@ -235,8 +222,9 @@ function TechnicianConsole() {
                     {t.zone && (
                       <span style={{
                         fontSize: '11px',
-                        color: '#60a5fa',
-                        background: 'rgba(59, 130, 246, 0.12)',
+                        color: 'var(--abb-early)',
+                        background: 'var(--abb-early-soft)',
+                        border: '1px solid var(--abb-early-line)',
                         padding: '2px 8px',
                         borderRadius: '4px',
                         fontWeight: 600
@@ -247,8 +235,8 @@ function TechnicianConsole() {
                     <span style={{
                       fontSize: '11px',
                       color: sevColor,
-                      background: `${sevColor}12`,
-                      border: `1px solid ${sevColor}33`,
+                      background: `${sevColor}0f`,
+                      border: `1px solid ${sevColor}44`,
                       padding: '2px 8px',
                       borderRadius: '4px',
                       fontWeight: 600
@@ -256,7 +244,7 @@ function TechnicianConsole() {
                       {sevLabel}
                     </span>
                   </div>
-                  <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#f8fafc', margin: '0 0 4px 0', letterSpacing: '-0.02em' }}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'var(--abb-font-ui)', color: 'var(--abb-ink-0)', margin: '0 0 4px 0', letterSpacing: '-0.02em', textTransform: 'uppercase' }}>
                     {t.machine ?? 'Unknown Unit'}
                   </h2>
                 </div>
@@ -266,42 +254,35 @@ function TechnicianConsole() {
                     <button 
                       onClick={() => handleStart(t.id)} 
                       disabled={busy} 
+                      className="abb-btn abb-btn--primary"
                       style={{
-                        background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                        color: '#ffffff',
-                        border: 'none',
-                        padding: '12px 24px',
-                        borderRadius: '8px',
-                        fontSize: '13px',
+                        padding: '10px 20px',
+                        fontSize: '12px',
                         fontWeight: 600,
                         cursor: busy ? 'default' : 'pointer',
                         transition: 'all 0.2s ease',
-                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
-                        opacity: busy ? 0.6 : 1
                       }}
                     >
-                      {busy ? 'Starting...' : 'Start Work'}
+                      {busy ? 'Starting...' : 'START WORK'}
                     </button>
                   )}
                   {t.status === 'in_progress' && (
                     <button 
                       onClick={() => handleResolve(t.id)} 
                       disabled={busy} 
+                      className="abb-btn"
                       style={{
                         background: 'linear-gradient(135deg, #10b981, #059669)',
                         color: '#ffffff',
                         border: 'none',
-                        padding: '12px 24px',
-                        borderRadius: '8px',
-                        fontSize: '13px',
+                        padding: '10px 20px',
+                        fontSize: '12px',
                         fontWeight: 600,
                         cursor: busy ? 'default' : 'pointer',
                         transition: 'all 0.2s ease',
-                        boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)',
-                        opacity: busy ? 0.6 : 1
                       }}
                     >
-                      {busy ? 'Resolving...' : 'Complete & Resolve'}
+                      {busy ? 'Resolving...' : '✓ COMPLETE WORK'}
                     </button>
                   )}
                 </div>
@@ -310,57 +291,57 @@ function TechnicianConsole() {
               {/* Simplified Professional Instruction */}
               <div style={{
                 fontSize: '13px',
-                color: '#cbd5e1',
+                color: 'var(--abb-ink-1)',
                 padding: '12px 16px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                borderRadius: '8px',
-                borderLeft: '3px solid #3b82f6'
+                background: 'var(--abb-surface-2)',
+                borderRadius: 'var(--abb-radius-sm)',
+                borderLeft: `3px solid ${sevColor}`
               }}>
                 <strong>Instruction:</strong> Go to the machine location and update task status above.
               </div>
 
               {/* Backend Data Surfaced (Clean Table Layout) */}
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--abb-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                   Task Specifications
                 </div>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                   gap: '12px',
-                  background: 'rgba(255, 255, 255, 0.01)',
-                  border: '1px solid rgba(255, 255, 255, 0.04)',
-                  borderRadius: '8px',
+                  background: 'var(--abb-surface-2)',
+                  border: '1px solid var(--abb-line)',
+                  borderRadius: 'var(--abb-radius-sm)',
                   padding: '16px'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <span style={{ color: '#94a3b8' }}>Task ID</span>
-                    <span className="mono" style={{ color: '#e2e8f0', fontWeight: 500 }}>#{t.id}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid var(--abb-line-faint)' }}>
+                    <span style={{ color: 'var(--abb-ink-2)' }}>Task ID</span>
+                    <span className="abb-data" style={{ color: 'var(--abb-ink-0)', fontWeight: 600 }}>#{t.id}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <span style={{ color: '#94a3b8' }}>Alarm ID</span>
-                    <span className="mono" style={{ color: '#e2e8f0', fontWeight: 500 }}>#{t.alarm_id ?? '—'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid var(--abb-line-faint)' }}>
+                    <span style={{ color: 'var(--abb-ink-2)' }}>Alarm ID</span>
+                    <span className="abb-data" style={{ color: 'var(--abb-ink-0)', fontWeight: 600 }}>#{t.alarm_id ?? '—'}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <span style={{ color: '#94a3b8' }}>Location Zone</span>
-                    <span style={{ color: '#e2e8f0', fontWeight: 500 }}>Zone {t.zone ?? '—'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid var(--abb-line-faint)' }}>
+                    <span style={{ color: 'var(--abb-ink-2)' }}>Location Zone</span>
+                    <span style={{ color: 'var(--abb-ink-0)', fontWeight: 600 }}>Zone {t.zone ?? '—'}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <span style={{ color: '#94a3b8' }}>Classification</span>
-                    <span style={{ color: '#e2e8f0', fontWeight: 500, textTransform: 'capitalize' }}>{t.fault_category ?? 'general'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid var(--abb-line-faint)' }}>
+                    <span style={{ color: 'var(--abb-ink-2)' }}>Classification</span>
+                    <span style={{ color: 'var(--abb-ink-0)', fontWeight: 600, textTransform: 'capitalize' }}>{t.fault_category ?? 'general'}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <span style={{ color: '#94a3b8' }}>Dispatch Match Score</span>
-                    <span className="mono" style={{ color: '#60a5fa', fontWeight: 600 }}>{t.score != null ? t.score.toFixed(3) : '—'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid var(--abb-line-faint)' }}>
+                    <span style={{ color: 'var(--abb-ink-2)' }}>Dispatch Match Score</span>
+                    <span className="abb-data" style={{ color: 'var(--abb-early)', fontWeight: 700 }}>{t.score != null ? t.score.toFixed(3) : '—'}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <span style={{ color: '#94a3b8' }}>Assigned At</span>
-                    <span className="mono" style={{ color: '#e2e8f0' }}>{clockOf(t.assigned_at)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid var(--abb-line-faint)' }}>
+                    <span style={{ color: 'var(--abb-ink-2)' }}>Assigned At</span>
+                    <span className="abb-data" style={{ color: 'var(--abb-ink-0)' }}>{clockOf(t.assigned_at)}</span>
                   </div>
                   {t.started_at && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                      <span style={{ color: '#94a3b8' }}>Work Started</span>
-                      <span className="mono" style={{ color: '#e2e8f0' }}>{clockOf(t.started_at)}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingBottom: '6px', borderBottom: '1px solid var(--abb-line-faint)' }}>
+                      <span style={{ color: 'var(--abb-ink-2)' }}>Work Started</span>
+                      <span className="abb-data" style={{ color: 'var(--abb-ink-0)' }}>{clockOf(t.started_at)}</span>
                     </div>
                   )}
                 </div>
@@ -373,7 +354,7 @@ function TechnicianConsole() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0b0d', color: '#e2e8f0', fontFamily: 'Inter, sans-serif' }}>
+    <div className="abb-page" style={{ display: 'flex', flexDirection: 'column' }}>
       <NavBar onBack={() => (window.location.href = '/')} onLogout={logout} />
       <SiteAlertBanner alert={siteAlert} />
 
@@ -390,70 +371,74 @@ function TechnicianConsole() {
             gap: '16px'
           }}>
             <div>
-              <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#f8fafc', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
-                Technician Console
+              <h1 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 'clamp(24px,3vw,32px)', fontWeight: 800, color: 'var(--abb-ink-0)', letterSpacing: '-0.02em', textTransform: 'uppercase', margin: '0 0 6px 0' }}>
+                Technician Console <span style={{ color: 'var(--abb-red)' }}>— My Tasks</span>
               </h1>
-              <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
-                Welcome back, <strong style={{ color: '#f1f5f9' }}>{user ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : 'Operator'}</strong> • Status: <span style={{ color: active === false ? '#ef4444' : '#4ade80', fontWeight: 600 }}>{active === false ? 'Off Duty (Deactivated)' : 'On Duty'}</span> {user?.zone ? `• Zone ${user.zone}` : ''}
+              <p style={{ color: 'var(--abb-ink-2)', fontSize: '13px', margin: 0 }}>
+                Welcome back, <strong style={{ color: 'var(--abb-ink-0)' }}>{user ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : 'Operator'}</strong> • Status: <span style={{ color: active === false ? 'var(--abb-alarm)' : '#22c55e', fontWeight: 600 }}>{active === false ? 'Off Duty (Deactivated)' : 'On Duty'}</span> {user?.zone ? `• Zone ${user.zone}` : ''}
               </p>
             </div>
 
             {/* Backend-driven stats panels */}
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               <div style={{
-                background: 'rgba(30, 41, 59, 0.5)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '8px',
+                background: 'var(--abb-surface-1)',
+                border: '1px solid var(--abb-line)',
+                borderRadius: 'var(--abb-radius-sm)',
+                boxShadow: 'var(--abb-shadow-1)',
                 padding: '10px 16px',
                 textAlign: 'center',
                 minWidth: '90px'
               }}>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: '#f59e0b' }}>
+                <div className="abb-data" style={{ fontSize: '18px', fontWeight: 700, color: '#f59e0b' }}>
                   {tasks.filter((t) => t.status === 'assigned').length}
                 </div>
-                <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>To Do</div>
+                <div style={{ fontSize: '10px', color: 'var(--abb-ink-2)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>To Do</div>
               </div>
               <div style={{
-                background: 'rgba(30, 41, 59, 0.5)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '8px',
+                background: 'var(--abb-surface-1)',
+                border: '1px solid var(--abb-line)',
+                borderRadius: 'var(--abb-radius-sm)',
+                boxShadow: 'var(--abb-shadow-1)',
                 padding: '10px 16px',
                 textAlign: 'center',
                 minWidth: '90px'
               }}>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: '#3b82f6' }}>
+                <div className="abb-data" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--abb-early)' }}>
                   {tasks.filter((t) => t.status === 'in_progress').length}
                 </div>
-                <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Active</div>
+                <div style={{ fontSize: '10px', color: 'var(--abb-ink-2)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Active</div>
               </div>
               {stats && (
                 <>
                   <div style={{
-                    background: 'rgba(30, 41, 59, 0.5)',
-                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                    borderRadius: '8px',
+                    background: 'var(--abb-surface-1)',
+                    border: '1px solid var(--abb-line)',
+                    borderRadius: 'var(--abb-radius-sm)',
+                    boxShadow: 'var(--abb-shadow-1)',
                     padding: '10px 16px',
                     textAlign: 'center',
                     minWidth: '90px'
                   }}>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#10b981' }}>
+                    <div className="abb-data" style={{ fontSize: '18px', fontWeight: 700, color: '#22c55e' }}>
                       {stats.resolved_count}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Resolved</div>
+                    <div style={{ fontSize: '10px', color: 'var(--abb-ink-2)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Resolved</div>
                   </div>
                   {stats.avg_resolution_minutes != null && (
                     <div style={{
-                      background: 'rgba(30, 41, 59, 0.5)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: '8px',
+                      background: 'var(--abb-surface-1)',
+                      border: '1px solid var(--abb-line)',
+                      borderRadius: 'var(--abb-radius-sm)',
+                      boxShadow: 'var(--abb-shadow-1)',
                       padding: '10px 16px',
                       textAlign: 'center',
                       minWidth: '90px'
                     }}>
-                      <div style={{ fontSize: '18px', fontWeight: 700, color: '#60a5fa' }}>
+                      <div className="abb-data" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--abb-early)' }}>
                         {stats.avg_resolution_minutes.toFixed(1)}m
                       </div>
-                      <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Avg Speed</div>
+                      <div style={{ fontSize: '10px', color: 'var(--abb-ink-2)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Avg Speed</div>
                     </div>
                   )}
                 </>
@@ -468,9 +453,9 @@ function TechnicianConsole() {
             <div
               className="mono fade-in-up"
               style={{
-                background: 'rgba(16,185,129,0.08)',
-                border: '1px solid rgba(16,185,129,0.3)',
-                borderRadius: 8,
+                background: 'rgba(16,185,129,0.06)',
+                border: '1px solid rgba(16,185,129,0.2)',
+                borderRadius: 'var(--abb-radius)',
                 padding: '12px 16px',
                 fontSize: 12,
                 color: '#10b981',
@@ -489,9 +474,9 @@ function TechnicianConsole() {
             <div
               className="mono"
               style={{
-                background: 'rgba(245,158,11,0.08)',
-                border: '1px solid rgba(245,158,11,0.3)',
-                borderRadius: 8,
+                background: 'rgba(245,158,11,0.06)',
+                border: '1px solid rgba(245,158,11,0.2)',
+                borderRadius: 'var(--abb-radius)',
                 padding: '12px 16px',
                 fontSize: 12,
                 color: '#f59e0b',

@@ -84,8 +84,8 @@ export default function Login({
             <IconShield size={12} color="var(--abb-ink-3)" /> ROLE-BASED ACCESS
           </div>
 
-          <h1 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 'clamp(24px, 3.4vw, 30px)', fontWeight: 300, color: 'var(--abb-ink-0)', lineHeight: 1.18, marginBottom: 14 }}>
-            Sign in to your console.
+          <h1 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 'clamp(24px, 3.4vw, 30px)', fontWeight: 800, color: 'var(--abb-ink-0)', letterSpacing: '-0.02em', textTransform: 'uppercase', lineHeight: 1.18, marginBottom: 14 }}>
+            Sign in <span style={{ color: 'var(--abb-red)' }}>to console</span>
           </h1>
           <p style={{ fontSize: 13, color: 'var(--abb-ink-2)', lineHeight: 1.82, marginBottom: 28, maxWidth: 380 }}>
             Each operator role has its own view, alerts, and tools. Select your role and authenticate to enter the live control surface.
@@ -110,7 +110,7 @@ export default function Login({
         </div>
 
         {/* RIGHT — FORM */}
-        <div style={{ background: 'var(--abb-surface-1)', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius)', boxShadow: 'var(--abb-shadow-1)', padding: 26 }}>
+        <div style={{ background: 'var(--abb-surface-1)', border: '1px solid var(--abb-line)', borderTop: '3px solid var(--abb-red)', borderRadius: 'var(--abb-radius)', boxShadow: 'var(--abb-shadow-1)', padding: 26 }}>
           {/* Role tabs (prefill only — routing is server-driven) */}
           <div style={{ display: 'flex', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius-sm)', overflow: 'hidden', marginBottom: 26 }}>
             {ROLE_KEYS.map((k) => {

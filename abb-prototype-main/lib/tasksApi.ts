@@ -8,7 +8,7 @@
 // UI - callers always receive a discriminated { ok } result and can render an
 // error state instead of crashing the page.
 
-import type { LifecycleTask, ResolvedTask } from '@/types/telemetry';
+import type { LifecycleTask, ResolvedTask, TelemetryRecord } from '@/types/telemetry';
 import { getToken, clearSession } from '@/lib/authStorage';
 
 // Same host as the WS bridge, overridable per-environment. Mirrors the
@@ -160,5 +160,9 @@ export function assignTask(taskId: number, engineerId: number): Promise<ApiResul
     method: 'POST',
     body: JSON.stringify({ engineer_id: engineerId }),
   });
+}
+
+export function fetchTelemetrySnapshot(): Promise<ApiResult<TelemetryRecord[]>> {
+  return request<TelemetryRecord[]>('/telemetry/snapshot', { method: 'GET' });
 }
 

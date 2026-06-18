@@ -156,12 +156,12 @@ function AdminConsole() {
       {/* 7 — NavBar with logout (wiring unchanged) */}
       <NavBar onBack={() => (window.location.href = '/')} onLogout={logout} />
 
-      <div className="abb-shell" style={{ paddingTop: 'clamp(28px,4vw,40px)', paddingBottom: 56, display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="abb-shell" style={{ paddingTop: 'clamp(28px,4vw,40px)', paddingBottom: 56, display: 'flex', flexDirection: 'column', gap: 28 }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 'clamp(22px,3vw,28px)', fontWeight: 300, color: 'var(--abb-ink-0)', marginBottom: 6 }}>
-              Plant Manager — All Zones
+            <h1 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 'clamp(24px,3vw,32px)', fontWeight: 800, color: 'var(--abb-ink-0)', letterSpacing: '-0.02em', textTransform: 'uppercase', marginBottom: 6 }}>
+              Plant Manager <span style={{ color: 'var(--abb-red)' }}>— All Zones</span>
             </h1>
             <p style={{ fontSize: 13, color: 'var(--abb-ink-2)' }}>Site-wide live machine health, zone rollup, and prediction metrics.</p>
           </div>
@@ -172,11 +172,11 @@ function AdminConsole() {
         </div>
 
         {/* 3 — PLANT OVERVIEW STRIP (real derived counts) */}
-        <Panel style={{ padding: 22 }}>
+        <Panel className="section-enter" style={{ padding: 22, borderTop: '3px solid var(--abb-red)', animationDelay: '0.1s' }}>
           <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
             {STRIP.map((s) => (
               <div key={s.label}>
-                <div className="abb-data" style={{ fontSize: 30, fontWeight: 600, color: s.tone ?? 'var(--abb-ink-0)', letterSpacing: '-0.01em' }}>
+                <div className="abb-data" style={{ fontSize: 32, fontWeight: 700, color: s.tone ?? 'var(--abb-ink-0)', letterSpacing: '-0.02em' }}>
                   {s.value}
                 </div>
                 <MicroLabel style={{ marginTop: 4 }}>{s.label}</MicroLabel>
@@ -186,7 +186,7 @@ function AdminConsole() {
         </Panel>
 
         {/* 4 — LIVE MACHINE ANALYTICS (all zones) */}
-        <Panel style={{ padding: 22 }}>
+        <Panel className="section-enter" style={{ padding: 22, borderTop: '3px solid var(--abb-red)', animationDelay: '0.2s' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
             <MicroLabel>LIVE MACHINE ANALYTICS · ALL ZONES</MicroLabel>
             <div className="abb-data" style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 9, color: 'var(--abb-ink-3)', letterSpacing: '0.06em' }}>
@@ -249,7 +249,7 @@ function AdminConsole() {
         </Panel>
 
         {/* 5 — ZONE ROLLUP (per-zone summary, grouped by machine zone) */}
-        <Panel style={{ padding: 22 }}>
+        <Panel className="section-enter" style={{ padding: 22, animationDelay: '0.3s' }}>
           {sectionLabel('ZONE ROLLUP · A / B / C / D')}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
             {zoneRollup.map((z) => (
@@ -279,7 +279,7 @@ function AdminConsole() {
         </Panel>
 
         {/* 5a — ADVANCED ANALYTICS — CHARTS & GRAPHS */}
-        <Panel style={{ padding: 22 }}>
+        <Panel className="section-enter" style={{ padding: 22, animationDelay: '0.4s' }}>
           {sectionLabel('ADVANCED ANALYTICS — CONTROL SYSTEM PERFORMANCE')}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
 
@@ -496,7 +496,7 @@ function AdminConsole() {
         </Panel>
 
         {/* 6 — LIVE METRICS PANEL (restyled to tokens; computation UNCHANGED) */}
-        <Panel style={{ padding: 22 }}>
+        <Panel className="section-enter" style={{ padding: 22, animationDelay: '0.5s' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, gap: 12, flexWrap: 'wrap' }}>
             <MicroLabel>PREDICTION &amp; SEGREGATION — LIVE METRICS</MicroLabel>
             <div className="abb-data" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 9, color: 'var(--abb-ink-3)', letterSpacing: '0.08em' }}>
@@ -560,7 +560,7 @@ function AdminConsole() {
         </Panel>
 
         {/* 7 — WORKFORCE (engineers & technicians) — moved after analytics */}
-        <Panel style={{ padding: 22 }}>
+        <Panel className="section-enter" style={{ padding: 22, borderTop: '3px solid var(--abb-red)', animationDelay: '0.6s' }}>
           {sectionLabel('WORKFORCE · ENGINEERS & TECHNICIANS')}
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 420px', minWidth: 320 }}>

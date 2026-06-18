@@ -73,6 +73,11 @@ engine = AnomalyEngine()
 active_assignments: dict[tuple[str, str], dict] = {}
 _assign_lock = threading.Lock()
 
+# Latest telemetry record received for each machine, keyed by machine name.
+# Tracks the current state of the plant to bootstrap new frontend clients on login.
+latest_machine_states: dict[str, dict] = {}
+_states_lock = threading.Lock()
+
 
 def clear_dedupe_for(machine, fault_category) -> bool:
     """Drop the in-memory dedupe entry for (machine, fault_category).
@@ -129,14 +134,26 @@ def is_early_record(record: dict) -> bool:
     Evaluated AFTER the risk stage, on the CAPPED nexops_risk already on the
     record (so anomaly-only is at most MEDIUM, predictive may be HIGH/CRITICAL).
 
-      - is_nuisance is True            -> False (noise is never EARLY)
-      - is_predictive is True          -> RISK_INDEX[nexops_risk] > gateway idx
-                                          (predictive divergence; full strength)
-      - else (anomaly-only)            -> gateway_calm AND RISK_INDEX >= MEDIUM
+    PREREQUISITE: anomaly_score must be a real number (not None). NexOps cannot
+    claim "we caught it early" when the anomaly engine hasn't produced a score
+    yet (warming up / errored). The is_predictive flag still influences
+    nexops_risk (via risk.py), but the EARLY BADGE requires actual ML evidence.
+
+      - anomaly_score is None            -> False (no ML evidence yet)
+      - is_nuisance is True              -> False (noise is never EARLY)
+      - is_predictive is True            -> RISK_INDEX[nexops_risk] > gateway idx
+                                            (predictive divergence; full strength)
+      - else (anomaly-only)              -> gateway_calm AND RISK_INDEX >= MEDIUM
 
     FAIL-SAFE: missing is_predictive -> not predictive; missing nexops_risk ->
     LOW -> not early; missing is_nuisance -> not nuisance.
     """
+    # ML EVIDENCE GATE: the anomaly engine must have actually scored this record.
+    # During warmup (anomaly_score=None), risk may still be elevated by
+    # is_predictive (via risk.py), but that's the GATEWAY's own flag — not
+    # NexOps's intelligence. Badge only when we have our OWN analysis.
+    if record.get("anomaly_score") is None:
+        return False
     if record.get("is_nuisance") is True:
         return False
     risk_idx = _RISK_INDEX.get(str(record.get("nexops_risk", "") or "").upper(), 0)
@@ -466,6 +483,11 @@ def on_message(client, userdata, msg):
     # TODO(Stage: ARIA) attach ARIA explanation here
     # ---------------------------------------------------------------------
 
+    # Store the latest record for this machine in our thread-safe cache
+    if "Machine" in record:
+        with _states_lock:
+            latest_machine_states[record["Machine"]] = record
+
     # Hand off from this sync MQTT thread to the asyncio event loop.
     if event_loop is not None:
         asyncio.run_coroutine_threadsafe(manager.broadcast(record), event_loop)
@@ -531,6 +553,41 @@ async def shutdown():
 async def health():
     """Simple health check - open in a browser to confirm the service is up."""
     return {"status": "ok", "clients": len(manager.active)}
+
+
+@app.get("/telemetry/snapshot")
+def get_telemetry_snapshot(current: CurrentUser = Depends(get_current_user)):
+    """Return the latest telemetry record for each machine.
+
+    Stage 3b: Requires a valid JWT token. Plant managers see all records;
+    field managers and technicians see only records in their zone.
+    """
+    with _states_lock:
+        records = list(latest_machine_states.values())
+
+    if current.role == "plant_manager":
+        return records
+
+    scoped_records = []
+    for r in records:
+        rz = r.get("zone")
+        if not rz:
+            mach = str(r.get("Machine", "")).lower()
+            if any(k in mach for k in ("compressor", "pump", "motor")):
+                rz = "A"
+            elif any(k in mach for k in ("distillation", "heat exchanger", "storage tank", "separator")):
+                rz = "B"
+            elif any(k in mach for k in ("boiler", "generator", "control valve", "mcc panel")):
+                rz = "C"
+            elif any(k in mach for k in ("reactor", "fired heater", "cooling tower", "flare")):
+                rz = "D"
+            else:
+                h = sum(ord(c) for c in r.get("Machine", "")) % 4
+                rz = ["A", "B", "C", "D"][h]
+
+        if rz == current.zone:
+            scoped_records.append(r)
+    return scoped_records
 
 
 # ----------------------------------------------------------------------

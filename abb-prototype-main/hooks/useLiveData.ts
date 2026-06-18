@@ -23,6 +23,7 @@ import {
   isEarlyWarning,
   zoneFor,
 } from '@/lib/adapter';
+import { fetchTelemetrySnapshot } from '@/lib/tasksApi';
 
 // ======================================================================
 // SWAPPABLE DATA SOURCE
@@ -505,6 +506,7 @@ export function useLiveData(zoneFilter?: string) {
   // the published snapshot lives in `metrics` state above. Reset on reload.
   const metricsAcc = useRef<MetricsAcc>(freshMetricsAcc());
   const faultLC = useRef<Map<string, FaultLC>>(new Map());
+  const lastTimestamps = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     // Clear maps and accumulators when subscription filter changes to prevent leakage
@@ -512,15 +514,20 @@ export function useLiveData(zoneFilter?: string) {
     taskMap.current.clear();
     metricsAcc.current = freshMetricsAcc();
     faultLC.current.clear();
+    lastTimestamps.current.clear();
     setMachines([]);
     setAlarms([]);
     setTasks([]);
     setControlAlarms([]);
     setMetrics(EMPTY_METRICS);
 
-    // `connected` is now driven by the socket lifecycle (onopen/onclose),
-    // reported via the second subscribe() argument.
-    const unsubscribe = subscribe((raw) => {
+    const processRecord = (raw: TelemetryRecord) => {
+      const lastTime = lastTimestamps.current.get(raw.Machine);
+      if (lastTime && raw.Timestamp <= lastTime) {
+        return;
+      }
+      lastTimestamps.current.set(raw.Machine, raw.Timestamp);
+
       const recordZone = raw.zone || zoneFor(raw.Machine).replace('Zone ', '');
       const isSiteEmergency = raw.site_alert === true && raw.alert_scope === 'site';
 
@@ -591,7 +598,23 @@ export function useLiveData(zoneFilter?: string) {
       } catch (err) {
         console.error('[useLiveData] metrics accumulation skipped:', err);
       }
-    }, setConnected);
+    };
+
+    // 1. Fetch current telemetry snapshot from backend to bootstrap initial state
+    fetchTelemetrySnapshot().then((res) => {
+      if (res.ok && res.data) {
+        res.data.forEach((raw) => {
+          try {
+            processRecord(raw);
+          } catch (err) {
+            console.error('[useLiveData] error processing snapshot record:', err);
+          }
+        });
+      }
+    });
+
+    // 2. Subscribe to live WebSocket feed for real-time updates
+    const unsubscribe = subscribe(processRecord, setConnected);
 
     return () => {
       unsubscribe();

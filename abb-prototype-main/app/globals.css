@@ -1,22 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
-/* Scrollbar */
+/* Scrollbar — light ABB theme */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f1117;
+  background: var(--abb-surface-0, #f3f4f6);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2d3748;
-  border-radius: 2px;
+  background: var(--abb-line-strong, #b7bec9);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--abb-ink-3, #8b94a3);
 }
 
 /* Pulse animations */
@@ -95,13 +99,13 @@
 .stagger > *:nth-child(7) { animation-delay: 480ms; }
 .stagger > *:nth-child(8) { animation-delay: 560ms; }
 
-/* Card hover lift */
+/* Card hover lift — premium light theme */
 .card-hover {
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.24s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.24s ease;
 }
 .card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  box-shadow: 0 8px 28px rgba(20,26,38,0.1), 0 2px 8px rgba(20,26,38,0.04);
 }
 
 /* Smooth bar grow on load */
@@ -286,10 +290,19 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--abb-font-ui) !important;
   }
   html {
     @apply font-sans;
   }
+}
+
+body, button, input, select, textarea {
+  font-family: var(--abb-font-ui) !important;
+}
+
+.abb-data {
+  font-family: var(--abb-font-mono) !important;
 }
 
 /* ====================================================================== */
@@ -344,9 +357,14 @@
   --abb-nuisance: #98a1b0; /* nuisance-filtered — muted / de-emphasised */
   --abb-nuisance-soft: #eef0f2;
 
+  /* ABB Brand Colors */
+  --abb-red: #E00A18;
+  --abb-red-hover: #c10915;
+
   /* Typography — brand identity lives in TYPE, not colour */
-  --abb-font-ui: 'Inter', var(--font-geist-sans), system-ui, sans-serif;
-  --abb-font-data: 'JetBrains Mono', var(--font-geist-mono), ui-monospace, monospace;
+  --abb-font-ui: 'Outfit', system-ui, sans-serif;
+  --abb-font-data: 'Space Grotesk', sans-serif;
+  --abb-font-mono: 'JetBrains Mono', monospace;
 
   /* Radii — crisp, small (control-panel convention) */
   --abb-radius: 4px;
@@ -429,15 +447,19 @@
   border: 1px solid var(--abb-line);
   border-radius: var(--abb-radius);
   box-shadow: var(--abb-shadow-1);
+  transition: box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.28s ease;
+}
+.abb-card:hover {
+  box-shadow: var(--abb-shadow-2);
 }
 .abb-card--interactive {
   cursor: pointer;
-  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .abb-card--interactive:hover {
   border-color: var(--abb-line-strong);
-  box-shadow: var(--abb-shadow-2);
-  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(20,26,38,0.1);
+  transform: translateY(-2px);
 }
 
 .abb-input {
@@ -472,11 +494,11 @@
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 .abb-btn--primary {
-  background: var(--abb-ink-0);
+  background: var(--abb-red);
   color: #ffffff;
-  border-color: var(--abb-ink-0);
+  border-color: var(--abb-red);
 }
-.abb-btn--primary:hover { background: #2a3142; }
+.abb-btn--primary:hover { background: var(--abb-red-hover); border-color: var(--abb-red-hover); }
 .abb-btn--ghost {
   background: transparent;
   color: var(--abb-ink-1);
@@ -526,6 +548,32 @@
   color: var(--abb-ink-1);
   padding: 11px 14px;
   border-bottom: 1px solid var(--abb-line-faint);
+}
+.abb-table tbody tr {
+  transition: background 0.14s ease;
+}
+.abb-table tbody tr:hover {
+  background: var(--abb-surface-2);
+}
+
+/* Section divider with red accent */
+.abb-section-accent {
+  border-top: 3px solid var(--abb-red);
+}
+
+/* Smooth page section enter */
+@keyframes sectionEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.section-enter {
+  animation: sectionEnter 0.45s ease-out both;
+}
+
+/* Selection highlight */
+::selection {
+  background: rgba(224, 10, 24, 0.12);
+  color: var(--abb-ink-0);
 }
 
 /* Site-wide CRITICAL banner — the ONE place red is allowed to dominate. */

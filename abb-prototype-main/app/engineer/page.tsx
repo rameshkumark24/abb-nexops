@@ -132,12 +132,12 @@ function FieldManagerConsole() {
       {/* 6 — NavBar + logout (wiring unchanged) */}
       <NavBar onBack={() => (window.location.href = '/')} onLogout={logout} />
 
-      <div className="abb-shell" style={{ paddingTop: 'clamp(28px,4vw,40px)', paddingBottom: 56, display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="abb-shell" style={{ paddingTop: 'clamp(28px,4vw,40px)', paddingBottom: 56, display: 'flex', flexDirection: 'column', gap: 28 }}>
         {/* 2 — ZONE HEADER + health summary */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 'clamp(22px,3vw,28px)', fontWeight: 300, color: 'var(--abb-ink-0)', marginBottom: 6 }}>
-              Zone {zoneLetter} — Field Manager
+            <h1 style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 'clamp(24px,3vw,32px)', fontWeight: 800, color: 'var(--abb-ink-0)', letterSpacing: '-0.02em', textTransform: 'uppercase', marginBottom: 6 }}>
+              Zone {zoneLetter} <span style={{ color: 'var(--abb-red)' }}>— Field Manager</span>
             </h1>
             <p className="abb-data" style={{ fontSize: 12, color: 'var(--abb-ink-2)' }}>
               FIELD MANAGER · {user?.username ?? '—'} · scoped to Zone {zoneLetter}
@@ -145,11 +145,11 @@ function FieldManagerConsole() {
           </div>
         </div>
 
-        <Panel style={{ padding: 22 }}>
+        <Panel className="section-enter" style={{ padding: 22, borderTop: '3px solid var(--abb-red)', animationDelay: '0.1s' }}>
           <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap' }}>
             {SUMMARY.map((s) => (
               <div key={s.label}>
-                <div className="abb-data" style={{ fontSize: 30, fontWeight: 600, color: s.tone ?? 'var(--abb-ink-0)', letterSpacing: '-0.01em' }}>
+                <div className="abb-data" style={{ fontSize: 32, fontWeight: 700, color: s.tone ?? 'var(--abb-ink-0)', letterSpacing: '-0.02em' }}>
                   {s.value}
                 </div>
                 <MicroLabel style={{ marginTop: 4 }}>{s.label}</MicroLabel>
@@ -159,7 +159,7 @@ function FieldManagerConsole() {
         </Panel>
 
         {/* 3 — ZONE MACHINE HEALTH (filtered to user.zone) */}
-        <Panel style={{ padding: 22 }}>
+        <Panel className="section-enter" style={{ padding: 22, borderTop: '3px solid var(--abb-red)', animationDelay: '0.2s' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
             <MicroLabel>ZONE {zoneLetter} · MACHINE HEALTH &amp; PREDICTION</MicroLabel>
             <div className="abb-data" style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 9, color: 'var(--abb-ink-3)', letterSpacing: '0.06em' }}>
@@ -221,7 +221,7 @@ function FieldManagerConsole() {
         </Panel>
 
         {/* 4 (team+tasks) + 5 (analytics) + 6 (ARIA) — 3-panel grid layout on wide screens */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, alignItems: 'start' }}>
+        <div className="section-enter" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 28, alignItems: 'start', animationDelay: '0.3s' }}>
           {/* 4 — ZONE FIELD TEAM + TASK ASSIGNMENTS */}
           <Panel style={{ padding: 22 }}>
             <MicroLabel style={{ marginBottom: 16 }}>ZONE {zoneLetter} · FIELD TEAM &amp; CAPACITY</MicroLabel>
@@ -368,7 +368,7 @@ function FieldManagerConsole() {
                           No lifecycle tasks open
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: 8 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid var(--abb-line-faint)', paddingTop: 8 }}>
                           {engTasks.map((t) => (
                             <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                               <span className="abb-data" style={{ fontSize: 10.5, color: 'var(--abb-ink-1)' }}>

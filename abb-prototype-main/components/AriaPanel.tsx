@@ -71,7 +71,7 @@ export default function AriaPanel({ zone }: { zone: string }) {
   }
 
   return (
-    <div className="abb-card" style={{ display: 'flex', flexDirection: 'column', alignSelf: 'start', maxHeight: collapsed ? undefined : 560 }}>
+    <div className="abb-card" style={{ display: 'flex', flexDirection: 'column', alignSelf: 'start', maxHeight: collapsed ? undefined : 560, borderTop: '3px solid var(--abb-red)' }}>
       {/* Header */}
       <div
         style={{

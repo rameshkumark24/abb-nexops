@@ -3,19 +3,19 @@ import { ReactNode } from 'react';
 import { IconLock } from './Icons';
 
 const COLORS = {
-  textPrimary: '#f1f5f9',
-  textSec: '#94a3b8',
-  textMuted: '#64748b',
-  textFaint: '#475569',
-  borderFaint: '#1a1d27',
-  borderSub: '#222636',
+  textPrimary: 'var(--abb-ink-0, #1c2230)',
+  textSec: 'var(--abb-ink-1, #39414f)',
+  textMuted: 'var(--abb-ink-2, #5a6473)',
+  textFaint: 'var(--abb-ink-3, #8b94a3)',
+  borderFaint: 'var(--abb-line-faint, #e6e8ec)',
+  borderSub: 'var(--abb-line, #d3d8df)',
   green: '#22c55e',
-  greenBg: 'rgba(20,83,45,0.5)',
-  greenBorder: '#166534',
-  navBg: 'rgba(10,11,13,0.92)',
-  cardBg: '#0f1117',
-  cardBgHov: '#13161e',
-  panelBg: '#0c0e14',
+  greenBg: 'rgba(34,197,94,0.08)',
+  greenBorder: 'rgba(34,197,94,0.2)',
+  navBg: 'rgba(255,255,255,0.92)',
+  cardBg: 'var(--abb-surface-1, #ffffff)',
+  cardBgHov: 'var(--abb-surface-2, #e9ebef)',
+  panelBg: 'var(--abb-surface-0, #f3f4f6)',
 };
 
 export const Dot = ({ color, cls = 'pulse', size = 7 }: { color: string; cls?: string; size?: number }) => (
@@ -42,10 +42,11 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
-      padding: '12px clamp(16px, 4vw, 32px)',
+      padding: '14px clamp(16px, 4vw, 32px)',
       borderBottom: '1px solid var(--abb-line)',
-      background: 'rgba(255,255,255,0.86)',
-      backdropFilter: 'blur(10px)',
+      background: 'rgba(255,255,255,0.92)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       position: 'sticky',
       top: 0,
       zIndex: 100,
@@ -60,9 +61,9 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
             background: 'none',
             border: 'none',
             color: 'var(--abb-ink-1)',
-            fontFamily: 'var(--abb-font-data)',
-            fontSize: 11,
-            letterSpacing: '0.08em',
+            fontFamily: 'var(--abb-font-ui)',
+            fontSize: 12,
+            letterSpacing: '0.04em',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -74,30 +75,46 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
-          NEXOPS
+          <span style={{ fontWeight: 700 }}>NEX<span style={{ color: 'var(--abb-red)' }}>OPS</span></span>
         </button>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div
             style={{
-              width: 22,
-              height: 22,
-              background: 'var(--abb-surface-2)',
-              border: '1px solid var(--abb-line-strong)',
+              width: 24,
+              height: 24,
+              background: 'var(--abb-red)',
               borderRadius: 'var(--abb-radius-sm)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              color: '#ffffff',
             }}
           >
-            <div style={{ width: 8, height: 8, background: 'var(--abb-ink-0)', borderRadius: '50%' }} />
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4.5 19.5c1-3.5 3-6.5 5.5-9L17.5 3c1.5-1.5 3.5-1 4 0s1.5 2.5 0 4L14 14.5c-2.5 2.5-5.5 4.5-9 5.5z" />
+              <path d="M9.5 14.5L5 20l-1-4M14.5 9.5L20 5l-4-1" />
+              <circle cx="15.5" cy="8.5" r="1.5" fill="currentColor" />
+              <line x1="2" y1="22" x2="5" y2="19" />
+              <line x1="0" y1="18" x2="2" y2="16" />
+              <line x1="6" y1="24" x2="8" y2="22" />
+            </svg>
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--abb-font-data)', fontSize: 13, fontWeight: 600, color: 'var(--abb-ink-0)', letterSpacing: '0.04em' }}>
-              NexOps
+            <div style={{ fontFamily: 'var(--abb-font-ui)', fontSize: 14, fontWeight: 700, color: 'var(--abb-ink-0)', letterSpacing: '-0.02em' }}>
+              NEX<span style={{ color: 'var(--abb-red)' }}>OPS</span>
             </div>
-            <div className="abb-micro" style={{ fontSize: 8.5 }}>
+            <div className="abb-micro" style={{ fontSize: 8.5, letterSpacing: '0.08em' }}>
               PENGUINS · ABB ACCELERATOR 2026
             </div>
           </div>
@@ -131,7 +148,6 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
           <IconLock size={12} color="var(--abb-ink-3)" /> SECURE OPERATOR LOGIN
         </div>
       ) : (
-        <>
           <div
             style={{
               display: 'flex',
@@ -150,21 +166,6 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
             <Dot color="var(--abb-nominal)" size={6} cls="" />
             PROTOTYPE LIVE
           </div>
-          <div
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--abb-line)',
-              padding: '5px 12px',
-              borderRadius: 'var(--abb-radius-sm)',
-              fontFamily: 'var(--abb-font-data)',
-              fontSize: 10,
-              color: 'var(--abb-ink-3)',
-              letterSpacing: '0.1em',
-            }}
-          >
-            V0.9 · HUSH DEMO
-          </div>
-        </>
       )}
     </div>
   </nav>
@@ -247,7 +248,7 @@ export const Button = ({
   children: ReactNode;
   className?: string;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-  <button type={type} className={`abb-btn abb-btn--${variant} ${className}`} style={style} {...rest}>
+  <button type={type} className={`abb-btn abb-btn--${variant} ${className}`} style={{ fontWeight: 600, ...style }} {...rest}>
     {children}
   </button>
 );

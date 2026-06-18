@@ -141,12 +141,17 @@ export function cappedRisk(raw: TelemetryRecord): NexopsRisk {
 //     the gateway severity - full strength, may be HIGH/CRITICAL (headline).
 //   - ANOMALY-ONLY on a calm gateway: NexOps elevated to MEDIUM+ while the gateway
 //     is calm - still an EARLY catch, but capped at MEDIUM (see cappedRisk).
+// PREREQUISITE: anomaly_score must exist (not null). NexOps can't claim "early
+// detection" when the anomaly engine hasn't produced a score yet (warming up).
 export function isEarlyWarning(raw: TelemetryRecord): boolean {
   // PREFER the backend's single-source-of-truth flag. The backend now stamps
   // is_early on the wire (computed from this exact rule), so all views agree.
   // Fall back to the client-side computation only for OLD records that predate
   // the field (backward-compat) — do NOT remove the fallback.
   if (typeof raw.is_early === 'boolean') return raw.is_early;
+  // ML EVIDENCE GATE: no anomaly score = no early badge. The is_predictive flag
+  // may still influence risk, but it's the gateway's signal, not NexOps's own.
+  if (raw.anomaly_score == null) return false;
   if (raw.is_nuisance === true) return false; // noise is never EARLY
   const riskIdx = RISK_INDEX[cappedRisk(raw)] ?? 0; // cappedRisk re-cap is idempotent here
   if (raw.is_predictive === true) {
