@@ -188,6 +188,22 @@ class User(Base):
     active = Column(Boolean, nullable=False, default=True)
 
 
+class IndustrialQA(Base):
+    """Industrial maintenance Q&A knowledge base seeded from NexOps-Industrial-QA.pdf.
+
+    Covers 38 equipment/operations sections (403 Q&A pairs total). Used by ARIA
+    to answer maintenance and troubleshooting questions using keyword-scored retrieval.
+    """
+
+    __tablename__ = "industrial_qa"
+
+    id = Column(Integer, primary_key=True)
+    section_number = Column(Integer, nullable=False, index=True)
+    section_name = Column(String, nullable=False, index=True)
+    question = Column(String, nullable=False)
+    answer = Column(String, nullable=False)
+
+
 # ----------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------

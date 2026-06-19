@@ -19,6 +19,8 @@ bcrypt              # password hashing — used DIRECTLY (5.0.0 installed & work
                     # passlib was dropped: it reads bcrypt.__about__ which 5.x removed)
 httpx               # required by FastAPI's TestClient (test_auth.py import)
 
+pdfplumber          # PDF text extraction for industrial_qa knowledge base seeding
+
 # --- NOT needed yet; uncomment as later stages land ---
 # influxdb-client     # Stage: history (time-series storage)
 # anthropic           # Stage: ARIA (explanations)

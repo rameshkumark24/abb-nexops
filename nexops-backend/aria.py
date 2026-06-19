@@ -8,7 +8,7 @@ from datetime import datetime
 import httpx
 
 # Models and DB access
-from db import Assignment, Engineer
+from db import Assignment, Engineer, IndustrialQA
 
 def is_out_of_domain(query: str) -> bool:
     """Detect if query is asking for general knowledge, sports, celebrities, or definitions unrelated to NexOps."""
@@ -28,7 +28,19 @@ def is_out_of_domain(query: str) -> bool:
         "compressor", "pump", "boiler", "reactor", "hx", "heat exchanger", "zone",
         "early", "warning", "task", "assignment", "assigned", "assign", "engineer",
         "ravi", "sam", "lena", "diego", "fault", "vibration", "temp", "pressure", "flow",
-        "level", "telemetry", "alarm", "alert", "mcc panel", "work", "workload", "roster"
+        "level", "telemetry", "alarm", "alert", "mcc panel", "work", "workload", "roster",
+        # Equipment & maintenance terms from knowledge base
+        "bearing", "motor", "valve", "turbine", "gearbox", "fan", "blower", "conveyor",
+        "hydraulic", "pneumatic", "piping", "flange", "instrument", "control", "electrical",
+        "alignment", "balancing", "corrosion", "inspection", "ndt", "lubrication",
+        "safety", "esd", "cooling tower", "vessel", "tank", "refin", "mining", "food",
+        "pharmaceutical", "reliability", "wastewater", "cavitation", "seal", "coupling",
+        "impeller", "rotor", "stator", "winding", "insulation", "grounding", "overload",
+        "overheating", "leaking", "leak", "noise", "cavitat", "rpm", "speed", "torque",
+        "current", "voltage", "frequency", "maintenance", "inspection", "shutdown",
+        "startup", "interlock", "trip", "relief", "safety valve", "process", "chemical",
+        "fouling", "corrod", "erosion", "fatigue", "crack", "weld", "gasket", "packing",
+        "mechanical seal", "o-ring", "grease", "oil", "lube", "filter", "strainer",
     ]
     
     for k in ood_keywords:
@@ -212,6 +224,53 @@ def find_worst_moving_sensor(trend: list[dict], features: list[str]) -> dict | N
         
     projections.sort(key=lambda p: p["eta_minutes_low"])
     return projections[0]
+
+
+_KB_STOPWORDS = {
+    "the", "is", "are", "was", "were", "how", "why", "what", "when", "where",
+    "does", "do", "can", "should", "will", "would", "which", "and", "or", "in",
+    "on", "at", "to", "for", "of", "a", "an", "my", "our", "this", "that",
+    "with", "from", "by", "not", "be", "has", "have", "had", "its", "if",
+    "but", "so", "up", "out", "about", "than", "into", "through", "during",
+    "before", "after", "get", "use", "used", "using", "run", "set",
+}
+
+
+def search_knowledge_base(query: str, session, top_k: int = 3) -> list[dict]:
+    """Score industrial_qa rows by keyword overlap and return the top matches."""
+    words = re.findall(r"\b[a-z]{3,}\b", query.lower())
+    keywords = [w for w in words if w not in _KB_STOPWORDS]
+    if not keywords:
+        return []
+
+    try:
+        all_qa = session.query(IndustrialQA).all()
+    except Exception as e:
+        print(f"[aria-kb] failed to query industrial_qa: {e}")
+        return []
+
+    scored: list[tuple[int, IndustrialQA]] = []
+    for row in all_qa:
+        q_lower = row.question.lower()
+        a_lower = row.answer.lower()
+        # Question matches weighted 2x; answer matches 1x
+        score = (
+            sum(2 for kw in keywords if kw in q_lower)
+            + sum(1 for kw in keywords if kw in a_lower)
+        )
+        if score > 0:
+            scored.append((score, row))
+
+    scored.sort(key=lambda x: -x[0])
+    return [
+        {
+            "section": row.section_name,
+            "question": row.question,
+            "answer": row.answer,
+        }
+        for _, row in scored[:top_k]
+    ]
+
 
 def build_context(query: str, role: str, scope_zone: str | None, latest: dict[str, dict], history: dict[str, list[dict]], session, username: str | None = None, engineer_id: int | None = None) -> dict:
     """Builds the structured AriaContext object containing scoped live states, trends, database metrics, and team rosters."""
@@ -434,7 +493,10 @@ def build_context(query: str, role: str, scope_zone: str | None, latest: dict[st
         "nuisance_machines": list(nuisance_machines),
         "ml_corroboration_rate": f"{corroboration_rate}%" if corroboration_rate is not None else "0% (no early warning alerts recorded yet)"
     }
-            
+
+    # Knowledge base lookup — attach top matching Q&A entries for maintenance questions
+    context["kb_results"] = search_knowledge_base(query, session)
+
     return context
 
 def render_fallback_answer(ctx: dict, key_failed: bool = False) -> str:
@@ -600,19 +662,42 @@ def format_system_prompt(query: str, ctx: dict) -> str:
         role_clause = "ROLE: plant_manager. You have a plant-wide view across all zones (A, B, C, D) and oversee all machines, engineers, and incidents."
         
     grounding_clause = (
-        "Answer ONLY from the SYSTEM STATE block below. Never invent sensor values, engineer names, risk levels, fault categories, or timings. "
-        "If the context lacks the answer, say so plainly. Distinguish the gateway's static threshold from NexOps's predictive risk. "
+        "For operational questions (machine status, sensor values, engineer assignments, risk levels, alerts), "
+        "answer ONLY from the SYSTEM STATE block below — never invent values not present there. "
+        "For maintenance, troubleshooting, or equipment knowledge questions, use the KNOWLEDGE BASE section when present. "
+        "Distinguish the gateway's static threshold from NexOps's predictive risk. "
         "Do not call yourself the anomaly model or the assignment engine — you report what they produced. "
-        "If the query is completely unrelated to the NexOps plant, telemetry, engineers, or tasks (e.g. asking about celebrities, sports, general knowledge, movies, etc.), "
-        "do NOT use the system state. Instead, refuse to answer by stating: 'I am ARIA, an AI assistant trained only for NexOps telemetry and dispatch. I cannot assist with out-of-domain topics.'"
+        "If the query is completely unrelated to the NexOps plant, industrial equipment, or maintenance "
+        "(e.g. asking about celebrities, sports, general knowledge, movies, etc.), refuse: "
+        "'I am ARIA, an AI assistant trained only for NexOps telemetry and dispatch. I cannot assist with out-of-domain topics.'"
     )
     
     focus = ctx.get("focus_machine")
+    kb_results = ctx.get("kb_results") or []
+
     if focus:
-        structure_clause = "Structure your response as exactly 5 short sections, separated by double newlines:\n1. What's Happening\n2. Likely Cause\n3. Failure Window (only if a time projection is present in SYSTEM STATE, explicitly labeled as a linear projection)\n4. Who's Responding\n5. One Recommended Action.\nKeep it highly concise."
+        structure_clause = (
+            "Structure your response as exactly 5 short sections, separated by double newlines:\n"
+            "1. What's Happening\n"
+            "2. Likely Cause\n"
+            "3. Failure Window (only if a time projection is present in SYSTEM STATE, explicitly labeled as a linear projection)\n"
+            "4. Who's Responding\n"
+            "5. One Recommended Action.\n"
+            "Keep it highly concise."
+        )
+    elif kb_results and not ctx.get("top_machines"):
+        structure_clause = (
+            "The user is asking a maintenance or equipment knowledge question. "
+            "Answer using the KNOWLEDGE BASE entries below. Be direct and practical. "
+            "If multiple entries are relevant, synthesize them into a clear answer."
+        )
     else:
-        structure_clause = "Summarize the at-risk units in the scope. If the user asks general questions, answer them purely based on the scoped machine states in SYSTEM STATE. Keep it concise."
-        
+        structure_clause = (
+            "Summarize the at-risk units in the scope. "
+            "If the user asks general maintenance questions, supplement with KNOWLEDGE BASE if present. "
+            "Keep it concise."
+        )
+
     # Serialize context state compactly (excluding heavy structures)
     compact_ctx = {
         "focus_machine": ctx.get("focus_machine"),
@@ -625,17 +710,29 @@ def format_system_prompt(query: str, ctx: dict) -> str:
         "open_task_count": ctx.get("open_task_count"),
         "scope_violation": ctx.get("scope_violation"),
         "personal_tasks": ctx.get("personal_tasks"),
-        "live_metrics": ctx.get("live_metrics")
+        "live_metrics": ctx.get("live_metrics"),
     }
-    
+
+    kb_section = ""
+    if kb_results:
+        kb_lines = ["KNOWLEDGE BASE (industrial maintenance reference):"]
+        for i, entry in enumerate(kb_results, 1):
+            kb_lines.append(
+                f"\n[{i}] Section: {entry['section']}\n"
+                f"Q: {entry['question']}\n"
+                f"A: {entry['answer']}"
+            )
+        kb_section = "\n".join(kb_lines)
+
     return f"""{role_clause}
-    
+
 {grounding_clause}
 
 {structure_clause}
 
 SYSTEM STATE:
 {json.dumps(compact_ctx, indent=2)}
+{kb_section}
 
 USER QUERY:
 {query}
