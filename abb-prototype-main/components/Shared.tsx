@@ -1,6 +1,9 @@
+'use client';
+
 import type React from 'react';
 import { ReactNode } from 'react';
 import { IconLock } from './Icons';
+import { useTheme } from '@/context/ThemeContext';
 
 const COLORS = {
   textPrimary: 'var(--abb-ink-0, #1c2230)',
@@ -12,7 +15,7 @@ const COLORS = {
   green: '#22c55e',
   greenBg: 'rgba(34,197,94,0.08)',
   greenBorder: 'rgba(34,197,94,0.2)',
-  navBg: 'rgba(255,255,255,0.92)',
+  navBg: 'var(--abb-nav-bg)',
   cardBg: 'var(--abb-surface-1, #ffffff)',
   cardBgHov: 'var(--abb-surface-2, #e9ebef)',
   panelBg: 'var(--abb-surface-0, #f3f4f6)',
@@ -35,7 +38,9 @@ export const Dot = ({ color, cls = 'pulse', size = 7 }: { color: string; cls?: s
 // NavBar — restyled to the ABB control-system LIGHT tokens (Stage UI-1). Props
 // are UNCHANGED ({ onBack?, onLogout? }); only presentation moved to tokens, so
 // every page that already renders <NavBar …/> inherits the new look untouched.
-export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: () => void }) => (
+export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: () => void }) => {
+  const { theme, toggle } = useTheme();
+  return (
   <nav
     style={{
       display: 'flex',
@@ -44,7 +49,7 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
       gap: 12,
       padding: '14px clamp(16px, 4vw, 32px)',
       borderBottom: '1px solid var(--abb-line)',
-      background: 'rgba(255,255,255,0.92)',
+      background: 'var(--abb-nav-bg)',
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
       position: 'sticky',
@@ -123,6 +128,46 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
     </div>
 
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+      {/* Theme toggle — sun (light) / moon (dark) */}
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        style={{
+          background: 'none',
+          border: '1px solid var(--abb-line)',
+          borderRadius: 'var(--abb-radius-sm)',
+          padding: '6px 8px',
+          cursor: 'pointer',
+          color: 'var(--abb-ink-2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'background 0.15s ease, border-color 0.15s ease',
+        }}
+      >
+        {theme === 'dark' ? (
+          /* Sun icon */
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <line x1="12" y1="2" x2="12" y2="4" />
+            <line x1="12" y1="20" x2="12" y2="22" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="2" y1="12" x2="4" y2="12" />
+            <line x1="20" y1="12" x2="22" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+        ) : (
+          /* Moon icon */
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        )}
+      </button>
+
       {/* Logout (Stage 3c): rendered only when a page passes onLogout. */}
       {onLogout && (
         <button type="button" onClick={onLogout} className="abb-btn abb-btn--ghost" style={{ padding: '6px 12px', fontSize: 10, letterSpacing: '0.1em' }}>
@@ -148,28 +193,29 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
           <IconLock size={12} color="var(--abb-ink-3)" /> SECURE OPERATOR LOGIN
         </div>
       ) : (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              background: 'var(--abb-surface-1)',
-              border: '1px solid var(--abb-line)',
-              padding: '5px 12px',
-              borderRadius: 'var(--abb-radius-sm)',
-              fontFamily: 'var(--abb-font-data)',
-              fontSize: 10,
-              color: 'var(--abb-ink-2)',
-              letterSpacing: '0.12em',
-            }}
-          >
-            <Dot color="var(--abb-nominal)" size={6} cls="" />
-            PROTOTYPE LIVE
-          </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            background: 'var(--abb-surface-1)',
+            border: '1px solid var(--abb-line)',
+            padding: '5px 12px',
+            borderRadius: 'var(--abb-radius-sm)',
+            fontFamily: 'var(--abb-font-data)',
+            fontSize: 10,
+            color: 'var(--abb-ink-2)',
+            letterSpacing: '0.12em',
+          }}
+        >
+          <Dot color="var(--abb-nominal)" size={6} cls="" />
+          PROTOTYPE LIVE
+        </div>
       )}
     </div>
   </nav>
-);
+  );
+};
 
 // ----------------------------------------------------------------------
 // ABB control-system PRIMITIVES (Stage UI-1, additive). Token-driven light

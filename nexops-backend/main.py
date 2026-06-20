@@ -34,7 +34,7 @@ import threading
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import paho.mqtt.client as mqtt
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -55,13 +55,35 @@ from lifecycle import start_task, resolve_task, get_active_assignments
 from db import Assignment, Engineer, User, get_session, init_db
 from seed import seed, DEV_PASSWORD
 # Stage 3a auth foundation.
-from auth_jwt import verify_password, create_token, get_current_user, CurrentUser, hash_password
+from auth_jwt import (
+    verify_password, create_token, get_current_user, CurrentUser, hash_password,
+    decode_token, warn_insecure_secret,
+    check_rate_limit, record_failed_attempt, clear_rate_limit,
+    require_role,
+)
 # Stage 3b server-side role+zone scoping (the rule lives in scoping.py).
 from scoping import can_write_assignment, scope_engineer_query
 # ARIA system logic helper
 import aria
 
 app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
+
+# Warn loudly at startup if the JWT secret is still the insecure dev default.
+warn_insecure_secret()
+
+
+# Security headers on every HTTP response (not WebSocket frames).
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.update({
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    })
+    return response
 
 # One anomaly engine for the whole process. It maintains per-machine state
 # internally (rolling window + Isolation Forest per machine), so a single
@@ -1118,17 +1140,38 @@ class LoginRequest(BaseModel):
 
 
 @app.post("/auth/login")
-def auth_login(body: LoginRequest):
-    """Verify {username, password} -> issue a JWT. 401 on unknown user or bad
-    password (no detail leak about which). Demo: NO rate-limit / lockout — that
-    is future hardening. Never 500s on a bad credential."""
+def auth_login(body: LoginRequest, request: Request):
+    """Verify {username, password} -> issue a JWT.
+
+    Security hardening applied:
+    - Rate-limited per IP (10 failures / 5 min) and per username (5 failures / 5 min).
+      Exceeded threshold triggers a 15-minute lockout -> 429.
+    - Inactive accounts are rejected (same 401 as bad credentials — no info leak).
+    - Successful login clears the rate-limit counters for that IP + username.
+    """
+    client_ip = (request.client.host if request.client else "unknown")
+    uname = (body.username or "").strip().lower()
+
+    # Rate-limit check — before touching the DB.
+    allowed, reason = check_rate_limit(client_ip, uname)
+    if not allowed:
+        print(f"[auth] rate-limited login for {uname!r} from {client_ip}")
+        return JSONResponse(status_code=429, content={"error": reason})
+
     session = get_session()
     try:
-        uname = (body.username or "").strip().lower()
         user = session.query(User).filter(func.lower(User.username) == uname).first()
-        if user is None or not verify_password(body.password, user.password_hash):
+        # Unified 401: bad username, wrong password, OR deactivated account.
+        # Never reveal which condition failed.
+        active = getattr(user, "active", True)  # default True for plant_manager rows
+        if user is None or not active or not verify_password(body.password, user.password_hash):
+            record_failed_attempt(client_ip, uname)
+            print(f"[auth] failed login for {uname!r} from {client_ip}")
             return JSONResponse(status_code=401, content={"error": "invalid credentials"})
+
+        clear_rate_limit(client_ip, uname)
         token = create_token(user)
+        print(f"[auth] successful login for {uname!r} ({user.role}) from {client_ip}")
         return {
             "token": token,
             "user": {
@@ -1138,8 +1181,8 @@ def auth_login(body: LoginRequest):
                 "engineer_id": user.engineer_id,
             },
         }
-    except Exception as exc:  # never let a DB error crash the bridge
-        print(f"[auth] login failed for {body.username!r}: {exc}")
+    except Exception as exc:
+        print(f"[auth] login error for {uname!r}: {exc}")
         return JSONResponse(status_code=500, content={"error": "internal error"})
     finally:
         session.close()
@@ -1231,19 +1274,23 @@ async def http_aria_ask(body: AriaAskRequest, current: CurrentUser = Depends(get
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    # STAGE 3b DECISION: the WebSocket feed is left UNSCOPED on purpose. Every
-    # connected client still receives the RAW, full-site record stream and the
-    # frontend filters it per role/zone client-side (the REST endpoints above are
-    # the server-side-enforced surface for 3b). Per-connection WS auth (read a
-    # token from the query string / first message and scope each client's stream
-    # server-side) is a conscious DEFERRAL — it is NOT a blocker for 3b and is
-    # tracked for a later stage.
-    # TODO(Stage 3b+): authenticate the WS handshake (token in query/subprotocol)
-    #   and scope per-connection broadcasts by role+zone server-side.
+    """Authenticated WebSocket telemetry feed.
+
+    Requires a valid JWT passed as a query parameter: ws://host/ws?token=<jwt>
+    Closes with code 4001 (missing token) or 4003 (invalid/expired token) so
+    the frontend can distinguish auth failures from network errors.
+    """
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4001, reason="authentication required")
+        return
+    claims = decode_token(token)
+    if not claims:
+        await websocket.close(code=4003, reason="invalid or expired token")
+        return
+
     await manager.connect(websocket)
     try:
-        # We only push to the browser; we don't expect inbound messages, but
-        # we must keep reading so disconnects are detected promptly.
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:

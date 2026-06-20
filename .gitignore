@@ -12,3 +12,6 @@ test_tmp.db
 # Diagnostic / local report files
 repository_intelligence_report.md
 
+# Agent workspace directory
+.claude/
+

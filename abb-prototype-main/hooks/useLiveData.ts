@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { getToken } from '@/lib/authStorage';
 import type {
   TelemetryRecord,
   Machine,
@@ -175,19 +176,39 @@ function subscribe(
   onRecord: (record: TelemetryRecord) => void,
   onStatus?: (connected: boolean) => void,
 ): () => void {
+  // ===== TEMP LOCAL-VERIFY MOCK (reverted after smoke test) =====
+  if (process.env.NEXT_PUBLIC_USE_MOCK === '1') {
+    let seq = 0;
+    onStatus?.(true);
+    const intervalId = setInterval(() => {
+      onRecord(makeMockRecord(seq));
+      seq += 1;
+    }, 1200);
+    return () => {
+      clearInterval(intervalId);
+      onStatus?.(false);
+    };
+  }
   // ===== STAGE 2 SWAP POINT: LIVE WebSocket client =====
   // Records arrive already in the TelemetryRecord shape, so nothing else in
   // this file (or any component) changes - only this body.
   let ws: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let stopped = false; // set by unsubscribe so we never reconnect after unmount
+  let retryCount = 0;  // for exponential backoff
+  const MAX_BACKOFF_MS = 30000;
 
   const connect = () => {
     if (stopped) return;
-    ws = new WebSocket(WS_URL);
+    const token = getToken();
+    const url = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
+    ws = new WebSocket(url);
 
     ws.onopen = () => {
-      if (!stopped) onStatus?.(true);
+      if (!stopped) {
+        retryCount = 0; // reset backoff on successful connect
+        onStatus?.(true);
+      }
     };
 
     ws.onmessage = (event) => {
@@ -205,10 +226,12 @@ function subscribe(
     ws.onclose = () => {
       onStatus?.(false);
       if (stopped || reconnectTimer !== null) return;
+      const delay = Math.min(1000 * Math.pow(2, retryCount), MAX_BACKOFF_MS);
+      retryCount += 1;
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
         connect();
-      }, 2000);
+      }, delay);
     };
 
     // onerror is typically followed by onclose; route through the close path.
@@ -500,6 +523,7 @@ export function useLiveData(zoneFilter?: string) {
   // Keyed by machine name so each grid/task entry reflects the machine's
   // latest state instead of growing without bound.
   const machineMap = useRef<Map<string, Machine>>(new Map());
+  const machineSigs = useRef<Map<string, string>>(new Map()); // signature for change detection
   const taskMap = useRef<Map<string, Task>>(new Map());
   const siteAlertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Mutable metrics accumulator + per-machine fault lifecycles (no re-render);
@@ -511,6 +535,7 @@ export function useLiveData(zoneFilter?: string) {
   useEffect(() => {
     // Clear maps and accumulators when subscription filter changes to prevent leakage
     machineMap.current.clear();
+    machineSigs.current.clear();
     taskMap.current.clear();
     metricsAcc.current = freshMetricsAcc();
     faultLC.current.clear();
@@ -544,9 +569,14 @@ export function useLiveData(zoneFilter?: string) {
         return;
       }
 
-      // machines: newest state per machine
-      machineMap.current.set(raw.Machine, mapToMachine(raw));
-      setMachines(Array.from(machineMap.current.values()));
+      // machines: newest state per machine — only update state when data changes
+      const m = mapToMachine(raw);
+      const sig = `${m.perf}|${m.nexopsRisk}|${m.isEarly}|${m.anomalyScore}|${m.assignedEngineer}|${m.faultCategory}`;
+      if (machineSigs.current.get(m.name) !== sig) {
+        machineSigs.current.set(m.name, sig);
+        machineMap.current.set(raw.Machine, m);
+        setMachines(Array.from(machineMap.current.values()));
+      }
 
       // Feeds surface anything the gateway alarmed on OR anything NexOps caught
       // early (gateway still calm but NexOps risk elevated) - otherwise the

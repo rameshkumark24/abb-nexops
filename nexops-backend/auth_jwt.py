@@ -18,12 +18,16 @@ overridden in any real deployment (state in the report).
 """
 
 import os
-from dataclasses import dataclass
+import threading
+import time
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from typing import Callable
 
 import bcrypt
 import jwt  # PyJWT
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 
 from db import User, get_session
 
@@ -168,3 +172,97 @@ def get_current_user_optional(request: Request):
     """FastAPI dependency: resolve the token if present, else return None (no
     401). For routes that stay public during the 3a->3b transition."""
     return _load_user_from_request(request)
+
+
+# ----------------------------------------------------------------------
+# Insecure-secret startup warning
+# ----------------------------------------------------------------------
+
+_INSECURE_SECRET = "dev-insecure-nexops-secret-change-me"
+
+
+def warn_insecure_secret() -> None:
+    """Print a prominent banner if the JWT secret is still the dev default."""
+    if JWT_SECRET == _INSECURE_SECRET:
+        banner = "!" * 64
+        print(f"\n{banner}")
+        print("  SECURITY WARNING: NEXOPS_JWT_SECRET is the insecure dev")
+        print("  default. Any party that knows this value can forge tokens")
+        print("  and gain full plant-manager access.")
+        print("  → Set NEXOPS_JWT_SECRET in your environment before any")
+        print("    non-local deployment.")
+        print(f"{banner}\n")
+
+
+# ----------------------------------------------------------------------
+# Login rate limiter  (in-memory, per-IP + per-username)
+# ----------------------------------------------------------------------
+
+_ATTEMPT_WINDOW_S  = 5 * 60    # sliding window: 5 minutes
+_MAX_IP_ATTEMPTS   = 10         # max failures per IP before lockout
+_MAX_USER_ATTEMPTS = 5          # max failures per username before lockout
+_LOCKOUT_S         = 15 * 60   # lockout duration: 15 minutes
+
+@dataclass
+class _Bucket:
+    timestamps: list = field(default_factory=list)
+    locked_until: float = 0.0
+
+_rate_lock   = threading.Lock()
+_ip_buckets: dict[str, _Bucket]   = defaultdict(_Bucket)
+_user_buckets: dict[str, _Bucket] = defaultdict(_Bucket)
+
+
+def check_rate_limit(ip: str, username: str) -> tuple[bool, str]:
+    """Return (allowed, reason). Call BEFORE verifying credentials."""
+    now = time.monotonic()
+    with _rate_lock:
+        for bucket, limit in [(_ip_buckets[ip], _MAX_IP_ATTEMPTS),
+                               (_user_buckets[username.strip().lower()], _MAX_USER_ATTEMPTS)]:
+            if bucket.locked_until > now:
+                wait = int((bucket.locked_until - now) / 60) + 1
+                return False, f"Too many failed attempts. Try again in {wait} minute(s)."
+            bucket.timestamps = [t for t in bucket.timestamps if now - t < _ATTEMPT_WINDOW_S]
+    return True, ""
+
+
+def record_failed_attempt(ip: str, username: str) -> None:
+    """Stamp a failure; trigger lockout if the threshold is reached."""
+    now = time.monotonic()
+    with _rate_lock:
+        for bucket, limit in [(_ip_buckets[ip], _MAX_IP_ATTEMPTS),
+                               (_user_buckets[username.strip().lower()], _MAX_USER_ATTEMPTS)]:
+            bucket.timestamps.append(now)
+            bucket.timestamps = [t for t in bucket.timestamps if now - t < _ATTEMPT_WINDOW_S]
+            if len(bucket.timestamps) >= limit:
+                bucket.locked_until = now + _LOCKOUT_S
+                bucket.timestamps = []
+
+
+def clear_rate_limit(ip: str, username: str) -> None:
+    """Reset counters after a successful login."""
+    with _rate_lock:
+        _ip_buckets[ip] = _Bucket()
+        _user_buckets[username.strip().lower()] = _Bucket()
+
+
+# ----------------------------------------------------------------------
+# Role-enforcement dependency factory
+# ----------------------------------------------------------------------
+
+def require_role(*roles: str) -> Callable:
+    """FastAPI dependency factory that enforces role membership.
+
+    Usage:
+        @app.post("/admin/thing")
+        def endpoint(current: CurrentUser = Depends(require_role("plant_manager"))):
+            ...
+    """
+    def _check(current: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+        if current.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{current.role}' is not authorised for this action.",
+            )
+        return current
+    return _check

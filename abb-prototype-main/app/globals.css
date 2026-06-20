@@ -245,6 +245,58 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* ── ABB dark-mode token overrides ──────────────────────────────────────
+     Surfaces move from off-white to deep navy-slate. Text inverts.
+     Status hues (red/amber/indigo) are preserved — they carry operational
+     meaning and must look identical to operators switching modes.
+     Soft badge backgrounds darken to stay within the surface range.       */
+
+  /* Surfaces */
+  --abb-surface-0: #0d1117;
+  --abb-surface-1: #161b27;
+  --abb-surface-2: #1e2334;
+  --abb-surface-3: #242a3d;
+
+  /* Ink */
+  --abb-ink-0: #e8ecf1;
+  --abb-ink-1: #b8bdc8;
+  --abb-ink-2: #7a8499;
+  --abb-ink-3: #4e5668;
+
+  /* Borders */
+  --abb-line-faint: #1a2030;
+  --abb-line:       #263048;
+  --abb-line-strong: #374060;
+
+  /* Status palette — same hues, slightly boosted for dark legibility */
+  --abb-nominal:        #7a8499;
+  --abb-nominal-soft:   #161c2c;
+  --abb-warning:        #c49020;
+  --abb-warning-soft:   #1a1400;
+  --abb-warning-line:   #3d3000;
+  --abb-high:           #d05c2a;
+  --abb-high-soft:      #1c0c00;
+  --abb-high-line:      #381800;
+  --abb-early:          #6366f1;
+  --abb-early-soft:     #0e1030;
+  --abb-early-line:     #242878;
+  --abb-alarm:          #e8202e;
+  --abb-alarm-strong:   #c1121f;
+  --abb-alarm-soft:     #1a0406;
+  --abb-alarm-line:     #3d0a12;
+  --abb-nuisance:       #5a6473;
+  --abb-nuisance-soft:  #161c2c;
+
+  /* ABB red brand stays constant — it is a brand colour, not a surface */
+  /* --abb-red: #E00A18; (unchanged) */
+
+  /* Shadows — stronger contrast on dark surfaces */
+  --abb-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --abb-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.60);
+
+  /* Nav glassmorphism background */
+  --abb-nav-bg: rgba(13, 17, 23, 0.92);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -374,6 +426,9 @@ body, button, input, select, textarea {
   /* Elevation — flat; a hairline + faint shadow only */
   --abb-shadow-1: 0 1px 2px rgba(20, 26, 38, 0.06);
   --abb-shadow-2: 0 4px 14px rgba(20, 26, 38, 0.08);
+
+  /* Nav glassmorphism (overridden to dark in .dark) */
+  --abb-nav-bg: rgba(255, 255, 255, 0.92);
 }
 
 /* ---- Layout containers (responsive) -------------------------------- */
@@ -403,7 +458,7 @@ body, button, input, select, textarea {
   font-family: var(--abb-font-data);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--abb-ink-3);
 }
 
@@ -514,7 +569,7 @@ body, button, input, select, textarea {
   align-items: center;
   gap: 5px;
   font-family: var(--abb-font-data);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -536,7 +591,7 @@ body, button, input, select, textarea {
   font-family: var(--abb-font-data);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--abb-ink-3);
   text-align: left;
   background: var(--abb-surface-2);
@@ -544,7 +599,7 @@ body, button, input, select, textarea {
   border-bottom: 1px solid var(--abb-line);
 }
 .abb-table tbody td {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--abb-ink-1);
   padding: 11px 14px;
   border-bottom: 1px solid var(--abb-line-faint);
@@ -574,6 +629,149 @@ body, button, input, select, textarea {
 ::selection {
   background: rgba(224, 10, 24, 0.12);
   color: var(--abb-ink-0);
+}
+
+/* ---- Plant dashboard draggable grid (Section 1A) -------------------- */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
+  grid-auto-flow: row dense;
+  align-items: start;
+}
+/* Tablet: 2-column (full-width widgets stay full). */
+@media (max-width: 1024px) and (min-width: 768px) {
+  .admin-grid > [data-span] { grid-column: span 6 / span 6 !important; }
+  .admin-grid > [data-fullspan='true'] { grid-column: span 12 / span 12 !important; }
+}
+/* Mobile: single stacked column, drag disabled (handled in JS). */
+@media (max-width: 767px) {
+  .admin-grid { grid-template-columns: 1fr; gap: 16px; }
+  .admin-grid > * { grid-column: 1 / -1 !important; }
+}
+.dashboard-card__handle:active { cursor: grabbing; }
+
+/* Highlight ring when a Top-5 bar focuses a machine row (3s). */
+.admin-highlight {
+  outline: 2px solid #f59e0b;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.18);
+  transition: outline 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Search-navigation highlight — amber ring that flashes immediately and fades. */
+@keyframes widgetHighlight {
+  /* Ring is fully visible from frame 0 — no slow build-up. */
+  0%, 18% {
+    box-shadow:
+      0 0 0 4px #f59e0b,
+      0 0 0 10px rgba(245, 158, 11, 0.28),
+      0 16px 48px rgba(245, 158, 11, 0.22);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(245, 158, 11, 0),
+      0 0 0 0 rgba(245, 158, 11, 0),
+      0 0 0  rgba(245, 158, 11, 0);
+  }
+}
+.dashboard-card--highlight {
+  /* Suppress the .abb-card base transition so the ring appears instantly. */
+  transition: none !important;
+  animation: widgetHighlight 2.6s cubic-bezier(0.4, 0, 0.8, 1) forwards;
+}
+
+/* ---- ARIA floating drawer (Section 2E / 3C) ------------------------- */
+@keyframes ariaSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes ariaSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* Dark-mode drawer overrides — stronger shadow against dark surfaces */
+.dark .aria-drawer { box-shadow: -8px 0 32px rgba(0, 0, 0, 0.55); }
+.dark .aria-drawer--mobile { box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.55); }
+.dark .aria-backdrop { background: rgba(0, 0, 0, 0.45); }
+.dark .aria-tab { box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4); }
+
+.aria-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 26, 38, 0.06);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 90; /* below the sticky nav (z-100) so the nav stays sharp */
+}
+.aria-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 320px;
+  max-width: 92vw;
+  background: var(--abb-surface-1);
+  border-left: 1px solid var(--abb-line);
+  box-shadow: -8px 0 28px rgba(20, 26, 38, 0.14);
+  z-index: 110; /* above the nav so it spans full height */
+  display: flex;
+  flex-direction: column;
+  animation: ariaSlideIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.aria-drawer--mobile {
+  top: auto;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 82vh;
+  border-left: none;
+  border-top: 3px solid var(--abb-red);
+  border-top-left-radius: var(--abb-radius);
+  border-top-right-radius: var(--abb-radius);
+  box-shadow: 0 -8px 28px rgba(20, 26, 38, 0.16);
+  animation: ariaSlideUp 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.aria-tab {
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 95;
+  width: 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  background: var(--abb-surface-1);
+  border: 1px solid var(--abb-line);
+  border-right: none;
+  border-top-left-radius: var(--abb-radius);
+  border-bottom-left-radius: var(--abb-radius);
+  box-shadow: -4px 0 14px rgba(20, 26, 38, 0.08);
+  cursor: pointer;
+}
+.aria-tab__label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-family: var(--abb-font-data);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--abb-early);
+}
+@media (max-width: 767px) {
+  .aria-tab { top: auto; bottom: 16px; transform: none; width: 44px; height: 44px; border-radius: 50%; border-right: 1px solid var(--abb-line); padding: 0; justify-content: center; }
+  .aria-tab__label { writing-mode: horizontal-tb; transform: none; font-size: 8px; }
+}
+
+/* ---- Field Manager machine health grid (Section 2B) ----------------- */
+.machine-health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 767px) {
+  .machine-health-grid { grid-template-columns: 1fr; }
 }
 
 /* Site-wide CRITICAL banner — the ONE place red is allowed to dominate. */

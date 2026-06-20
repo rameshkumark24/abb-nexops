@@ -81,6 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.status === 401) {
           return { ok: false, error: 'Invalid username or password' };
         }
+        if (res.status === 429) {
+          let msg = 'Too many failed attempts. Please wait before trying again.';
+          try { const b = await res.json(); if (b?.error) msg = b.error; } catch { /* ignore */ }
+          return { ok: false, error: msg };
+        }
         if (!res.ok) {
           return { ok: false, error: `Login failed (${res.status})` };
         }
