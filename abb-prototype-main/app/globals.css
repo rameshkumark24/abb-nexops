@@ -210,6 +210,63 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* ABB control-system variables (light theme default) */
+  --abb-surface-0: #f3f4f6; /* page background */
+  --abb-surface-1: #ffffff; /* cards / panels */
+  --abb-surface-2: #e9ebef; /* insets, table header, hover */
+  --abb-surface-3: #dfe2e8; /* deeper inset */
+
+  /* Ink — dark grey text */
+  --abb-ink-0: #1c2230; /* primary text / headings */
+  --abb-ink-1: #39414f; /* secondary */
+  --abb-ink-2: #5a6473; /* muted */
+  --abb-ink-3: #8b94a3; /* faint / uppercase micro-labels */
+
+  /* Borders */
+  --abb-line-faint: #e6e8ec;
+  --abb-line: #d3d8df;
+  --abb-line-strong: #b7bec9;
+
+  /* State / risk palette — ISA-101 discipline */
+  --abb-nominal: #6c7480; /* LOW / nominal — QUIET grey */
+  --abb-nominal-soft: #eef0f3;
+  --abb-warning: #b07313; /* MEDIUM / warning — amber / ochre */
+  --abb-warning-soft: #fbf3e2;
+  --abb-warning-line: #e6cf95;
+  --abb-high: #c04a1b; /* HIGH — deep orange (between amber and alarm, NOT red) */
+  --abb-high-soft: #fbeee6;
+  --abb-high-line: #ecc3ad;
+  --abb-early: #4338ca; /* EARLY / predictive — indigo (deliberately NON-red) */
+  --abb-early-soft: #ecedfb;
+  --abb-early-line: #c3c5f0;
+  --abb-alarm: #c1121f; /* CRITICAL / alarm — RED, used NOWHERE else */
+  --abb-alarm-strong: #a30d18;
+  --abb-alarm-soft: #fae9ea;
+  --abb-alarm-line: #e9aab0;
+  --abb-nuisance: #98a1b0; /* nuisance-filtered — muted / de-emphasised */
+  --abb-nuisance-soft: #eef0f2;
+
+  /* ABB Brand Colors */
+  --abb-red: #E00A18;
+  --abb-red-hover: #c10915;
+
+  /* Typography — brand identity lives in TYPE, not colour */
+  --abb-font-ui: 'Outfit', system-ui, sans-serif;
+  --abb-font-data: 'Space Grotesk', sans-serif;
+  --abb-font-mono: 'JetBrains Mono', monospace;
+
+  /* Radii — crisp, small (control-panel convention) */
+  --abb-radius: 4px;
+  --abb-radius-sm: 3px;
+  --abb-radius-pill: 999px;
+
+  /* Elevation — flat; a hairline + faint shadow only */
+  --abb-shadow-1: 0 1px 2px rgba(20, 26, 38, 0.06);
+  --abb-shadow-2: 0 4px 14px rgba(20, 26, 38, 0.08);
+
+  /* Nav glassmorphism background */
+  --abb-nav-bg: rgba(255, 255, 255, 0.92);
 }
 
 .dark {
@@ -333,6 +390,49 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+
+    /* Surfaces */
+    --abb-surface-0: #0d1117;
+    --abb-surface-1: #161b27;
+    --abb-surface-2: #1e2334;
+    --abb-surface-3: #242a3d;
+
+    /* Ink */
+    --abb-ink-0: #e8ecf1;
+    --abb-ink-1: #b8bdc8;
+    --abb-ink-2: #7a8499;
+    --abb-ink-3: #4e5668;
+
+    /* Borders */
+    --abb-line-faint: #1a2030;
+    --abb-line:       #263048;
+    --abb-line-strong: #374060;
+
+    /* Status palette — same hues, slightly boosted for dark legibility */
+    --abb-nominal:        #7a8499;
+    --abb-nominal-soft:   #161c2c;
+    --abb-warning:        #c49020;
+    --abb-warning-soft:   #1a1400;
+    --abb-warning-line:   #3d3000;
+    --abb-high:           #d05c2a;
+    --abb-high-soft:      #1c0c00;
+    --abb-high-line:      #381800;
+    --abb-early:          #6366f1;
+    --abb-early-soft:     #0e1030;
+    --abb-early-line:     #242878;
+    --abb-alarm:          #e8202e;
+    --abb-alarm-strong:   #c1121f;
+    --abb-alarm-soft:     #1a0406;
+    --abb-alarm-line:     #3d0a12;
+    --abb-nuisance:       #5a6473;
+    --abb-nuisance-soft:  #161c2c;
+
+    /* Shadows — stronger contrast on dark surfaces */
+    --abb-shadow-1: 0 1px 3px rgba(0, 0, 0, 0.45);
+    --abb-shadow-2: 0 4px 16px rgba(0, 0, 0, 0.60);
+
+    /* Nav glassmorphism background */
+    --abb-nav-bg: rgba(13, 17, 23, 0.92);
   }
 }
 
@@ -372,64 +472,6 @@ body, button, input, select, textarea {
 /*                                                                         */
 /* RESPONSIVE BREAKPOINTS: sm 640 · md 768 · lg 1024 · xl 1280px.          */
 /* ====================================================================== */
-:root {
-  /* Surfaces — off-white / light-grey */
-  --abb-surface-0: #f3f4f6; /* page background */
-  --abb-surface-1: #ffffff; /* cards / panels */
-  --abb-surface-2: #e9ebef; /* insets, table header, hover */
-  --abb-surface-3: #dfe2e8; /* deeper inset */
-
-  /* Ink — dark grey text */
-  --abb-ink-0: #1c2230; /* primary text / headings */
-  --abb-ink-1: #39414f; /* secondary */
-  --abb-ink-2: #5a6473; /* muted */
-  --abb-ink-3: #8b94a3; /* faint / uppercase micro-labels */
-
-  /* Borders */
-  --abb-line-faint: #e6e8ec;
-  --abb-line: #d3d8df;
-  --abb-line-strong: #b7bec9;
-
-  /* State / risk palette — ISA-101 discipline */
-  --abb-nominal: #6c7480; /* LOW / nominal — QUIET grey */
-  --abb-nominal-soft: #eef0f3;
-  --abb-warning: #b07313; /* MEDIUM / warning — amber / ochre */
-  --abb-warning-soft: #fbf3e2;
-  --abb-warning-line: #e6cf95;
-  --abb-high: #c04a1b; /* HIGH — deep orange (between amber and alarm, NOT red) */
-  --abb-high-soft: #fbeee6;
-  --abb-high-line: #ecc3ad;
-  --abb-early: #4338ca; /* EARLY / predictive — indigo (deliberately NON-red) */
-  --abb-early-soft: #ecedfb;
-  --abb-early-line: #c3c5f0;
-  --abb-alarm: #c1121f; /* CRITICAL / alarm — RED, used NOWHERE else */
-  --abb-alarm-strong: #a30d18;
-  --abb-alarm-soft: #fae9ea;
-  --abb-alarm-line: #e9aab0;
-  --abb-nuisance: #98a1b0; /* nuisance-filtered — muted / de-emphasised */
-  --abb-nuisance-soft: #eef0f2;
-
-  /* ABB Brand Colors */
-  --abb-red: #E00A18;
-  --abb-red-hover: #c10915;
-
-  /* Typography — brand identity lives in TYPE, not colour */
-  --abb-font-ui: 'Outfit', system-ui, sans-serif;
-  --abb-font-data: 'Space Grotesk', sans-serif;
-  --abb-font-mono: 'JetBrains Mono', monospace;
-
-  /* Radii — crisp, small (control-panel convention) */
-  --abb-radius: 4px;
-  --abb-radius-sm: 3px;
-  --abb-radius-pill: 999px;
-
-  /* Elevation — flat; a hairline + faint shadow only */
-  --abb-shadow-1: 0 1px 2px rgba(20, 26, 38, 0.06);
-  --abb-shadow-2: 0 4px 14px rgba(20, 26, 38, 0.08);
-
-  /* Nav glassmorphism (overridden to dark in .dark) */
-  --abb-nav-bg: rgba(255, 255, 255, 0.92);
-}
 
 /* ---- Layout containers (responsive) -------------------------------- */
 /* Opaque light surface that COVERS the root layout's dark background, so
@@ -793,4 +835,18 @@ body, button, input, select, textarea {
 }
 @media (max-width: 640px) {
   .abb-banner-alarm { font-size: 11px; padding: 10px 14px; }
+}
+
+/* Theme toggle icon visibility (handles React hydration cleanly) */
+.theme-icon-dark {
+  display: none !important;
+}
+.theme-icon-light {
+  display: block !important;
+}
+.dark .theme-icon-dark {
+  display: block !important;
+}
+.dark .theme-icon-light {
+  display: none !important;
 }

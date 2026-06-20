@@ -27,6 +27,7 @@ import os
 import re
 import sys
 import threading
+import time
 
 # Make local modules (config.py, adapter.py) resolve no matter how the app is
 # launched - `uvicorn main:app`, `python -m uvicorn main:app`, or from any CWD.
@@ -34,7 +35,7 @@ import threading
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import paho.mqtt.client as mqtt
-from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -50,6 +51,7 @@ from assignment import (
     fault_category_for,
     is_safety_critical,
     find_open_assignment,
+    find_recent_resolved_assignment,
 )
 from lifecycle import start_task, resolve_task, get_active_assignments
 from db import Assignment, Engineer, User, get_session, init_db
@@ -57,10 +59,13 @@ from seed import seed, DEV_PASSWORD
 # Stage 3a auth foundation.
 from auth_jwt import (
     verify_password, create_token, get_current_user, CurrentUser, hash_password,
-    decode_token, warn_insecure_secret,
+    decode_token, warn_insecure_secret, revoke_user_tokens, create_ws_ticket,
     check_rate_limit, record_failed_attempt, clear_rate_limit,
     require_role,
+    AUTH_COOKIE, CSRF_COOKIE, CSRF_HEADER, JWT_EXPIRE_HOURS,
 )
+import hmac
+import secrets as _secrets
 # Stage 3b server-side role+zone scoping (the rule lives in scoping.py).
 from scoping import can_write_assignment, scope_engineer_query
 # ARIA system logic helper
@@ -85,6 +90,55 @@ async def _security_headers(request: Request, call_next):
     })
     return response
 
+
+# ----------------------------------------------------------------------
+# Auth cookies + CSRF (browser session model).
+#
+# Browser clients authenticate via an httpOnly `nexops_token` cookie (set at
+# login, unreadable by JS so XSS can't steal it). Because a cookie is sent
+# AUTOMATICALLY by the browser, cookie-authed UNSAFE requests need CSRF defense:
+# we use the stateless DOUBLE-SUBMIT pattern — a random `nexops_csrf` value is
+# placed in a JS-READABLE cookie at login and the SPA echoes it in the
+# X-CSRF-Token header; the middleware below requires the two to match. Requests
+# that authenticate with an `Authorization: Bearer` header instead (tests /
+# non-browser clients) are NOT subject to CSRF (that header is never auto-sent).
+# ----------------------------------------------------------------------
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+# Paths that can't carry CSRF yet (no session established) or don't need it.
+_CSRF_EXEMPT_PATHS = {"/auth/login"}
+
+
+def _set_auth_cookies(response: Response, token: str) -> None:
+    """Set the httpOnly session cookie + the readable CSRF cookie at login."""
+    max_age = JWT_EXPIRE_HOURS * 3600
+    response.set_cookie(AUTH_COOKIE, token, max_age=max_age, path="/",
+                        httponly=True, samesite="lax", secure=config.COOKIE_SECURE)
+    response.set_cookie(CSRF_COOKIE, _secrets.token_urlsafe(32), max_age=max_age,
+                        path="/", httponly=False, samesite="lax",
+                        secure=config.COOKIE_SECURE)
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    """Drop both auth cookies at logout."""
+    response.delete_cookie(AUTH_COOKIE, path="/", samesite="lax")
+    response.delete_cookie(CSRF_COOKIE, path="/", samesite="lax")
+
+
+@app.middleware("http")
+async def _csrf_protect(request: Request, call_next):
+    method = request.method.upper()
+    cookie_authed = (request.headers.get("authorization") is None
+                     and request.cookies.get(AUTH_COOKIE) is not None)
+    if (method not in _SAFE_METHODS
+            and cookie_authed
+            and request.url.path not in _CSRF_EXEMPT_PATHS):
+        sent = request.headers.get(CSRF_HEADER) or request.headers.get(CSRF_HEADER.lower())
+        expected = request.cookies.get(CSRF_COOKIE)
+        if not sent or not expected or not hmac.compare_digest(sent, expected):
+            return JSONResponse(status_code=403,
+                                content={"error": "CSRF token missing or invalid"})
+    return await call_next(request)
+
 # One anomaly engine for the whole process. It maintains per-machine state
 # internally (rolling window + Isolation Forest per machine), so a single
 # instance shared across all MQTT messages is correct.
@@ -97,7 +151,17 @@ engine = AnomalyEngine()
 # recurrence is treated as a fresh fault. Mutated only from paho's single
 # background callback thread, but guarded with a lock for safety.
 active_assignments: dict[tuple[str, str], dict] = {}
+resolved_timestamps: dict[tuple[str, str], float] = {}
 _assign_lock = threading.Lock()
+
+# RECOVERY GRACE after a task is resolved. The simulator heals a machine on its
+# OWN ~2-minute timer, independent of task resolution, so a just-resolved machine
+# keeps emitting the same high/critical warning for a while. We suppress new
+# assignments for this window so the resolve->re-assign loop can't restart. The
+# window is RE-ARMED on every suppressed tick (a sliding window), so it can never
+# expire while the machine is still emitting the same fault — it lapses only once
+# the warnings actually stop (machine healed) or back_to_normal clears it.
+RESOLVE_COOLDOWN_SECONDS = 120
 
 # Latest telemetry record received for each machine, keyed by machine name.
 # Tracks the current state of the plant to bootstrap new frontend clients on login.
@@ -119,6 +183,7 @@ def clear_dedupe_for(machine, fault_category) -> bool:
     if not machine:
         return False
     with _assign_lock:
+        resolved_timestamps[(machine, fault_category)] = time.time()
         return active_assignments.pop((machine, fault_category), None) is not None
 
 
@@ -276,10 +341,7 @@ def emergency_type_for(record: dict):
 # React fails with an opaque CORS error. (Stage 3c)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=config.CORS_ORIGINS,  # env-driven; set CORS_ORIGINS in production
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
@@ -290,25 +352,70 @@ app.add_middleware(
 # Connection manager: tracks live WebSocket clients and fans out records.
 # ----------------------------------------------------------------------
 
+def _derive_record_zone(record: dict) -> str | None:
+    """The machine's zone (A-D), used to SCOPE who may see a telemetry record.
+    Prefer the explicit record['zone']; otherwise infer it from the machine name.
+    This is the SINGLE source of truth shared by /telemetry/snapshot and the live
+    WebSocket broadcast so the two channels enforce the SAME zone boundary."""
+    rz = record.get("zone")
+    if rz:
+        return str(rz).upper()
+    mach_name = record.get("Machine", "") or ""
+    match = re.search(r'\b([A-D])[0-9]+\b', mach_name, re.IGNORECASE)
+    if match:
+        return match.group(1).upper()
+    mach = str(mach_name).lower()
+    if any(k in mach for k in ("compressor", "pump", "motor")):
+        return "A"
+    if any(k in mach for k in ("distillation", "heat exchanger", "storage tank", "separator")):
+        return "B"
+    if any(k in mach for k in ("boiler", "generator", "control valve", "mcc panel")):
+        return "C"
+    if any(k in mach for k in ("reactor", "fired heater", "cooling tower", "flare")):
+        return "D"
+    if mach_name:
+        return ["A", "B", "C", "D"][sum(ord(c) for c in mach_name) % 4]
+    return None
+
+
 class ConnectionManager:
     def __init__(self):
-        self.active: list[WebSocket] = []
+        # Each entry: (websocket, role, zone). role/zone come from the connecting
+        # client's JWT claims and SCOPE what that connection is allowed to receive
+        # (see broadcast). Defaults fail CLOSED (technician + no zone => sees only
+        # its own zone, i.e. nothing unless matched).
+        self.active: list[tuple[WebSocket, str, str | None]] = []
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, role: str = "technician",
+                      zone: str | None = None):
         await websocket.accept()
-        self.active.append(websocket)
+        self.register(websocket, role, zone)
+
+    def register(self, websocket: WebSocket, role: str = "technician",
+                 zone: str | None = None):
+        """Add an ALREADY-ACCEPTED socket to the broadcast set (used by the WS
+        endpoint, which must accept first to read the auth handshake message)."""
+        self.active.append((websocket, role, zone))
 
     def disconnect(self, websocket: WebSocket):
-        if websocket in self.active:
-            self.active.remove(websocket)
+        self.active = [c for c in self.active if c[0] is not websocket]
 
     async def broadcast(self, record: dict):
-        """Send one record (as JSON) to every client. A dropped client must
-        not kill the loop, so each send is isolated; failed clients are
-        pruned afterwards."""
+        """Send one record (as JSON) to every client THAT IS ALLOWED TO SEE IT.
+
+        Zone scoping MIRRORS /telemetry/snapshot: a plant_manager sees all zones;
+        a field_manager/technician sees ONLY records in their own zone. SITE-WIDE
+        emergencies (record['site_alert']) intentionally bypass zone scoping and
+        reach everyone — a plant emergency must be visible to all roles. A dropped
+        client must not kill the loop, so each send is isolated and failed clients
+        are pruned afterwards."""
         payload = json.dumps(record)
+        rec_zone = _derive_record_zone(record)
+        site_wide = bool(record.get("site_alert"))
         dead: list[WebSocket] = []
-        for ws in list(self.active):
+        for ws, role, zone in list(self.active):
+            if not (site_wide or role == "plant_manager" or zone == rec_zone):
+                continue  # out of this connection's zone scope -> do not leak it
             try:
                 await ws.send_text(payload)
             except Exception:
@@ -420,9 +527,27 @@ def on_message(client, userdata, msg):
             category = fault_category_for(record)
             key = (machine, category)
             with _assign_lock:
+                last_resolved = resolved_timestamps.get(key)
+                is_cooling_down = (last_resolved is not None
+                                   and time.time() - last_resolved < RESOLVE_COOLDOWN_SECONDS)
                 cached = active_assignments.get(key)
 
-            if cached is not None:
+            if is_cooling_down:
+                # RECOVERY GRACE (re-assignment loop fix): the machine was just
+                # resolved but the simulator heals on its OWN ~2-min timer, so it
+                # keeps emitting the same fault. RE-ARM the window on every
+                # suppressed tick (sliding window) so suppression lasts until the
+                # warnings actually STOP or back_to_normal clears it — the cooldown
+                # can never expire mid-recovery and spawn a duplicate.
+                with _assign_lock:
+                    resolved_timestamps[key] = time.time()
+                result = {
+                    "engineer_id": None,
+                    "engineer_name": "Unassigned",
+                    "reasoning": f"Suppressing duplicate {category} fault on {machine} (recovering after resolve)",
+                    "fault_category": category,
+                }
+            elif cached is not None:
                 # Same ongoing fault -> REUSE the engineer. No re-score, no
                 # re-increment of load.
                 result = cached
@@ -437,6 +562,7 @@ def on_message(client, userdata, msg):
                 # original assign+persist - we prefer a rare duplicate over DROPPING
                 # a real fault.
                 session = get_session()
+                suppress = False
                 try:
                     existing = None
                     try:
@@ -458,13 +584,42 @@ def on_message(client, userdata, msg):
                                           f"{category} fault on {machine} suppressed"),
                         }
                     else:
-                        # New fault for this machine+category -> score + persist once.
-                        result = assign_engineer(record, session)
-                        record_assignment(record, result, session)
+                        # RESTART-SAFE RECOVERY GRACE (re-assignment loop fix): the
+                        # in-memory cooldown is lost on a backend restart, so also
+                        # check the DB for a RECENTLY RESOLVED task for this (machine,
+                        # category). If one resolved within the recovery window, the
+                        # simulator is still healing the machine — SUPPRESS and re-seed
+                        # the in-memory window instead of spawning a duplicate task.
+                        recent = None
+                        try:
+                            recent = find_recent_resolved_assignment(
+                                session, machine, category, RESOLVE_COOLDOWN_SECONDS)
+                        except Exception as exc:
+                            recent = None
+                            print(f"[assignment] recent-resolved lookup failed for "
+                                  f"{machine}/{category}: {exc} (creating task)")
+                        if recent is not None:
+                            suppress = True
+                            result = {
+                                "engineer_id": None,
+                                "engineer_name": "Unassigned",
+                                "reasoning": (f"Suppressing duplicate {category} fault on "
+                                              f"{machine} (recently resolved #{recent.id}, recovering)"),
+                                "fault_category": category,
+                            }
+                        else:
+                            # New fault for this machine+category -> score + persist once.
+                            result = assign_engineer(record, session)
+                            record_assignment(record, result, session)
                 finally:
                     session.close()
                 with _assign_lock:
-                    active_assignments[key] = result
+                    if suppress:
+                        # Re-seed the sliding window so subsequent ticks take the
+                        # fast in-memory cooldown path (no repeated DB lookups).
+                        resolved_timestamps[key] = time.time()
+                    else:
+                        active_assignments[key] = result
 
             record["assigned_engineer"] = result.get("engineer_name") or "Unassigned"
             record["assigned_engineer_id"] = result.get("engineer_id")
@@ -477,6 +632,8 @@ def on_message(client, userdata, msg):
             with _assign_lock:
                 for stale in [k for k in active_assignments if k[0] == machine]:
                     active_assignments.pop(stale, None)
+                for stale in [k for k in resolved_timestamps if k[0] == machine]:
+                    resolved_timestamps.pop(stale, None)
     except Exception as exc:
         # Keep the defaults set above; never let the DB layer break the feed.
         record["assigned_engineer"] = "Unassigned"
@@ -599,31 +756,8 @@ def get_telemetry_snapshot(current: CurrentUser = Depends(get_current_user)):
     if current.role == "plant_manager":
         return records
 
-    scoped_records = []
-    for r in records:
-        rz = r.get("zone")
-        if not rz:
-            mach_name = r.get("Machine", "")
-            match = re.search(r'\b([A-D])[0-9]+\b', mach_name, re.IGNORECASE)
-            if match:
-                rz = match.group(1).upper()
-            else:
-                mach = str(mach_name).lower()
-                if any(k in mach for k in ("compressor", "pump", "motor")):
-                    rz = "A"
-                elif any(k in mach for k in ("distillation", "heat exchanger", "storage tank", "separator")):
-                    rz = "B"
-                elif any(k in mach for k in ("boiler", "generator", "control valve", "mcc panel")):
-                    rz = "C"
-                elif any(k in mach for k in ("reactor", "fired heater", "cooling tower", "flare")):
-                    rz = "D"
-                else:
-                    h = sum(ord(c) for c in mach_name) % 4
-                    rz = ["A", "B", "C", "D"][h]
-
-        if rz == current.zone:
-            scoped_records.append(r)
-    return scoped_records
+    # Same zone boundary as the live WebSocket feed (shared _derive_record_zone).
+    return [r for r in records if _derive_record_zone(r) == current.zone]
 
 
 # ----------------------------------------------------------------------
@@ -950,6 +1084,10 @@ def _set_engineer_active(engineer_id, active, current):
         engineer.active = active
         for u in session.query(User).filter(User.engineer_id == engineer_id).all():
             u.active = active
+            if not active:
+                # Force-logout: invalidate the deactivated user's outstanding JWTs
+                # so reactivation later can't revive an old session either.
+                u.token_version = int(getattr(u, "token_version", 0) or 0) + 1
 
         session.flush()
 
@@ -1139,8 +1277,37 @@ class LoginRequest(BaseModel):
     password: str
 
 
+# An IP literal only ever contains these characters (IPv4 dotted-quad or IPv6
+# incl. zone id). We use this to SANITIZE the value before it is used as a rate-
+# limit key or written to a log line — X-Forwarded-For is attacker-controlled, so
+# without this a CRLF-laced header could forge log entries (log injection).
+_IP_CHARS_RE = re.compile(r"[^0-9a-fA-F:.%]")
+
+
+def _sanitize_ip(value: str) -> str:
+    cleaned = _IP_CHARS_RE.sub("", value or "")[:45]  # 45 = max IPv6 text length
+    return cleaned or "unknown"
+
+
+def _client_ip(request: Request) -> str:
+    """Resolve the real client IP for login throttling. Behind a TRUSTED reverse
+    proxy (config.TRUST_PROXY=1) the direct peer is the proxy, so we take the
+    left-most X-Forwarded-For entry (the original client); otherwise we use the
+    direct peer. X-Forwarded-For is NOT trusted by default (it is client-spoofable
+    unless a trusted proxy sets it), so per-IP limits stay meaningful in dev. The
+    result is SANITIZED to IP characters only, so an attacker-controlled header can
+    never inject into the rate-limit key or the auth log lines."""
+    if config.TRUST_PROXY:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            first = xff.split(",")[0].strip()
+            if first:
+                return _sanitize_ip(first)
+    return _sanitize_ip(request.client.host) if request.client else "unknown"
+
+
 @app.post("/auth/login")
-def auth_login(body: LoginRequest, request: Request):
+def auth_login(body: LoginRequest, request: Request, response: Response):
     """Verify {username, password} -> issue a JWT.
 
     Security hardening applied:
@@ -1148,8 +1315,10 @@ def auth_login(body: LoginRequest, request: Request):
       Exceeded threshold triggers a 15-minute lockout -> 429.
     - Inactive accounts are rejected (same 401 as bad credentials — no info leak).
     - Successful login clears the rate-limit counters for that IP + username.
+    - Sets the httpOnly session cookie + readable CSRF cookie (browser model). The
+      token is ALSO returned in the body for non-browser clients (tests / tools).
     """
-    client_ip = (request.client.host if request.client else "unknown")
+    client_ip = _client_ip(request)
     uname = (body.username or "").strip().lower()
 
     # Rate-limit check — before touching the DB.
@@ -1171,6 +1340,7 @@ def auth_login(body: LoginRequest, request: Request):
 
         clear_rate_limit(client_ip, uname)
         token = create_token(user)
+        _set_auth_cookies(response, token)  # browser session (httpOnly + CSRF)
         print(f"[auth] successful login for {uname!r} ({user.role}) from {client_ip}")
         return {
             "token": token,
@@ -1202,11 +1372,38 @@ def auth_me(current: CurrentUser = Depends(get_current_user)):
 
 
 @app.post("/auth/logout")
-def auth_logout():
-    """JWT is stateless: there is nothing to invalidate server-side, so the
-    client simply DROPS the token. No server blacklist for the demo (a future
-    hardening step if token revocation is ever needed). Always 200."""
-    return {"status": "ok", "detail": "client should discard the token"}
+def auth_logout(response: Response, current: CurrentUser = Depends(get_current_user)):
+    """REAL server-side logout: bump the user's token_version so EVERY
+    outstanding JWT for this account is immediately invalidated — not just the one
+    the client is holding (so a leaked/stolen token dies on logout too) — and clear
+    the browser auth cookies. Requires a valid token; always 200 even if the
+    revoke write fails."""
+    session = get_session()
+    try:
+        revoke_user_tokens(session, current.id)
+    except Exception as exc:
+        print(f"[auth] logout revoke failed for {current.username!r}: {exc}")
+    finally:
+        session.close()
+    _clear_auth_cookies(response)
+    return {"status": "ok", "detail": "token revoked server-side"}
+
+
+@app.get("/auth/ws-ticket")
+def auth_ws_ticket(current: CurrentUser = Depends(get_current_user)):
+    """Mint a SHORT-LIVED WebSocket ticket for the authenticated session. The SPA
+    fetches this (cookie-authed, same-origin) and passes it as the WS first
+    message, since the httpOnly cookie can't be attached to a cross-origin WS
+    handshake. GET + read-only, so no CSRF needed."""
+    session = get_session()
+    try:
+        u = session.get(User, current.id)
+        ticket = create_ws_ticket(u) if u is not None else None
+    finally:
+        session.close()
+    if not ticket:
+        return JSONResponse(status_code=401, content={"error": "no session"})
+    return {"ticket": ticket}
 
 
 class AriaAskRequest(BaseModel):
@@ -1272,15 +1469,52 @@ async def http_aria_ask(body: AriaAskRequest, current: CurrentUser = Depends(get
         session.close()
 
 
+def _extract_ws_token(message: str) -> str | None:
+    """Pull the JWT from the WS auth handshake first-message: either a JSON
+    envelope {"type":"auth","token":"<jwt>"} or a bare token string."""
+    if not message:
+        return None
+    msg = message.strip()
+    try:
+        obj = json.loads(msg)
+        if isinstance(obj, dict):
+            tok = obj.get("token")
+            return tok if isinstance(tok, str) and tok else None
+    except Exception:
+        pass
+    # Bare token string: accept only if it LOOKS like a JWT (header.payload.sig).
+    return msg if msg.count(".") == 2 else None
+
+
+# Seconds to wait for the WS auth handshake before giving up (avoids a hung,
+# never-authenticated socket holding a connection open).
+_WS_AUTH_TIMEOUT_S = 10
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Authenticated WebSocket telemetry feed.
 
-    Requires a valid JWT passed as a query parameter: ws://host/ws?token=<jwt>
-    Closes with code 4001 (missing token) or 4003 (invalid/expired token) so
-    the frontend can distinguish auth failures from network errors.
+    The JWT is sent as the FIRST message after the socket opens — either a JSON
+    envelope {"type":"auth","token":"<jwt>"} or a bare token string — so it never
+    appears in the URL/query string (which would leak the credential into server
+    access logs, proxy logs, and browser history). A legacy ?token=<jwt> query
+    param is still accepted as a fallback for non-browser clients. Closes with
+    code 4001 (missing/timed-out token) or 4003 (invalid/expired token) so the
+    frontend can distinguish auth failures from network errors.
     """
-    token = websocket.query_params.get("token")
+    await websocket.accept()
+
+    token = websocket.query_params.get("token")  # legacy / non-browser fallback
+    if not token:
+        try:
+            first = await asyncio.wait_for(
+                websocket.receive_text(), timeout=_WS_AUTH_TIMEOUT_S)
+            token = _extract_ws_token(first)
+        except Exception:
+            # Timeout, disconnect, or malformed handshake -> treat as missing.
+            token = None
+
     if not token:
         await websocket.close(code=4001, reason="authentication required")
         return
@@ -1289,7 +1523,11 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=4003, reason="invalid or expired token")
         return
 
-    await manager.connect(websocket)
+    # SCOPE the live feed by the token's role + zone (mirrors /telemetry/snapshot).
+    # Default fails CLOSED to a zone-less technician if claims are malformed.
+    role = claims.get("role") or "technician"
+    zone = claims.get("zone")
+    manager.register(websocket, role=role, zone=zone)  # already accepted above
     try:
         while True:
             await websocket.receive_text()

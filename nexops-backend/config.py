@@ -24,3 +24,29 @@ WS_PORT = int(os.environ.get("WS_PORT", "8000"))
 # psycopg2-binary driver - see requirements.txt):
 #   postgresql://user:pass@localhost:5432/nexops
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///nexops.db")
+
+# --- CORS (browser origins allowed to call the API) ---
+# Comma-separated list of allowed origins. Defaults to the local Next.js dev
+# origins so it "just works" on a laptop; set CORS_ORIGINS to your REAL frontend
+# origin(s) in production (a wildcard "*" is invalid with credentialed requests,
+# so the origins must be named explicitly).
+CORS_ORIGINS = [
+    o.strip()
+    for o in os.environ.get(
+        "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if o.strip()
+]
+
+# --- Auth cookies ---
+# Set COOKIE_SECURE=1 in production so the session/CSRF cookies are only sent over
+# HTTPS. Default OFF so the cookies work on plain-http localhost during dev.
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "").strip().lower() in ("1", "true", "yes")
+
+# --- Reverse-proxy trust (login rate limiting) ---
+# When the app sits behind a trusted reverse proxy / load balancer, the direct
+# peer IP is the PROXY's, so per-IP login throttling would bucket every user
+# together (lock everyone out, or be meaningless). Set TRUST_PROXY=1 to instead
+# read the real client IP from the left-most X-Forwarded-For entry. Default OFF,
+# because X-Forwarded-For is client-spoofable unless a trusted proxy sets it.
+TRUST_PROXY = os.environ.get("TRUST_PROXY", "").strip().lower() in ("1", "true", "yes")

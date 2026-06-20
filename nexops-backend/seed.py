@@ -46,13 +46,18 @@ assignment.ZONE_WEIGHT), so a skilled other-zone engineer always beats an
 unskilled same-zone one - that is exactly what makes cross-zone fallback work.
 """
 
+import os
+
 from db import Engineer, FaultMTTR, User, get_session, reset_db
 
-# DEMO-ONLY shared dev password for EVERY seeded user. Hashed at seed time. This
-# is NOT production-safe (one known password, printed to the console) — it exists
-# so the demo operator can log in as any role instantly. Real deployments must
-# replace this with per-user provisioning.
-DEV_PASSWORD = "nexops123"
+# Shared seed password for EVERY seeded user, hashed at seed time. OVERRIDABLE via
+# NEXOPS_SEED_PASSWORD so a deployer can set a real password without code changes.
+# The fallback 'nexops123' is a DEMO-ONLY convenience (one known password, printed
+# to the console) so the operator can log in as any role instantly — NOT
+# production-safe. Real deployments should set NEXOPS_SEED_PASSWORD (or move to
+# per-user provisioning).
+DEV_PASSWORD = os.environ.get("NEXOPS_SEED_PASSWORD", "nexops123")
+_SEED_PASSWORD_IS_DEFAULT = "NEXOPS_SEED_PASSWORD" not in os.environ
 
 
 # (name, role, skills, active_tasks, available, experience_years, max_capacity, zone)
@@ -176,9 +181,14 @@ def seed_users(session=None):
         if owns_session:
             session.commit()
 
-        # CREDENTIALS table (demo operator login sheet).
+        # CREDENTIALS table (demo operator login sheet). Only echo the password
+        # when it's the built-in DEMO default; a deployer-set NEXOPS_SEED_PASSWORD
+        # is never printed (don't leak a real credential into logs).
         print("[seed] users — DEMO credentials (NOT production-safe):")
-        print(f"       password for ALL users: {DEV_PASSWORD!r}")
+        if _SEED_PASSWORD_IS_DEFAULT:
+            print(f"       password for ALL users: {DEV_PASSWORD!r}")
+        else:
+            print("       password for ALL users: (set via NEXOPS_SEED_PASSWORD — not shown)")
         print(f"       {'username':<14}{'role':<16}zone")
         for uname, role, zone in creds:
             print(f"       {uname:<14}{role:<16}{zone or '-'}")

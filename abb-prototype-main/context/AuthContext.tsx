@@ -19,9 +19,8 @@ import { useRouter } from 'next/navigation';
 import { BASE_URL } from '@/lib/tasksApi';
 import {
   clearSession,
-  getToken,
+  getCsrfToken,
   getUser,
-  isTokenExpired,
   setSession,
   type AuthUser,
 } from '@/lib/authStorage';
@@ -43,7 +42,6 @@ export type LoginResult =
 
 interface AuthState {
   user: AuthUser | null;
-  token: string | null;
   ready: boolean; // rehydration finished (avoids guard flicker on first paint)
   login: (username: string, password: string) => Promise<LoginResult>;
   logout: () => void;
@@ -53,20 +51,13 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
-  // Rehydrate from localStorage on mount (client only). Drop an expired/invalid
-  // token so a stale session never lands the user on a broken page.
+  // Rehydrate the cached user on mount (client only). The token itself lives in
+  // an httpOnly cookie we can't read here; if the cookie has expired, the first
+  // /api call returns 401 and tasksApi clears + bounces to /login.
   useEffect(() => {
-    const t = getToken();
-    const u = getUser();
-    if (t && u && !isTokenExpired(t)) {
-      setToken(t);
-      setUser(u);
-    } else if (t) {
-      clearSession();
-    }
+    setUser(getUser());
     setReady(true);
   }, []);
 
@@ -77,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
+          credentials: 'include', // receive + store the httpOnly session cookie
         });
         if (res.status === 401) {
           return { ok: false, error: 'Invalid username or password' };
@@ -96,8 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           zone: data?.user?.zone ?? null,
           engineer_id: data?.user?.engineer_id ?? null,
         };
-        setSession(data.token, u);
-        setToken(data.token);
+        setSession(u); // persist ONLY the user; the token is in the cookie
         setUser(u);
         return { ok: true, user: u };
       } catch {
@@ -108,14 +99,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    // Best-effort SERVER-SIDE revocation + cookie clear. Cookie-authed, so it
+    // carries the CSRF header; fire-and-forget so logout never hangs, and we
+    // clear local state + redirect regardless.
+    try {
+      const csrf = getCsrfToken();
+      fetch(`${BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: csrf ? { 'X-CSRF-Token': csrf } : {},
+        credentials: 'include',
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* ignore — local cleanup below still runs */
+    }
     clearSession();
-    setToken(null);
     setUser(null);
     if (typeof window !== 'undefined') window.location.href = '/login';
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, ready, login, logout }}>
+    <AuthContext.Provider value={{ user, ready, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -160,21 +164,21 @@ export function RoleGuard({
   role: string;
   children: ReactNode;
 }) {
-  const { user, token, ready } = useAuth();
+  const { user, ready } = useAuth();
   const router = useRouter();
 
-  const authorized = ready && !!token && !!user && user.role === role;
+  const authorized = ready && !!user && user.role === role;
 
   useEffect(() => {
     if (!ready) return;
-    if (!token || !user) {
+    if (!user) {
       router.replace('/login');
       return;
     }
     if (user.role !== role) {
       router.replace(ROLE_ROUTE[user.role] ?? '/login');
     }
-  }, [ready, token, user, role, router]);
+  }, [ready, user, role, router]);
 
   if (!authorized) return <GuardSplash />;
   return <>{children}</>;

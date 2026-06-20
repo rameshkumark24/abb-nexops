@@ -94,7 +94,10 @@ def test_c_me_valid_missing_tampered_expired():
     assert body["role"] == "field_manager"
     assert body["zone"] == "B"
 
-    # no token
+    # no token. Clear the cookie jar too: _login() above set the browser session
+    # cookie on the shared TestClient, so "no credentials" must drop BOTH the
+    # Bearer header and the cookie.
+    client.cookies.clear()
     assert client.get("/auth/me").status_code == 401
 
     # tampered signature
@@ -127,9 +130,18 @@ def test_d_technician_token_zone_matches_engineer():
     assert me["role"] == "technician"
 
 
-# Logout is stateless: always 200, no server-side state to clear.
-def test_logout_is_stateless_ok():
-    assert client.post("/auth/logout").status_code == 200
+# Logout is now a REAL authenticated operation: it revokes the user's tokens
+# (bumps token_version) and clears the auth cookies, so it REQUIRES a valid
+# session and (for the cookie path) a matching CSRF header.
+def test_logout_requires_auth_then_ok():
+    # no credentials -> 401 (logout is no longer an anonymous no-op)
+    client.cookies.clear()
+    assert client.post("/auth/logout").status_code == 401
+    # a real session (cookie) + matching CSRF header -> 200
+    client.cookies.clear()
+    _login("plant")  # sets nexops_token (httpOnly) + nexops_csrf on the jar
+    csrf = client.cookies.get("nexops_csrf")
+    assert client.post("/auth/logout", headers={"X-CSRF-Token": csrf}).status_code == 200
 
 
 # Public routes stay reachable WITHOUT a token: health + login (the entry point).
@@ -144,6 +156,7 @@ def test_public_routes_token_free():
 # they now return 401 (this matches the 3b contract-change list exactly —
 # GET /tasks, POST /tasks/{id}/start, POST /tasks/{id}/resolve).
 def test_scoped_routes_require_token():
+    client.cookies.clear()  # drop any session cookie a prior test's login left
     assert client.get("/tasks").status_code == 401                  # was 200 in 3a
     assert client.post("/tasks/1/start").status_code == 401
     assert client.post("/tasks/1/resolve").status_code == 401

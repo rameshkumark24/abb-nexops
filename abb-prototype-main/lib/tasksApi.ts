@@ -9,11 +9,16 @@
 // error state instead of crashing the page.
 
 import type { LifecycleTask, ResolvedTask, TelemetryRecord } from '@/types/telemetry';
-import { getToken, clearSession } from '@/lib/authStorage';
+import { getCsrfToken, clearSession } from '@/lib/authStorage';
 
-// Same host as the WS bridge, overridable per-environment. Mirrors the
-// NEXT_PUBLIC_WS_URL convention already used by useLiveData.
-export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// SAME-ORIGIN base: calls go to /api/* on this origin, which Next proxies to the
+// backend (see next.config rewrites). This keeps the httpOnly auth cookie
+// first-party so the browser sends it automatically. Override with
+// NEXT_PUBLIC_API_BASE only if you intentionally bypass the proxy.
+export const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || '/api';
+
+// Methods that mutate state require the double-submit CSRF header.
+const _UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // Discriminated result: success carries data, failure carries a message.
 export type ApiResult<T> =
@@ -32,18 +37,24 @@ function handleUnauthorized(): void {
 
 async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
   try {
-    // Attach Authorization: Bearer <token> automatically so the Stage 3b-gated
-    // endpoints (/tasks, start, resolve) receive the JWT on every call.
-    const token = getToken();
+    // Auth rides in the httpOnly cookie sent automatically with credentials:
+    // 'include'. For unsafe methods we add the double-submit CSRF header (read
+    // from the readable CSRF cookie) so the server accepts the cookie-authed
+    // mutation. No JWT is read or attached by JS.
+    const method = (init?.method ?? 'GET').toUpperCase();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...((init?.headers as Record<string, string> | undefined) ?? {}),
     };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (_UNSAFE.has(method)) {
+      const csrf = getCsrfToken();
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+    }
 
     const res = await fetch(`${BASE_URL}${path}`, {
       ...init,
       headers,
+      credentials: 'include',
     });
 
     if (res.status === 401) {

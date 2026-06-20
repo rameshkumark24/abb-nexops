@@ -88,7 +88,10 @@ export function loadLayout(): AdminLayout {
     const missing = DEFAULT_ORDER.filter((id) => !saved.includes(id));
     return {
       order: [...saved, ...missing],
-      collapsed: parsed.collapsed ?? {},
+      collapsed: {
+        ...defaultLayout().collapsed,
+        ...(parsed.collapsed ?? {}),
+      },
     };
   } catch {
     return defaultLayout();

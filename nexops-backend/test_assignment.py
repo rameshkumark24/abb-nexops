@@ -97,7 +97,7 @@ SAMPLES = [
     {
         # (b) CROSS-ZONE FALLBACK: hydraulic fault in Zone C, but the ONLY
         # hydraulic specialist (Mara) is in Zone D -> the fault falls back across
-        # zones to her (skill 0.425 >> zone 0.08, so no local can win it).
+        # zones to her (skill 0.425 >> zone 0.20, so no local can win it).
         "_note": "(b) CROSS-ZONE FALLBACK - no hydraulic hand in Zone C -> Mara (Zone D)",
         "alarm_id": 5006,
         "Machine": "Control Valve C1",

@@ -159,7 +159,10 @@ def test_e_validation_and_auth_codes():
                       json={"name": "Bad Zone", "zone": "Z", "skills": []})
     assert bad.status_code == 400, bad.text
 
-    # no token -> 401
+    # no token -> 401. Clear the cookie jar too: _login() above set the browser
+    # session cookie on the shared TestClient, so a truly-unauthenticated request
+    # must omit BOTH the Bearer header and the cookie.
+    client.cookies.clear()
     assert client.post("/engineers", json={"name": "No Auth", "zone": "A", "skills": []}).status_code == 401
 
     # unknown id deactivate -> 404
@@ -178,7 +181,9 @@ def test_get_engineers_scoped():
     fc = client.get("/engineers", headers=_auth(_token("fieldC"))).json()
     assert fc and all(r["zone"] == "C" for r in fc)
 
-    # no token -> 401
+    # no token -> 401 (clear the cookie jar so the request carries no session
+    # cookie either — _token()/_login() above set one on the shared TestClient).
+    client.cookies.clear()
     assert client.get("/engineers").status_code == 401
 
 

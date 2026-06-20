@@ -34,8 +34,9 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  KeyboardSensor,
 } from '@dnd-kit/core';
-import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 
 const ZONES = ['Zone A', 'Zone B', 'Zone C', 'Zone D'] as const;
 
@@ -87,7 +88,10 @@ function AdminConsole() {
     saveLayout(layout);
   }, [layout]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
@@ -98,6 +102,32 @@ function AdminConsole() {
       return { ...l, order: arrayMove(l.order, oldI, newI) };
     });
   };
+
+  // Group widgets into sections dynamically based on their `sectionLabel` in ADMIN_WIDGETS
+  const widgetSections = useMemo(() => {
+    const list: { label: string; widgetIds: string[] }[] = [];
+    let currentSection: { label: string; widgetIds: string[] } | null = null;
+    for (const w of ADMIN_WIDGETS) {
+      if (w.sectionLabel) {
+        currentSection = { label: w.sectionLabel, widgetIds: [] };
+        list.push(currentSection);
+      }
+      if (currentSection) {
+        currentSection.widgetIds.push(w.id);
+      }
+    }
+    return list;
+  }, []);
+
+  // Sort each section's widgets according to their position in layout.order
+  const sectionWidgets = useMemo(() => {
+    return widgetSections.map((sec) => {
+      const sortedIds = [...sec.widgetIds].sort((a, b) => {
+        return layout.order.indexOf(a) - layout.order.indexOf(b);
+      });
+      return { ...sec, widgetIds: sortedIds };
+    });
+  }, [layout.order, widgetSections]);
   const toggleCollapse = (id: string) =>
     setLayout((l) => ({ ...l, collapsed: { ...l.collapsed, [id]: !l.collapsed[id] } }));
   const resetLayout = () => setLayout(defaultLayout());
@@ -290,9 +320,9 @@ function AdminConsole() {
     { value: stat(kDispatched), label: 'ENGINEERS DISPATCHED' },
   ];
 
-  // Zone rollup (filtered).
+  // Zone rollup (unfiltered by severity).
   const zoneRollup = ZONES.filter((z) => zonesSel.includes(z.replace('Zone ', ''))).map((z) => {
-    const inZone = filteredMachines.filter((m) => m.zone === z);
+    const inZone = machines.filter((m) => m.zone === z);
     const sorted = [...inZone].sort((a, b) => a.perf - b.perf);
     return {
       zone: z,
@@ -750,58 +780,63 @@ function AdminConsole() {
       <div className="abb-shell" style={{ paddingTop: 20, paddingBottom: 56 }}>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={layout.order} strategy={rectSortingStrategy}>
-            <div className="admin-grid">
-              {layout.order.map((id) => {
-                const def = WIDGET_BY_ID[id];
-                if (!def) return null;
-                const tierAccent =
-                  id === 'zoneRollup' ? 'var(--abb-ink-1)' :
-                  id === 'machineAnalytics' || id === 'faultDonut' ? 'var(--abb-red)' :
-                  id === 'alarmsPerHour' || id === 'alarmPipeline' ? 'var(--abb-warning)' :
-                  id === 'topMachines' || id === 'leaderboard' ? 'var(--abb-early)' :
-                  id === 'heatmap' ? 'var(--abb-early)' :
-                  id === 'predictionMetrics' ? 'var(--abb-nominal)' :
-                  id === 'workforce' ? 'var(--abb-red)' :
-                  undefined;
-                return (
-                  <React.Fragment key={id}>
-                    {def.sectionLabel && (
-                      <div
-                        style={{
-                          gridColumn: '1 / -1',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 14,
-                          paddingTop: 14,
-                          paddingBottom: 2,
-                        }}
-                      >
-                        <span
-                          className="abb-micro"
-                          style={{ fontSize: 9, color: 'var(--abb-ink-3)', letterSpacing: '0.16em', whiteSpace: 'nowrap' }}
-                        >
-                          {def.sectionLabel}
-                        </span>
-                        <div style={{ flex: 1, height: 1, background: 'var(--abb-line-faint)' }} />
-                      </div>
-                    )}
-                    <DashboardCard
-                      id={id}
-                      title={def.title}
-                      subtitle={def.subtitle}
-                      span={def.span}
-                      fullWidth={def.fullWidth}
-                      draggable={!isMobile}
-                      collapsed={!!layout.collapsed[id]}
-                      onToggleCollapse={toggleCollapse}
-                      accent={tierAccent}
-                      highlight={highlightId === id}
+            <div>
+              {sectionWidgets.map((sec) => (
+                <div key={sec.label} style={{ marginBottom: 28 }}>
+                  {/* Section Label Divider */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      paddingTop: 14,
+                      paddingBottom: 12,
+                    }}
+                  >
+                    <span
+                      className="abb-micro"
+                      style={{ fontSize: 9, color: 'var(--abb-ink-3)', letterSpacing: '0.16em', whiteSpace: 'nowrap' }}
                     >
-                      {renderWidget(id)}
-                    </DashboardCard>
-                  </React.Fragment>
-                );
-              })}
+                      {sec.label}
+                    </span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--abb-line-faint)' }} />
+                  </div>
+
+                  {/* Section Grid Container */}
+                  <div className="admin-grid">
+                    {sec.widgetIds.map((id) => {
+                      const def = WIDGET_BY_ID[id];
+                      if (!def) return null;
+                      const tierAccent =
+                        id === 'zoneRollup' ? 'var(--abb-ink-1)' :
+                        id === 'machineAnalytics' || id === 'faultDonut' ? 'var(--abb-red)' :
+                        id === 'alarmsPerHour' || id === 'alarmPipeline' ? 'var(--abb-warning)' :
+                        id === 'topMachines' || id === 'leaderboard' ? 'var(--abb-early)' :
+                        id === 'heatmap' ? 'var(--abb-early)' :
+                        id === 'predictionMetrics' ? 'var(--abb-nominal)' :
+                        id === 'workforce' ? 'var(--abb-red)' :
+                        undefined;
+                      return (
+                        <DashboardCard
+                          key={id}
+                          id={id}
+                          title={def.title}
+                          subtitle={def.subtitle}
+                          span={def.span}
+                          fullWidth={def.fullWidth}
+                          draggable={!isMobile}
+                          collapsed={!!layout.collapsed[id]}
+                          onToggleCollapse={toggleCollapse}
+                          accent={tierAccent}
+                          highlight={highlightId === id}
+                        >
+                          {renderWidget(id)}
+                        </DashboardCard>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </SortableContext>
         </DndContext>

@@ -157,7 +157,9 @@ def test_d_plant_any_engineer():
 # ---- (e) no token -> 401; unknown id -> 404 ----------------------------
 
 def test_e_no_token_and_unknown_id():
-    # no token -> 401 (dependency rejects before any lookup)
+    # no token -> 401 (dependency rejects before any lookup). Clear the cookie jar
+    # so a prior _login() session cookie doesn't authenticate this request.
+    client.cookies.clear()
     assert client.get("/engineers/1/stats").status_code == 401
 
     # unknown engineer id -> 404 (plant token so scope can't mask it)

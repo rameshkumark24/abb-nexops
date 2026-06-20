@@ -181,23 +181,39 @@ python test_assignment.py  # seeds, then scores sample faults and prints results
 
 ### The weighted score
 
-Three named weights at the top of [`assignment.py`](assignment.py) (skill is
-dominant; they sum to 1.0, so the score is in `0..1`):
+Named weights at the top of [`assignment.py`](assignment.py) (skill is dominant).
+The four BASE weights sum to `0.95`; `ZONE_WEIGHT` is an ADDITIVE same-zone bonus
+on top. The absolute range doesn't matter — only the RANKING does, since every
+candidate for the same fault is scored with identical weights:
 
 ```
-score = SKILL_WEIGHT * skill_match     # 0.60  -> 1.0 if engineer has the skill, else 0.15
-      + LOAD_WEIGHT  * load_factor      # 0.20  -> (MAX_LOAD - active_tasks) / MAX_LOAD, clamped 0..1
-      + MTTR_WEIGHT  * speed_factor     # 0.20  -> min-max normalized over the candidate pool:
+score = SKILL_WEIGHT * skill_match     # 0.50  -> 1.0 if engineer has the skill, else 0.15
+      + LOAD_WEIGHT  * load_factor      # 0.23  -> (MAX_LOAD - active_tasks) / MAX_LOAD, clamped 0..1
+      + MTTR_WEIGHT  * speed_factor     # 0.10  -> min-max normalized over the candidate pool:
                                         #          1.0 = fastest at THIS category, 0.0 = slowest
+      + exp_weight   * exp_factor       # 0.12  -> min-max normalized experience over the pool;
+                                        #          DOUBLED to 0.24 for CRITICAL faults
+      + ZONE_WEIGHT  * zone_factor      # +0.20 iff engineer.zone == machine zone (record["zone"])
 ```
 
 - **skill_match** — `1.0` if the engineer's `skills` include the fault category,
-  else a small base (`SKILL_BASE = 0.15`).
+  else a small base (`SKILL_BASE = 0.15`). For NON-critical, non-`general` faults
+  a STRICT skill gate also applies: engineers lacking the category skill are
+  filtered out before scoring (skill is a hard requirement, not just a weight).
 - **load_factor** — capacity, normalized by `MAX_LOAD = 10`: `0` tasks → `1.0`,
-  `≥10` tasks → `0.0`. An overloaded engineer is dragged down, not excluded.
+  `≥10` tasks → `0.0`. A soft nudge; the HARD cap (`active_tasks >= max_capacity`)
+  excludes an over-cap engineer entirely for non-critical faults.
 - **speed_factor** — historical MTTR for *this* category, min-max normalized
   across the available candidates so the fastest gets `1.0`. Engineers with no
   history for the category fall back to a deliberately slow `NO_HISTORY_MTTR`.
+- **exp_factor** — experience years, min-max normalized over the pool. The weight
+  doubles for CRITICAL faults (`CRIT_EXP_MULTIPLIER = 2.0`), so a senior wins a
+  critical even if slower.
+- **zone_factor** — `1.0` when the engineer is in the machine's zone, else `0.0`.
+  A same-zone TIEBREAKER that prefers a LOCAL engineer, never an override of skill
+  (the `0.20` bonus is far below the `0.425` skill gap, so a skilled other-zone
+  engineer still wins cross-zone FALLBACK when no skilled local exists). CRITICAL
+  faults bypass the cap/skill-gate and may cross zones to find the best available.
 
 Only `available` engineers are scored (an off-shift engineer is **skipped**
 entirely). If none are available, the result is a clear `UNASSIGNED` (no crash).

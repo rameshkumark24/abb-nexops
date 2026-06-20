@@ -20,6 +20,9 @@ env/
 .env.local
 .env.*.local
 
+# Auto-generated per-deployment JWT signing secret (NEVER commit)
+.jwt_secret
+
 # OS
 .DS_Store
 Thumbs.db

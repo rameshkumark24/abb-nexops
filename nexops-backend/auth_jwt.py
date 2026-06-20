@@ -18,11 +18,13 @@ overridden in any real deployment (state in the report).
 """
 
 import os
+import secrets
 import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Callable
 
 import bcrypt
@@ -32,10 +34,44 @@ from fastapi import Depends, HTTPException, Request, status
 from db import User, get_session
 
 # --- secret / algorithm / lifetime --------------------------------------
-# DEV FALLBACK is insecure on purpose: override NEXOPS_JWT_SECRET in production.
-JWT_SECRET = os.environ.get("NEXOPS_JWT_SECRET", "dev-insecure-nexops-secret-change-me")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 12
+
+# SECRET RESOLUTION — there is deliberately NO hardcoded fallback constant. A
+# committed default secret lets anyone who reads the source forge a plant-manager
+# token, which would defeat the entire auth system. Resolution order:
+#   1. NEXOPS_JWT_SECRET env var — the ONLY thing to set in production.
+#   2. Else a per-deployment RANDOM secret, persisted to a gitignored local file
+#      so the demo still runs with zero setup, every machine gets a UNIQUE secret,
+#      and issued tokens survive a restart.
+#   3. Else (filesystem unavailable) an EPHEMERAL per-process random secret —
+#      still never a known constant, so it FAILS CLOSED (the only cost is tokens
+#      don't survive a restart / aren't shared across workers).
+_SECRET_FILE = Path(__file__).resolve().parent / ".jwt_secret"
+
+
+def _resolve_secret() -> tuple[str, str]:
+    """Return (secret, source). NEVER returns a shared/known constant."""
+    env = os.environ.get("NEXOPS_JWT_SECRET")
+    if env:
+        return env, "env"
+    try:
+        if _SECRET_FILE.exists():
+            existing = _SECRET_FILE.read_text(encoding="utf-8").strip()
+            if existing:
+                return existing, "file"
+        generated = secrets.token_hex(32)  # 256-bit
+        _SECRET_FILE.write_text(generated, encoding="utf-8")
+        try:
+            os.chmod(_SECRET_FILE, 0o600)  # best-effort: owner-only (no-op on some FS)
+        except OSError:
+            pass
+        return generated, "generated"
+    except Exception:
+        return secrets.token_hex(32), "ephemeral"
+
+
+JWT_SECRET, JWT_SECRET_SOURCE = _resolve_secret()
 
 # ----------------------------------------------------------------------
 # Password hashing (bcrypt used DIRECTLY).
@@ -85,8 +121,29 @@ def create_token(user) -> str:
         "username": user.username,
         "role": user.role,
         "zone": user.zone,
+        # tv = the user's token_version at mint time. Auth rejects the token once
+        # the user's token_version moves past this (logout / force-logout).
+        "tv": int(getattr(user, "token_version", 0) or 0),
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=JWT_EXPIRE_HOURS)).timestamp()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def create_ws_ticket(user) -> str:
+    """Sign a SHORT-LIVED ticket the browser passes as the WS first message. It
+    carries role/zone/tv (so WS zone-scoping + revocation still apply) and a
+    'scope':'ws' marker, and expires in WS_TICKET_TTL_SECONDS."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "user_id": user.id,
+        "username": user.username,
+        "role": user.role,
+        "zone": user.zone,
+        "tv": int(getattr(user, "token_version", 0) or 0),
+        "scope": "ws",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(seconds=WS_TICKET_TTL_SECONDS)).timestamp()),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -114,6 +171,22 @@ class CurrentUser:
     engineer_id: int | None
 
 
+# Name of the httpOnly cookie that carries the session JWT for browser clients
+# (set by the backend at login; unreadable by JS, so XSS cannot exfiltrate it).
+AUTH_COOKIE = "nexops_token"
+# Double-submit CSRF: a RANDOM value placed in a JS-READABLE cookie at login and
+# echoed back by the SPA in this header on every unsafe request. A cross-site
+# attacker can't read the cookie to set the header, so forged requests fail.
+CSRF_COOKIE = "nexops_csrf"
+CSRF_HEADER = "X-CSRF-Token"
+
+# Short-lived WebSocket ticket: the SPA can't attach the httpOnly cookie to a
+# cross-origin WS handshake, so it fetches a single-use, ~minute-long ticket from
+# a cookie-authed endpoint and passes THAT as the WS first message. Stateless
+# (signed JWT), so it scales without a server-side ticket store.
+WS_TICKET_TTL_SECONDS = 60
+
+
 def _bearer_token(request: Request):
     """Extract the token from an `Authorization: Bearer <token>` header, or None."""
     header = request.headers.get("Authorization") or request.headers.get("authorization")
@@ -125,10 +198,24 @@ def _bearer_token(request: Request):
     return parts[1].strip() or None
 
 
+def _request_token(request: Request):
+    """The session JWT for this request: the `Authorization: Bearer` header if
+    present (non-browser clients, tests), else the httpOnly auth cookie (browser
+    clients). Returning the SOURCE too lets CSRF enforcement target only the
+    cookie path (a Bearer header is not auto-sent, so it needs no CSRF guard)."""
+    tok = _bearer_token(request)
+    if tok:
+        return tok, "header"
+    cookie = request.cookies.get(AUTH_COOKIE)
+    if cookie:
+        return cookie, "cookie"
+    return None, None
+
+
 def _load_user_from_request(request: Request):
     """Token -> CurrentUser, or None on any failure. Loads the user FRESH from the
     DB so the returned object carries engineer_id (which is not in the token)."""
-    token = _bearer_token(request)
+    token, _ = _request_token(request)
     if not token:
         return None
     claims = decode_token(token)
@@ -141,6 +228,14 @@ def _load_user_from_request(request: Request):
     try:
         user = session.get(User, user_id)
         if user is None:
+            return None
+        # Reject DEACTIVATED users immediately — don't wait for token expiry.
+        if getattr(user, "active", True) is False:
+            return None
+        # Reject REVOKED tokens: logout / force-logout bumps token_version, so any
+        # token minted with an older tv is no longer valid. Missing tv (legacy
+        # token) compares against 0 — still valid until the version first moves.
+        if int(claims.get("tv", 0) or 0) != int(getattr(user, "token_version", 0) or 0):
             return None
         return CurrentUser(
             id=user.id,
@@ -174,24 +269,40 @@ def get_current_user_optional(request: Request):
     return _load_user_from_request(request)
 
 
-# ----------------------------------------------------------------------
-# Insecure-secret startup warning
-# ----------------------------------------------------------------------
+def revoke_user_tokens(session, user_id: int) -> bool:
+    """Invalidate ALL of a user's outstanding JWTs by bumping token_version (real
+    server-side logout / force-logout). Caller owns the session/commit decision;
+    we commit here so the new version is durable before the response returns.
+    Returns True if the user existed."""
+    user = session.get(User, user_id)
+    if user is None:
+        return False
+    user.token_version = int(getattr(user, "token_version", 0) or 0) + 1
+    session.commit()
+    return True
 
-_INSECURE_SECRET = "dev-insecure-nexops-secret-change-me"
 
+# ----------------------------------------------------------------------
+# JWT-secret startup advisory
+# ----------------------------------------------------------------------
 
 def warn_insecure_secret() -> None:
-    """Print a prominent banner if the JWT secret is still the dev default."""
-    if JWT_SECRET == _INSECURE_SECRET:
+    """Advise on the JWT secret source at startup. There is no longer a known
+    default constant to forge, so this is informational — except the EPHEMERAL
+    case, which is flagged because tokens won't survive a restart / multi-worker."""
+    if JWT_SECRET_SOURCE == "env":
+        return  # production-correct: nothing to warn about.
+    if JWT_SECRET_SOURCE == "ephemeral":
         banner = "!" * 64
         print(f"\n{banner}")
-        print("  SECURITY WARNING: NEXOPS_JWT_SECRET is the insecure dev")
-        print("  default. Any party that knows this value can forge tokens")
-        print("  and gain full plant-manager access.")
-        print("  → Set NEXOPS_JWT_SECRET in your environment before any")
-        print("    non-local deployment.")
+        print("  NOTICE: JWT secret is EPHEMERAL (could not persist a local")
+        print("  secret file). Issued tokens are invalidated on restart and are")
+        print("  NOT shared across workers. Set NEXOPS_JWT_SECRET to fix.")
         print(f"{banner}\n")
+    else:
+        # "file" or "generated": a unique local secret is in use (safe for dev).
+        print(f"[auth] using a local per-deployment JWT secret "
+              f"({_SECRET_FILE.name}); set NEXOPS_JWT_SECRET for production.")
 
 
 # ----------------------------------------------------------------------

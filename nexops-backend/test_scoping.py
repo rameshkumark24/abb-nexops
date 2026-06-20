@@ -195,6 +195,7 @@ def test_e_field_manager_resolve_out_of_zone_403():
 # ---- (f) no token on a scoped endpoint -> 401 ------------------------
 
 def test_f_no_token_401():
+    client.cookies.clear()  # drop any session cookie a prior _login() left on the jar
     assert client.get("/tasks").status_code == 401
     assert client.post("/tasks/1/resolve").status_code == 401
     assert client.post("/tasks/1/start").status_code == 401

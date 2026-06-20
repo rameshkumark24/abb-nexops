@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { AdminLayout, WidgetDef } from '@/lib/adminLayout';
 
 export interface DashboardSearchProps {
@@ -72,7 +73,7 @@ export function DashboardSearch({ open, onClose, widgets, layout, onNavigate }: 
 
   if (!open) return null;
 
-  return (
+  const content = (
     <>
       {/* Backdrop */}
       <div
@@ -272,4 +273,6 @@ export function DashboardSearch({ open, onClose, widgets, layout, onNavigate }: 
       </div>
     </>
   );
+
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : null;
 }

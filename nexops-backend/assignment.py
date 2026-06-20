@@ -10,6 +10,7 @@ later at the existing TODO(Stage: assignment) marker.
 """
 
 import re
+from datetime import datetime, timedelta
 
 from db import Assignment, Engineer, FaultMTTR
 
@@ -18,27 +19,45 @@ from db import Assignment, Engineer, FaultMTTR
 # is in 0..1.
 # ----------------------------------------------------------------------
 SKILL_WEIGHT = 0.50   # having the matching skill is still the biggest driver
-LOAD_WEIGHT = 0.28    # prefer engineers with spare capacity (a SOFT nudge)
+LOAD_WEIGHT = 0.23    # prefer engineers with spare capacity (a SOFT nudge)
 MTTR_WEIGHT = 0.10    # prefer engineers historically fast at THIS category
 EXP_WEIGHT = 0.12     # prefer more experienced engineers
-# (0.50 + 0.28 + 0.10 + 0.12 = 1.00)
+# (0.50 + 0.23 + 0.10 + 0.12 = 0.95). The base no longer sums to exactly 1.0, and
+# that's fine: only the RANKING matters, since every candidate for the SAME fault
+# is scored with identical weights (the zone term below is additive on top).
+# LOAD was lowered 0.28 -> 0.23 (paired with ZONE 0.15 -> 0.20) so a same-zone
+# engineer holds the task across the full realistic load range instead of being
+# poached by an idle neighbour on load alone - see ZONE_WEIGHT note below.
 
 # ZONE PREFERENCE (Stage 1 of the zone hierarchy). A small ADDITIVE bonus given
 # to an engineer whose zone == the machine's zone (read from record["zone"]).
-# It is a TIEBREAKER, never an override: it is deliberately far smaller than the
-# skill gap. Having vs lacking the category skill is worth
-# SKILL_WEIGHT * (1.0 - SKILL_BASE) = 0.50 * 0.85 = 0.425, so a 0.15 same-zone
-# bonus can NEVER make an unskilled local beat a skilled engineer in another
-# zone. That is precisely what gives us cross-zone FALLBACK: when no skilled
-# engineer exists in the machine's zone, a skilled OTHER-zone engineer still wins
-# (skill 0.425 >> zone 0.15). Like CRIT_EXP_MULTIPLIER, this can push a winning
-# score slightly above 1.0; only the RANKING matters, since every candidate for
-# the same fault is scored with identical weights. When a record has NO "zone"
-# (or an engineer has no zone), the term is 0 and behaviour is exactly as before.
-ZONE_WEIGHT = 0.15
+# It is a TIEBREAKER that prefers a LOCAL engineer, never an override of skill: it
+# is deliberately smaller than the skill gap. Having vs lacking the category skill
+# is worth SKILL_WEIGHT * (1.0 - SKILL_BASE) = 0.50 * 0.85 = 0.425, so a 0.20
+# same-zone bonus can NEVER make an unskilled local beat a skilled engineer in
+# another zone. That is precisely what gives us cross-zone FALLBACK: when no
+# skilled engineer exists in the machine's zone, a skilled OTHER-zone engineer
+# still wins (skill 0.425 >> zone 0.20).
+#
+# WHY 0.20 (raised from 0.15, paired with LOAD 0.28 -> 0.23): a skilled neighbour
+# can only out-score a skilled local on load+speed+experience, worth at most
+# LOAD_WEIGHT + MTTR_WEIGHT + EXP_WEIGHT = 0.23 + 0.10 + 0.12 = 0.45. The 0.20
+# head start does NOT cover that full 0.45, so a neighbour who is better on ALL
+# three can still win - which is desirable (don't hand work to your worst, busiest
+# engineer when an idle expert is next door). But for a pure LOAD difference the
+# hard capacity cap removes any local at/over max_capacity, so the worst eligible
+# local has load_factor ~0.5; a neighbour's load pull is then at most
+# LOAD_WEIGHT * 0.5 = 0.115 < 0.20, so the LOCAL keeps the task. Net effect: work
+# stays in-zone across the whole realistic load range, while skill stays dominant
+# and CRITICAL faults still cross zones (experience is 2x and zone is still small
+# vs the skill gap). Like CRIT_EXP_MULTIPLIER, this can push a winning score
+# slightly above 1.0; only the RANKING matters, since every candidate for the same
+# fault is scored with identical weights. When a record has NO "zone" (or an
+# engineer has no zone), the term is 0 and behaviour is exactly as before.
+ZONE_WEIGHT = 0.20
 
 # CRITICAL faults weigh experience heavier: the experience term is multiplied by
-# this factor (effective EXP weight = EXP_WEIGHT * CRIT_EXP_MULTIPLIER = 0.28 for
+# this factor (effective EXP weight = EXP_WEIGHT * CRIT_EXP_MULTIPLIER = 0.24 for
 # Critical). This intentionally over-weights experience for critical faults; it
 # is fine that the effective weights then exceed 1.0, because every candidate
 # for the SAME fault is scored with identical weights, so only the RANKING (not
@@ -481,5 +500,34 @@ def find_open_assignment(session, machine, fault_category):
         .filter(Assignment.fault_category == fault_category)
         .filter(Assignment.status.in_(OPEN_STATUSES))
         .order_by(Assignment.assigned_at.desc())
+        .first()
+    )
+
+
+def find_recent_resolved_assignment(session, machine, fault_category, grace_seconds):
+    """Return the most-recent RESOLVED Assignment for this exact (machine,
+    fault_category) whose resolved_at is within `grace_seconds` of now, else None.
+
+    RESTART-SAFE RECOVERY GRACE (re-assignment loop fix). The telemetry simulator
+    heals a machine on its OWN ~2-minute timer, INDEPENDENT of task resolution, so
+    a just-resolved machine keeps emitting the same high/critical warning for a
+    while. The live bridge suppresses that with an in-memory cooldown, but the
+    cooldown is lost on a backend restart — after which find_open_assignment (which
+    excludes 'resolved') would let the still-hot machine spawn a DUPLICATE task,
+    restarting the resolve->re-assign loop. This query lets the bridge SEE the
+    recent resolution from the DB and keep suppressing until the machine actually
+    recovers. Read-only — writes nothing.
+
+    resolved_at is stored as naive-UTC by SQLite, so we compare against a naive-UTC
+    cutoff (datetime.utcnow())."""
+    cutoff = datetime.utcnow() - timedelta(seconds=grace_seconds)
+    return (
+        session.query(Assignment)
+        .filter(Assignment.machine == machine)
+        .filter(Assignment.fault_category == fault_category)
+        .filter(Assignment.status == "resolved")
+        .filter(Assignment.resolved_at.isnot(None))
+        .filter(Assignment.resolved_at >= cutoff)
+        .order_by(Assignment.resolved_at.desc())
         .first()
     )

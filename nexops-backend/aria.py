@@ -3,6 +3,7 @@ ARIA AI Assistant logic: scoping, linear trends, API integration, and template f
 """
 
 import json
+import os
 import re
 from datetime import datetime
 import httpx
@@ -51,9 +52,12 @@ def is_out_of_domain(query: str) -> bool:
             
     return False
 
-# Primary Gemini & Secondary Groq API Keys (as provided)
-GEMINI_API_KEY = "AQ.Ab8RN6Jhp5dl6_iw1CCBKxqnyOIuDggN8BvRRcy-n8VlhxMWOw"
-GROQ_API_KEY = "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"
+# Primary Gemini & Secondary Groq API keys, read from the environment. NEVER
+# hardcode keys in source (committing them leaks the credential into git history).
+# When a key is absent ARIA degrades GRACEFULLY to its deterministic offline
+# template (render_fallback_answer), so the demo still runs with zero setup.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 class AriaLLMUnavailable(Exception):
     """Raised when all LLM services fail or time out."""
@@ -741,51 +745,52 @@ USER QUERY:
 async def call_llm(query: str, ctx: dict) -> tuple[str, str]:
     """Issues API calls. First attempts Gemini API. If failed/timed out, automatically falls back to Groq API."""
     prompt = format_system_prompt(query, ctx)
-    
-    # 1. Primary: Gemini API
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-        body = {
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }],
-            "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 600
+
+    # No keys configured -> go straight to the offline template (clean, no noise).
+    if not GEMINI_API_KEY and not GROQ_API_KEY:
+        raise AriaLLMUnavailable("No LLM API key configured (set GEMINI_API_KEY / GROQ_API_KEY).")
+
+    # 1. Primary: Gemini API (only if a key is configured)
+    if GEMINI_API_KEY:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+            body = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 600},
             }
-        }
-        async with httpx.AsyncClient() as client:
-            res = await client.post(url, json=body, timeout=6.0)
-            if res.status_code == 200:
-                data = res.json()
-                text = data["candidates"][0]["content"]["parts"][0]["text"]
-                return text.strip(), "llm"
-    except Exception as e:
-        print(f"[aria-llm] Gemini API failed or timed out: {e}")
-        
-    # 2. Secondary Fallback: Groq API
-    try:
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        body = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.2,
-            "max_tokens": 600
-        }
-        async with httpx.AsyncClient() as client:
-            res = await client.post(url, headers=headers, json=body, timeout=6.0)
-            if res.status_code == 200:
-                data = res.json()
-                text = data["choices"][0]["message"]["content"]
-                return text.strip(), "llm"
-    except Exception as e:
-        print(f"[aria-llm] Groq API failed or timed out: {e}")
-        
-    raise AriaLLMUnavailable("Both Gemini and Groq API pipelines failed.")
+            async with httpx.AsyncClient() as client:
+                res = await client.post(url, json=body, timeout=6.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    return text.strip(), "llm"
+        except Exception as e:
+            print(f"[aria-llm] Gemini API failed or timed out: {e}")
+
+    # 2. Secondary fallback: Groq API (only if a key is configured)
+    if GROQ_API_KEY:
+        try:
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            body = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2,
+                "max_tokens": 600,
+            }
+            async with httpx.AsyncClient() as client:
+                res = await client.post(url, headers=headers, json=body, timeout=6.0)
+                if res.status_code == 200:
+                    data = res.json()
+                    text = data["choices"][0]["message"]["content"]
+                    return text.strip(), "llm"
+        except Exception as e:
+            print(f"[aria-llm] Groq API failed or timed out: {e}")
+
+    raise AriaLLMUnavailable("All configured LLM pipelines failed.")
 
 async def answer(query: str, role: str, scope_zone: str | None, latest: dict, history: dict, session, username: str | None = None, engineer_id: int | None = None) -> dict:
     """The central orchestrator driving the context assembly, LLM/fallback rendering, and evidence footer binding."""

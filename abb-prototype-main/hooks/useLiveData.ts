@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getToken } from '@/lib/authStorage';
 import type {
   TelemetryRecord,
   Machine,
@@ -24,7 +23,7 @@ import {
   isEarlyWarning,
   zoneFor,
 } from '@/lib/adapter';
-import { fetchTelemetrySnapshot } from '@/lib/tasksApi';
+import { fetchTelemetrySnapshot, BASE_URL as API_BASE } from '@/lib/tasksApi';
 
 // ======================================================================
 // SWAPPABLE DATA SOURCE
@@ -198,17 +197,34 @@ function subscribe(
   let retryCount = 0;  // for exponential backoff
   const MAX_BACKOFF_MS = 30000;
 
-  const connect = () => {
+  const connect = async () => {
     if (stopped) return;
-    const token = getToken();
-    const url = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
-    ws = new WebSocket(url);
+    // The session lives in an httpOnly cookie that can't be attached to a
+    // cross-origin WS handshake, so we fetch a SHORT-LIVED ticket from the
+    // cookie-authed (same-origin) endpoint and pass THAT as the WS first message.
+    // The ticket never lands in the URL (no log/history leak).
+    let ticket: string | null = null;
+    try {
+      const res = await fetch(`${API_BASE}/auth/ws-ticket`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        ticket = typeof data?.ticket === 'string' ? data.ticket : null;
+      }
+    } catch {
+      /* no ticket -> the WS will fail auth and the close handler retries */
+    }
+    if (stopped) return;
+    ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
-      if (!stopped) {
-        retryCount = 0; // reset backoff on successful connect
-        onStatus?.(true);
+      if (stopped) return;
+      try {
+        if (ticket) ws?.send(JSON.stringify({ type: 'auth', token: ticket }));
+      } catch {
+        /* if the handshake send fails, the server times out and closes -> retry */
       }
+      retryCount = 0; // reset backoff on successful connect
+      onStatus?.(true);
     };
 
     ws.onmessage = (event) => {

@@ -183,9 +183,15 @@ class User(Base):
     # manager roles). Additive link — the engineers table is left untouched.
     engineer_id = Column(Integer, ForeignKey("engineers.id"), nullable=True)
     # active: mirrors the linked Engineer's soft-delete flag (Stage 3d). Set
-    # False when the technician is deactivated. NOT enforced in login here (auth
-    # logic is unchanged); assignment eligibility keys off Engineer.active.
+    # False when the technician is deactivated. Enforced in get_current_user so a
+    # deactivated user's outstanding tokens stop working immediately.
     active = Column(Boolean, nullable=False, default=True)
+    # token_version: bumped to REVOKE all of this user's outstanding JWTs (real
+    # server-side logout / force-logout on deactivation). A token carries the tv
+    # it was minted with; auth rejects any token whose tv != the user's current
+    # value. ADDITIVE — a pre-existing DB is migrated in init_db (_ensure_columns)
+    # since create_all does not ALTER an existing table.
+    token_version = Column(Integer, nullable=False, default=0)
 
 
 class IndustrialQA(Base):
@@ -209,8 +215,30 @@ class IndustrialQA(Base):
 # ----------------------------------------------------------------------
 
 def init_db():
-    """Create all tables if they don't already exist (no-op if present)."""
+    """Create all tables if they don't already exist (no-op if present), then
+    apply small ADDITIVE column migrations — create_all does NOT alter an existing
+    table, so a pre-existing DB needs these to gain columns added later."""
     Base.metadata.create_all(engine)
+    _ensure_columns()
+
+
+def _ensure_columns():
+    """Idempotently add columns introduced after a table was first created.
+    SQLite-only (the default backend); on other engines, schema is managed by
+    real migrations. Safe to run on every startup."""
+    if engine.dialect.name != "sqlite":
+        return
+    additive = {
+        "users": [("token_version", "INTEGER NOT NULL DEFAULT 0")],
+    }
+    with engine.begin() as conn:
+        for table, cols in additive.items():
+            present = {row[1] for row in conn.exec_driver_sql(
+                f"PRAGMA table_info({table})").fetchall()}
+            for name, ddl in cols:
+                if name not in present:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
 def reset_db():

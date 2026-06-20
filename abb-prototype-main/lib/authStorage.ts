@@ -1,15 +1,17 @@
-// Auth token + user persistence (Stage 3c).
+// Auth persistence (httpOnly-cookie session model).
 //
-// This is a REAL Next.js app (not a sandboxed artifact), so localStorage is the
-// correct place to persist the JWT + user so a page refresh keeps the session.
-// Every accessor is SSR-safe (guards `typeof window`) and never throws, so a
-// blocked/again-unavailable storage can never white-screen the app.
+// The session JWT is NO LONGER stored in JS-readable storage. It lives ONLY in an
+// httpOnly cookie set by the backend at login (sent automatically with every
+// same-origin /api request, and readable by the Next middleware server-side, but
+// invisible to JavaScript — so an XSS cannot exfiltrate it).
 //
-// Kept as a tiny standalone module (no React) so BOTH the AuthContext and the
-// non-React fetch helper (tasksApi) can read/clear the session without a cycle.
+// localStorage here holds ONLY the NON-sensitive user object, for instant UI
+// rehydration on refresh. The CSRF token lives in a JS-readable cookie that the
+// fetch helper echoes back in a header (double-submit). This module stays a tiny
+// standalone (no React) so AuthContext and the non-React fetch helper share it.
 
-export const TOKEN_KEY = 'nexops_token';
 export const USER_KEY = 'nexops_user';
+export const CSRF_COOKIE = 'nexops_csrf';
 
 // The compact user the backend returns from /auth/login and /auth/me.
 export interface AuthUser {
@@ -17,15 +19,6 @@ export interface AuthUser {
   role: string; // 'plant_manager' | 'field_manager' | 'technician'
   zone: string | null; // null for plant_manager, 'A'-'D' otherwise
   engineer_id: number | null;
-}
-
-export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
 }
 
 export function getUser(): AuthUser | null {
@@ -38,10 +31,24 @@ export function getUser(): AuthUser | null {
   }
 }
 
-export function setSession(token: string, user: AuthUser): void {
+// Read the double-submit CSRF token from its (readable) cookie, to echo in the
+// X-CSRF-Token header on unsafe requests. Returns null if absent.
+export function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const match = document.cookie.match(
+      new RegExp('(?:^|; )' + CSRF_COOKIE + '=([^;]*)'),
+    );
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setSession(user: AuthUser): void {
+  // The token cookie is set by the SERVER (httpOnly); we only persist the user.
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(TOKEN_KEY, token);
     window.localStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch {
     /* storage unavailable — session just won't persist; never crash */
@@ -49,24 +56,18 @@ export function setSession(token: string, user: AuthUser): void {
 }
 
 export function clearSession(): void {
+  // Drop the cached user. The httpOnly token cookie is cleared by the server on
+  // /auth/logout; we also best-effort clear the readable CSRF cookie here so a
+  // client-side 401 cleanup doesn't leave a stale CSRF value around.
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.removeItem(TOKEN_KEY);
     window.localStorage.removeItem(USER_KEY);
   } catch {
     /* ignore */
   }
-}
-
-// Best-effort JWT expiry check (no signature verification — that's the server's
-// job; this only avoids rehydrating an obviously-expired token on load). A
-// malformed token reads as expired so we fail safe to the login page.
-export function isTokenExpired(token: string): boolean {
   try {
-    const payload = JSON.parse(atob(token.split('.')[1] ?? ''));
-    if (!payload || typeof payload.exp !== 'number') return false;
-    return Date.now() >= payload.exp * 1000;
+    document.cookie = `${CSRF_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
   } catch {
-    return true;
+    /* ignore */
   }
 }

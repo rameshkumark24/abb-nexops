@@ -334,7 +334,7 @@ function TechnicianConsole() {
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--abb-ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
                     ARIA QUICK GUIDE
                   </div>
-                  <div style={{ background: '#f9fafb', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius-sm)', padding: '14px 16px', fontSize: 12.5, color: 'var(--abb-ink-1)', lineHeight: 1.7, minHeight: 60, position: 'relative' }}>
+                  <div style={{ background: 'var(--abb-surface-2)', border: '1px solid var(--abb-line)', borderRadius: 'var(--abb-radius-sm)', padding: '14px 16px', fontSize: 12.5, color: 'var(--abb-ink-1)', lineHeight: 1.7, minHeight: 60, position: 'relative' }}>
                     {guide == null || guide.loading ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--abb-ink-3)', fontSize: 11 }}>
                         <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--abb-early)', display: 'inline-block', animation: 'pulse 1s infinite' }} />

@@ -108,8 +108,8 @@ export function FilterBar({
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const toggleZone = (z: string) => {
-    const has = value.zones.includes(z);
-    const zones = has ? value.zones.filter((x) => x !== z) : [...value.zones, z];
+    const isOnlySelected = value.zones.length === 1 && value.zones[0] === z;
+    const zones = isOnlySelected ? [...ALL_ZONES] : [z];
     onChange({ ...value, zones });
   };
 
@@ -225,8 +225,8 @@ export function FilterBar({
           <button
             type="button"
             onClick={onSearchOpen}
-            aria-label="Search widgets (Ctrl+K)"
-            title="Search widgets  Ctrl+K"
+            aria-label="Press Ctrl+K or click here to search for specific sections"
+            title="Press Ctrl+K or click here to search for specific sections"
             style={{
               marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 7,
               background: 'none', border: '1px solid var(--abb-line)',
