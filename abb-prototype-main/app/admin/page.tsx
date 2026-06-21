@@ -247,18 +247,26 @@ function AdminConsole() {
   // ======================================================================
   const zonesSel = filters.zones;
   const sevSel = filters.severities;
-  const { from, to } = useMemo(() => resolveWindow(filters), [filters]);
-
   const filteredEvents = useMemo(
-    () =>
-      events.filter(
-        (e) =>
-          e.ts >= from &&
-          e.ts <= to &&
-          zonesSel.includes(e.zone.replace('Zone ', '').trim()) &&
-          sevSel.includes(e.severity),
-      ),
-    [events, from, to, zonesSel, sevSel],
+    () => {
+      const { from: activeFrom, to: activeTo } = resolveWindow(filters);
+      console.log("[DEBUG HEATMAP] events count:", events.length);
+      if (events.length > 0) {
+        console.log("[DEBUG HEATMAP] sample event:", events[0]);
+        console.log("[DEBUG HEATMAP] from:", activeFrom, "to:", activeTo, "now:", Date.now());
+        console.log("[DEBUG HEATMAP] zonesSel:", zonesSel, "sevSel:", sevSel);
+      }
+      return events.filter(
+        (e) => {
+          const zClean = e.zone.replace('Zone ', '').trim();
+          const matchTime = e.ts >= activeFrom && (filters.range === 'custom' ? e.ts <= activeTo : true);
+          const matchZone = zonesSel.includes(zClean);
+          const matchSev = sevSel.includes(e.severity);
+          return matchTime && matchZone && matchSev;
+        },
+      );
+    },
+    [events, filters, zonesSel, sevSel],
   );
 
   // Per-machine alarm counts within the window (drives Top 5 + 'alarms' sort).
@@ -275,6 +283,28 @@ function AdminConsole() {
   const topMachines = useMemo(() => {
     // Rank all machines by their current problem status.
     const sorted = [...machines].sort((a, b) => {
+      const riskRank: Record<string, number> = { CRITICAL: 3, HIGH: 2, MEDIUM: 1, LOW: 0 };
+      const rA = riskRank[a.nexopsRisk] ?? 0;
+      const rB = riskRank[b.nexopsRisk] ?? 0;
+      if (rB !== rA) return rB - rA;
+
+      const scoreA = a.anomalyScore ?? 0;
+      const scoreB = b.anomalyScore ?? 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+
+      return a.perf - b.perf; // lower performance = more problematic
+    });
+
+    return sorted.slice(0, 5).map((m) => ({
+      name: m.name,
+      zone: m.zone,
+      count: Math.round((m.anomalyScore ?? 0) * 100),
+    }));
+  }, [machines]);
+
+  const topEarlyCatches = useMemo(() => {
+    // Rank early catches by their current problem status.
+    const sorted = machines.filter((m) => m.isEarly).sort((a, b) => {
       const riskRank: Record<string, number> = { CRITICAL: 3, HIGH: 2, MEDIUM: 1, LOW: 0 };
       const rA = riskRank[a.nexopsRisk] ?? 0;
       const rB = riskRank[b.nexopsRisk] ?? 0;
@@ -433,8 +463,8 @@ function AdminConsole() {
               const prevPerf = prevPerfRef.current.get(m.name);
               const delta = prevPerf != null ? m.perf - prevPerf : null;
               const trendDown = delta != null && delta < -0.5;
-              const trendUp   = delta != null && delta >  0.5;
-              const trendIcon  = trendDown ? '▼' : trendUp ? '▲' : delta != null ? '→' : '';
+              const trendUp = delta != null && delta > 0.5;
+              const trendIcon = trendDown ? '▼' : trendUp ? '▲' : delta != null ? '→' : '';
               const trendColor = trendDown ? 'var(--abb-alarm)' : trendUp ? '#15803d' : 'var(--abb-ink-3)';
 
               // Sparkline history.
@@ -580,6 +610,9 @@ function AdminConsole() {
 
       case 'topMachines':
         return <TopMachinesChart data={topMachines} onSelect={focusMachine} />;
+
+      case 'earlyCatches':
+        return <TopMachinesChart data={topEarlyCatches} onSelect={focusMachine} />;
 
       case 'leaderboard':
         return <LeaderboardTable engineers={engineers ?? []} tasks={leaderboardTasks} mobile={isMobile} />;
@@ -826,13 +859,13 @@ function AdminConsole() {
                       if (!def) return null;
                       const tierAccent =
                         id === 'zoneRollup' ? 'var(--abb-ink-1)' :
-                        id === 'machineAnalytics' || id === 'faultDonut' ? 'var(--abb-red)' :
-                        id === 'alarmsPerHour' || id === 'alarmPipeline' ? 'var(--abb-warning)' :
-                        id === 'topMachines' || id === 'leaderboard' ? 'var(--abb-early)' :
-                        id === 'heatmap' ? 'var(--abb-early)' :
-                        id === 'predictionMetrics' ? 'var(--abb-nominal)' :
-                        id === 'workforce' ? 'var(--abb-red)' :
-                        undefined;
+                          id === 'machineAnalytics' || id === 'faultDonut' ? 'var(--abb-red)' :
+                            id === 'alarmsPerHour' || id === 'alarmPipeline' ? 'var(--abb-warning)' :
+                              id === 'topMachines' || id === 'earlyCatches' || id === 'leaderboard' ? 'var(--abb-early)' :
+                                id === 'heatmap' ? 'var(--abb-early)' :
+                                  id === 'predictionMetrics' ? 'var(--abb-nominal)' :
+                                    id === 'workforce' ? 'var(--abb-red)' :
+                                      undefined;
                       return (
                         <DashboardCard
                           key={id}
@@ -1020,7 +1053,15 @@ function AddTechnicianForm({ onCreated }: { onCreated: () => Promise<void> }) {
       </label>
       <label style={{ display: 'block' }}>
         <span className="abb-micro" style={{ display: 'block', marginBottom: 7 }}>Skills (comma separated)</span>
-        <input className="abb-input" value={skills} onChange={(e) => setSkills(e.currentTarget.value)} placeholder="mechanical, electrical" />
+        {/* <input className="abb-input" value={skills} onChange={(e) => setSkills(e.currentTarget.value)} placeholder="mechanical, electrical" /> */}
+        <select className="abb-input" value={skills} onChange={(e) => setSkills(e.currentTarget.value)}>
+          <option value="" disabled>Select skill focus...</option>
+          <option value="general">General</option>
+          <option value="mechanical">Mechanical</option>
+          <option value="electrical">Electrical</option>
+          <option value="instrumentation">Instrumentation</option>
+          <option value="thermal">Thermal</option>
+        </select>
       </label>
       <Field label="Username" value={username} onChange={(e) => setUsername(e.currentTarget.value)} />
       <Field label="Password" type="password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} />

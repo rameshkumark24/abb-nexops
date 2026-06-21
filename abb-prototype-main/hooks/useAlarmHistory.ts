@@ -64,7 +64,7 @@ export function useAlarmHistory(machines: Machine[]): AlarmEvent[] {
       const is = isAlarming(m);
       if (is && !was) {
         fresh.push({
-          ts: now,
+          ts: m.timestamp || now,
           machine: m.name,
           zone: m.zone,
           fault: (m.faultCategory && m.faultCategory.trim()) || 'general',

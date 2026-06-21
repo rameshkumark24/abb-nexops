@@ -223,6 +223,7 @@ export function mapToMachine(raw: TelemetryRecord): Machine {
     reasoning: raw.nexops_reasoning ?? '',
     assignedEngineer: raw.assigned_engineer ?? 'Unassigned',
     faultCategory: raw.fault_category ?? null,
+    timestamp: raw.Timestamp ? new Date(raw.Timestamp.replace(' ', 'T')).getTime() : Date.now(),
   };
 }
 

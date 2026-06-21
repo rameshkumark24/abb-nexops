@@ -37,7 +37,8 @@ export const ADMIN_WIDGETS: WidgetDef[] = [
 
   // ── TIER 4: PRIORITY & TEAM PERFORMANCE ─────────────────────────────────
   { id: 'topMachines',       title: 'TOP 5 PROBLEM MACHINES · LIVE', subtitle: 'Ranked by current live anomaly score', span: 6,              sectionLabel: 'PRIORITY & TEAM PERFORMANCE' },
-  { id: 'leaderboard',       title: 'ENGINEER LEADERBOARD · 24H',   subtitle: 'Points based on performance across all zones',    span: 6 },
+  { id: 'earlyCatches',      title: 'TOP 5 EARLY CATCHES · LIVE', subtitle: 'Highest-priority predictive anomalies', span: 6 },
+  { id: 'leaderboard',       title: 'ENGINEER LEADERBOARD · 24H',   subtitle: 'Points based on performance across all zones',    span: 12 },
 
   // ── TIER 5: SPATIAL INTELLIGENCE ────────────────────────────────────────
   { id: 'heatmap',           title: 'ZONE ALARM HEATMAP · LAST 24H', subtitle: 'Alarm density by zone and hour — find bad shifts instantly', span: 12, fullWidth: true, sectionLabel: 'SPATIAL INTELLIGENCE' },

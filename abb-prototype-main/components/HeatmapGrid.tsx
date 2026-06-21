@@ -72,6 +72,7 @@ export function HeatmapGrid({ events }: { events: AlarmEvent[] }) {
               </span>
               {HOURS.map((h) => {
                 const count = matrix[z][h];
+                const scaleMax = Math.max(max, 5);
                 return (
                   <div
                     key={h}
@@ -81,12 +82,12 @@ export function HeatmapGrid({ events }: { events: AlarmEvent[] }) {
                     style={{
                       height: 22,
                       borderRadius: 2,
-                      background: colorFor(count, max),
+                      background: colorFor(count, scaleMax),
                       borderLeft: h === currentHour ? '2px solid var(--abb-early-line)' : '2px solid transparent',
                       cursor: count > 0 ? 'pointer' : 'default',
                       transition: 'outline 0.1s ease',
                       outline:
-                        hover && hover.zone === z && hover.hour === h ? '1.5px solid var(--abb-ink-2)' : 'none',
+                          hover && hover.zone === z && hover.hour === h ? '1.5px solid var(--abb-ink-2)' : 'none',
                     }}
                   />
                 );

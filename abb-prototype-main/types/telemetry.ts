@@ -83,6 +83,7 @@ export interface Machine {
   // Real auto-assignment for the active fault (or "Unassigned").
   assignedEngineer: string;
   faultCategory: string | null;
+  timestamp?: number; // epoch ms of the last telemetry update
 }
 
 export interface Task {

@@ -59,12 +59,38 @@ export function clearSession(): void {
   // Drop the cached user. The httpOnly token cookie is cleared by the server on
   // /auth/logout; we also best-effort clear the readable CSRF cookie here so a
   // client-side 401 cleanup doesn't leave a stale CSRF value around.
+  //
+  // Additionally, clear all cached data, stale state, and outdated dashboard
+  // information from localStorage, sessionStorage, and the Cache API.
   if (typeof window === 'undefined') return;
+
   try {
-    window.localStorage.removeItem(USER_KEY);
+    // Preserve the theme setting
+    const theme = window.localStorage.getItem('nexops_theme');
+    window.localStorage.clear();
+    if (theme) {
+      window.localStorage.setItem('nexops_theme', theme);
+    }
   } catch {
     /* ignore */
   }
+
+  try {
+    window.sessionStorage.clear();
+  } catch {
+    /* ignore */
+  }
+
+  if ('caches' in window) {
+    try {
+      caches.keys().then((names) => {
+        for (const name of names) caches.delete(name);
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
   try {
     document.cookie = `${CSRF_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
   } catch {
