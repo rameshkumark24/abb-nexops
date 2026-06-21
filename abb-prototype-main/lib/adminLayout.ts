@@ -36,7 +36,7 @@ export const ADMIN_WIDGETS: WidgetDef[] = [
   { id: 'alarmPipeline',     title: 'ALARM PIPELINE · 10 MIN WINDOW',                                                           span: 6 },
 
   // ── TIER 4: PRIORITY & TEAM PERFORMANCE ─────────────────────────────────
-  { id: 'topMachines',       title: 'TOP 5 PROBLEM MACHINES · 24H', subtitle: 'By total alarm count across the selected window', span: 6,              sectionLabel: 'PRIORITY & TEAM PERFORMANCE' },
+  { id: 'topMachines',       title: 'TOP 5 PROBLEM MACHINES · LIVE', subtitle: 'Ranked by current live anomaly score', span: 6,              sectionLabel: 'PRIORITY & TEAM PERFORMANCE' },
   { id: 'leaderboard',       title: 'ENGINEER LEADERBOARD · 24H',   subtitle: 'Points based on performance across all zones',    span: 6 },
 
   // ── TIER 5: SPATIAL INTELLIGENCE ────────────────────────────────────────

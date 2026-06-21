@@ -538,7 +538,7 @@ def render_fallback_answer(ctx: dict, key_failed: bool = False) -> str:
             return prefix + f"There are currently {catches} distinct early warning prediction catches in Zone {zone}."
 
         # Intent A: MY_TASKS
-        if any(k in query for k in ("my task", "tasks for me", "my assignment", "my work")):
+        if any(k in query for k in ("my task", "tasks for me", "my assignment", "my work", "assigned to me", "works assigned")):
             personal = ctx.get("personal_tasks") or []
             if role != "technician":
                 return prefix + "Only technicians have personal task queues. As a manager, you can query overall zone dispatches."
@@ -659,11 +659,17 @@ def format_system_prompt(query: str, ctx: dict) -> str:
     """Formats the three-part system prompt enforcing the Role, Grounding, and Structure clauses."""
     scope_zone = ctx.get("scope_zone")
     role = ctx.get("role")
+    username = ctx.get("username") or "Unknown"
+    
+    role_desc = role.replace('_', ' ') if role else 'user'
     
     if scope_zone:
-        role_clause = f"ROLE: zone_manager for zone {scope_zone}. You see only this scope's machines, engineers, and incidents. If asked about other zones, say it's outside your scope and do not invent details."
+        role_clause = f"ROLE: AI Assistant. The user you are assisting is {username}, logged in as a {role_desc} in zone {scope_zone}. You see only this scope's machines, engineers, and incidents. If asked about other zones, say it's outside your scope and do not invent details."
     else:
-        role_clause = "ROLE: plant_manager. You have a plant-wide view across all zones (A, B, C, D) and oversee all machines, engineers, and incidents."
+        role_clause = f"ROLE: AI Assistant. The user you are assisting is {username}, logged in as a {role_desc}. You have a plant-wide view across all zones (A, B, C, D) and oversee all machines, engineers, and incidents."
+
+    if role == "technician":
+        role_clause += f"\nCRITICAL: If the user asks about their own tasks ('assigned to me', 'my tasks', 'my work', 'number of works assigned to me'), strictly use the 'personal_tasks' array in the SYSTEM STATE. These tasks belong exclusively to {username}."
         
     grounding_clause = (
         "For operational questions (machine status, sensor values, engineer assignments, risk levels, alerts), "
@@ -687,19 +693,17 @@ def format_system_prompt(query: str, ctx: dict) -> str:
             "3. Failure Window (only if a time projection is present in SYSTEM STATE, explicitly labeled as a linear projection)\n"
             "4. Who's Responding\n"
             "5. One Recommended Action.\n"
-            "Keep it highly concise."
-        )
-    elif kb_results and not ctx.get("top_machines"):
-        structure_clause = (
-            "The user is asking a maintenance or equipment knowledge question. "
-            "Answer using the KNOWLEDGE BASE entries below. Be direct and practical. "
-            "If multiple entries are relevant, synthesize them into a clear answer."
+            "Keep it highly concise.\n"
+            "IMPORTANT FORMATTING: Use HTML tags for text styling: <b> for bold, <i> for italic, and <u> for underline to emphasize important points. Do NOT use markdown like **."
         )
     else:
         structure_clause = (
-            "Summarize the at-risk units in the scope. "
-            "If the user asks general maintenance questions, supplement with KNOWLEDGE BASE if present. "
-            "Keep it concise."
+            "Address the user's request directly. "
+            "If they ask about their tasks ('assigned to me', 'my work', 'number of works assigned to me'), accurately summarize their 'personal_tasks' from the SYSTEM STATE. "
+            "If they ask a maintenance/equipment question, use the KNOWLEDGE BASE below to answer clearly and practically. "
+            "If they ask for a plant/zone overview, summarize the at-risk units. "
+            "Keep your answer highly concise.\n"
+            "IMPORTANT FORMATTING: Use HTML tags for text styling: <b> for bold, <i> for italic, and <u> for underline to emphasize important points. Do NOT use markdown like **."
         )
 
     # Serialize context state compactly (excluding heavy structures)

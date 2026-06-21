@@ -152,11 +152,11 @@ function FieldManagerConsole() {
   );
 
   return (
-    <div className="abb-page fade-in-up" style={{ display: 'flex', flexDirection: 'column' }}>
+    <div className="abb-page" style={{ display: 'flex', flexDirection: 'column' }}>
       <SiteAlertBanner alert={siteAlert} />
       <NavBar onBack={() => (window.location.href = '/')} onLogout={logout} />
 
-      <div className="abb-shell" style={{ paddingTop: 'clamp(28px,4vw,40px)', paddingBottom: 56, display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <div className="abb-shell fade-in-up" style={{ paddingTop: 'clamp(28px,4vw,40px)', paddingBottom: 56, display: 'flex', flexDirection: 'column', gap: 28 }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
           <div>

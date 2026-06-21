@@ -7,6 +7,10 @@ are provided so it "just works" on a laptop.
 """
 
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 # --- MQTT (where the simulator publishes telemetry) ---
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")

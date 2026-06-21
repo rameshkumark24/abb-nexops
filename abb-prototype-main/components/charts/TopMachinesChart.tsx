@@ -44,7 +44,7 @@ export function TopMachinesChart({
   if (data.length === 0) {
     return (
       <div className="abb-data" style={{ padding: '28px 0', textAlign: 'center', fontSize: 11, color: 'var(--abb-ink-3)', letterSpacing: '0.06em' }}>
-        Collecting per-machine alarm counts…
+        Awaiting live telemetry…
       </div>
     );
   }
@@ -68,7 +68,7 @@ export function TopMachinesChart({
             contentStyle={TOOLTIP_STYLE}
             formatter={(value, _n, item) => {
               const p = (item as { payload?: MachineCount })?.payload;
-              return [`${Number(value) || 0} alarms · ${p?.zone ?? ''}`, p?.name ?? ''];
+              return [`Anomaly: ${Number(value) || 0}% · ${p?.zone ?? ''}`, p?.name ?? ''];
             }}
           />
           <Bar
@@ -105,7 +105,7 @@ export function TopMachinesChart({
                     fontFamily="var(--abb-font-data)"
                     fill="var(--abb-ink-2)"
                   >
-                    {row.count} · {row.zone.replace('Zone ', 'Z')}
+                    {row.count}% · {row.zone.replace('Zone ', 'Z')}
                   </text>
                 );
               }}

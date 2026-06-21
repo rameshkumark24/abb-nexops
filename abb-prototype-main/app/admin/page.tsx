@@ -272,10 +272,27 @@ function AdminConsole() {
     return m;
   }, [filteredEvents]);
 
-  const topMachines = useMemo(
-    () => [...machineCounts.values()].sort((a, b) => b.count - a.count).slice(0, 5),
-    [machineCounts],
-  );
+  const topMachines = useMemo(() => {
+    // Rank all machines by their current problem status.
+    const sorted = [...machines].sort((a, b) => {
+      const riskRank: Record<string, number> = { CRITICAL: 3, HIGH: 2, MEDIUM: 1, LOW: 0 };
+      const rA = riskRank[a.nexopsRisk] ?? 0;
+      const rB = riskRank[b.nexopsRisk] ?? 0;
+      if (rB !== rA) return rB - rA;
+
+      const scoreA = a.anomalyScore ?? 0;
+      const scoreB = b.anomalyScore ?? 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+
+      return a.perf - b.perf; // lower performance = more problematic
+    });
+
+    return sorted.slice(0, 5).map((m) => ({
+      name: m.name,
+      zone: m.zone,
+      count: Math.round((m.anomalyScore ?? 0) * 100),
+    }));
+  }, [machines]);
 
   // Filtered + sorted machine list (zone + severity from the global filter).
   const filteredMachines = useMemo(

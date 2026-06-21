@@ -236,8 +236,10 @@ export default function AriaPanel({
                 lineHeight: 1.55,
               }}
             >
-              <div style={{ whiteSpace: 'pre-wrap' }}>{m.text}</div>
-              {m.role === 'aria' && m.evidence && <EvidenceGrounding evidence={m.evidence} source={m.source} />}
+              <div 
+                style={{ whiteSpace: 'pre-wrap' }} 
+                dangerouslySetInnerHTML={{ __html: m.text }}
+              />
             </div>
             <MicroLabel style={{ marginTop: 4, textAlign: m.role === 'user' ? 'right' : 'left' }}>
               {m.role === 'user'
