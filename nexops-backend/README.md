@@ -193,7 +193,7 @@ score = SKILL_WEIGHT * skill_match     # 0.50  -> 1.0 if engineer has the skill,
                                         #          1.0 = fastest at THIS category, 0.0 = slowest
       + exp_weight   * exp_factor       # 0.12  -> min-max normalized experience over the pool;
                                         #          DOUBLED to 0.24 for CRITICAL faults
-      + ZONE_WEIGHT  * zone_factor      # +0.20 iff engineer.zone == machine zone (record["zone"])
+      + ZONE_WEIGHT  * zone_factor      # +0.30 iff engineer.zone == machine zone (record["zone"])
 ```
 
 - **skill_match** — `1.0` if the engineer's `skills` include the fault category,

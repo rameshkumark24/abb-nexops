@@ -25,7 +25,7 @@ EXP_WEIGHT = 0.12     # prefer more experienced engineers
 # (0.50 + 0.23 + 0.10 + 0.12 = 0.95). The base no longer sums to exactly 1.0, and
 # that's fine: only the RANKING matters, since every candidate for the SAME fault
 # is scored with identical weights (the zone term below is additive on top).
-# LOAD was lowered 0.28 -> 0.23 (paired with ZONE 0.15 -> 0.20) so a same-zone
+# LOAD was lowered 0.28 -> 0.23 so a same-zone
 # engineer holds the task across the full realistic load range instead of being
 # poached by an idle neighbour on load alone - see ZONE_WEIGHT note below.
 
@@ -33,28 +33,20 @@ EXP_WEIGHT = 0.12     # prefer more experienced engineers
 # to an engineer whose zone == the machine's zone (read from record["zone"]).
 # It is a TIEBREAKER that prefers a LOCAL engineer, never an override of skill: it
 # is deliberately smaller than the skill gap. Having vs lacking the category skill
-# is worth SKILL_WEIGHT * (1.0 - SKILL_BASE) = 0.50 * 0.85 = 0.425, so a 0.20
+# is worth SKILL_WEIGHT * (1.0 - SKILL_BASE) = 0.50 * 0.85 = 0.425, so a 0.30
 # same-zone bonus can NEVER make an unskilled local beat a skilled engineer in
 # another zone. That is precisely what gives us cross-zone FALLBACK: when no
 # skilled engineer exists in the machine's zone, a skilled OTHER-zone engineer
-# still wins (skill 0.425 >> zone 0.20).
+# still wins (skill 0.425 >> zone 0.30).
 #
-# WHY 0.20 (raised from 0.15, paired with LOAD 0.28 -> 0.23): a skilled neighbour
-# can only out-score a skilled local on load+speed+experience, worth at most
-# LOAD_WEIGHT + MTTR_WEIGHT + EXP_WEIGHT = 0.23 + 0.10 + 0.12 = 0.45. The 0.20
-# head start does NOT cover that full 0.45, so a neighbour who is better on ALL
-# three can still win - which is desirable (don't hand work to your worst, busiest
-# engineer when an idle expert is next door). But for a pure LOAD difference the
-# hard capacity cap removes any local at/over max_capacity, so the worst eligible
-# local has load_factor ~0.5; a neighbour's load pull is then at most
-# LOAD_WEIGHT * 0.5 = 0.115 < 0.20, so the LOCAL keeps the task. Net effect: work
-# stays in-zone across the whole realistic load range, while skill stays dominant
+# WHY 0.30: It is now the second most important weight after SKILL_WEIGHT.
+# A skilled neighbour can only out-score a skilled local on load+speed+experience, worth at most
+# LOAD_WEIGHT + MTTR_WEIGHT + EXP_WEIGHT = 0.23 + 0.10 + 0.12 = 0.45. The 0.30
+# head start covers most of that, so a neighbour must be significantly better on ALL
+# three to win. Net effect: work stays in-zone across the whole realistic load range, while skill stays dominant
 # and CRITICAL faults still cross zones (experience is 2x and zone is still small
-# vs the skill gap). Like CRIT_EXP_MULTIPLIER, this can push a winning score
-# slightly above 1.0; only the RANKING matters, since every candidate for the same
-# fault is scored with identical weights. When a record has NO "zone" (or an
-# engineer has no zone), the term is 0 and behaviour is exactly as before.
-ZONE_WEIGHT = 0.20
+# vs the skill gap).
+ZONE_WEIGHT = 0.30
 
 # CRITICAL faults weigh experience heavier: the experience term is multiplied by
 # this factor (effective EXP weight = EXP_WEIGHT * CRIT_EXP_MULTIPLIER = 0.24 for
