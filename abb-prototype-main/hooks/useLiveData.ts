@@ -433,7 +433,9 @@ function accumulateMetrics(
 
   // Fault lifecycle is per machine. A return to Normal closes the current fault.
   const machine = raw.Machine;
-  if (raw.Status === 'Normal') {
+  const early = isEarlyWarning(raw);
+
+  if (raw.Status === 'Normal' && !early) {
     const lc = lcMap.get(machine);
     // 15-second debounce window to prevent sensor flickering from resetting the fault too quickly
     if (lc && lc.lastActiveAt && now - lc.lastActiveAt < 15000) {
@@ -446,7 +448,6 @@ function accumulateMetrics(
 
   const lc = lcMap.get(machine) ?? freshLC();
   lc.lastActiveAt = now; // update active timestamp on any warning/alert tick
-  const early = isEarlyWarning(raw);
   // (1) STATIC THRESHOLD TRIP: the gateway's REAL static alarm - a non-predictive
   // Warning(>Low)/Critical. The incubation window is is_predictive=true (a low
   // Warning), so excluding it is what makes the early-vs-gateway lead meaningful.
@@ -639,7 +640,10 @@ export function useLiveData(zoneFilter?: string) {
       // Fold this frame into the session metrics, then publish a snapshot.
       // Wrapped so a malformed frame can never break the feed or the panel.
       try {
-        accumulateMetrics(raw, metricsAcc.current, faultLC.current, Date.now());
+        const recordTime = raw.Timestamp
+          ? new Date(raw.Timestamp.replace(' ', 'T')).getTime()
+          : Date.now();
+        accumulateMetrics(raw, metricsAcc.current, faultLC.current, recordTime);
         setMetrics(buildMetricsSnapshot(metricsAcc.current, faultLC.current));
       } catch (err) {
         console.error('[useLiveData] metrics accumulation skipped:', err);

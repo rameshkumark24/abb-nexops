@@ -101,11 +101,13 @@ def resolve_task(assignment_id, session) -> dict:
     a.status = "resolved"
     a.resolved_at = now
 
-    # resolution_minutes = (resolved_at - assigned_at) in minutes, tz-safe.
-    assigned = _to_naive_utc(a.assigned_at)
-    resolved = _to_naive_utc(now)
-    if assigned is not None:
-        a.resolution_minutes = round(max(0.0, (resolved - assigned).total_seconds() / 60.0), 2)
+    # resolution_minutes = (resolved_at - started_at) in minutes, tz-safe.
+    # Fall back to assigned_at if started_at is not set (e.g. resolved directly).
+    start_time = a.started_at or a.assigned_at
+    start_dt = _to_naive_utc(start_time)
+    resolved_dt = _to_naive_utc(now)
+    if start_dt is not None:
+        a.resolution_minutes = round(max(0.0, (resolved_dt - start_dt).total_seconds() / 60.0), 2)
     else:
         a.resolution_minutes = None
 

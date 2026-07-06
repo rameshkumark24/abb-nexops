@@ -60,8 +60,11 @@ function MatchPill({ score }: { score: number | null | undefined }) {
 
 function clockOf(iso: string | null): string {
   if (!iso) return '—';
-  const t = iso.split('T')[1];
-  return t ? t.slice(0, 8) : iso;
+  // Ensure the ISO string is treated as UTC by appending 'Z' if it lacks a timezone offset
+  const dateStr = iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`;
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return iso;
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
 function TechnicianConsole() {

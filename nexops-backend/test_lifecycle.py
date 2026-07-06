@@ -57,6 +57,14 @@ def main():
     session = get_session()
     try:
         s_start = start_task(aid, session)
+        # Backdate started_at so resolution_minutes is non-zero
+        a = session.get(Assignment, aid)
+        a.started_at = datetime.now(timezone.utc) - timedelta(minutes=7)
+        session.commit()
+        s_start = {
+            "status": a.status,
+            "started_at": a.started_at.isoformat() if a.started_at else None
+        }
     finally:
         session.close()
     print(f"START   : status now '{s_start['status']}'  started_at={s_start['started_at']}")
