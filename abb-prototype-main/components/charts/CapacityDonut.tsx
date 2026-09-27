@@ -18,7 +18,7 @@ export function CapacityDonut({ free, occupied, total }: { free: number; occupie
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
       <div style={{ position: 'relative', width: 96, height: 96, flexShrink: 0 }}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
           <PieChart>
             <Pie
               data={hasData ? data : [{ name: 'none', value: 1 }]}

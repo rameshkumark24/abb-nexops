@@ -1,26 +1,25 @@
 # NexOps backend bridge (MQTT -> WebSocket)
-fastapi
-uvicorn[standard]
-paho-mqtt
-websockets
+# Version ranges are bounded to the majors the code is tested against, so a
+# fresh install/deploy can't silently pick up a breaking major release.
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+paho-mqtt>=2.0,<3        # uses CallbackAPIVersion.VERSION2 (paho 2.x API)
+websockets>=12
+python-dotenv>=1.0       # config.py loads a local .env
 
 # --- Stage: anomaly (NOW REQUIRED) — online Isolation Forest risk layer ---
-scikit-learn        # Stage: anomaly (Isolation Forest)
-numpy               # Stage: anomaly (feature vectors / score normalization)
+scikit-learn>=1.4,<2     # Stage: anomaly (Isolation Forest)
+numpy>=1.26,<3           # Stage: anomaly (feature vectors / score normalization)
 
-# --- Stage: assignment (standalone) — weighted engineer assignment ---
-SQLAlchemy          # ORM; the SAME models run on both SQLite (default) and Postgres
-psycopg2-binary     # Postgres driver — ONLY needed if DATABASE_URL points at Postgres.
-                    # The default SQLite backend needs nothing extra.
+# --- Stage: assignment — weighted engineer assignment ---
+SQLAlchemy>=2.0,<3       # ORM; the SAME models run on both SQLite (default) and Postgres
+psycopg2-binary>=2.9     # Postgres driver — ONLY needed if DATABASE_URL points at Postgres.
+                         # The default SQLite backend needs nothing extra.
 
 # --- Stage 3a: auth foundation (JWT login + role/zone identity) ---
-PyJWT               # JWT sign/verify (HS256)
-bcrypt              # password hashing — used DIRECTLY (5.0.0 installed & works;
-                    # passlib was dropped: it reads bcrypt.__about__ which 5.x removed)
-httpx               # required by FastAPI's TestClient (test_auth.py import)
+PyJWT>=2.8,<3            # JWT sign/verify (HS256)
+bcrypt>=4.1,<6           # password hashing — used DIRECTLY (passlib was dropped:
+                         # it reads bcrypt.__about__ which 5.x removed)
+httpx>=0.27,<1           # ARIA LLM calls + FastAPI's TestClient
 
-pdfplumber          # PDF text extraction for industrial_qa knowledge base seeding
-
-# --- NOT needed yet; uncomment as later stages land ---
-# influxdb-client     # Stage: history (time-series storage)
-# anthropic           # Stage: ARIA (explanations)
+pdfplumber>=0.11         # PDF text extraction for industrial_qa knowledge base seeding

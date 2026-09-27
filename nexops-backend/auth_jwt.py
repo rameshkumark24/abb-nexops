@@ -47,7 +47,12 @@ JWT_EXPIRE_HOURS = 12
 #   3. Else (filesystem unavailable) an EPHEMERAL per-process random secret —
 #      still never a known constant, so it FAILS CLOSED (the only cost is tokens
 #      don't survive a restart / aren't shared across workers).
-_SECRET_FILE = Path(__file__).resolve().parent / ".jwt_secret"
+#   NEXOPS_JWT_SECRET_FILE relocates that file (e.g. onto a persistent volume in
+#   a container, so sessions survive a redeploy without managing a secret).
+_SECRET_FILE = Path(
+    os.environ.get("NEXOPS_JWT_SECRET_FILE")
+    or Path(__file__).resolve().parent / ".jwt_secret"
+)
 
 
 def _resolve_secret() -> tuple[str, str]:
@@ -61,6 +66,7 @@ def _resolve_secret() -> tuple[str, str]:
             if existing:
                 return existing, "file"
         generated = secrets.token_hex(32)  # 256-bit
+        _SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
         _SECRET_FILE.write_text(generated, encoding="utf-8")
         try:
             os.chmod(_SECRET_FILE, 0o600)  # best-effort: owner-only (no-op on some FS)
@@ -153,7 +159,10 @@ def decode_token(token: str):
     Never raises — PyJWT's exceptions (expired, bad signature, malformed) all
     collapse to None so callers turn it into a clean 401."""
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        # `exp` is REQUIRED: a token minted without an expiry must never be
+        # accepted as an everlasting credential.
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM],
+                          options={"require": ["exp"]})
     except Exception:
         return None
 
@@ -221,6 +230,19 @@ def _load_user_from_request(request: Request):
     claims = decode_token(token)
     if not claims:
         return None
+    # A short-lived WS ticket authenticates the WebSocket handshake ONLY; it is
+    # never a REST session credential.
+    if claims.get("scope") == "ws":
+        return None
+    return user_from_claims(claims)
+
+
+def user_from_claims(claims: dict):
+    """Verified JWT claims -> CurrentUser, re-checked against the DB (the user
+    still exists, is ACTIVE, and the token's `tv` matches the current
+    token_version). Returns None on any failure (fail CLOSED). Shared by the
+    REST dependency and the WebSocket endpoint so both enforce revocation and
+    deactivation identically."""
     user_id = claims.get("user_id")
     if user_id is None:
         return None

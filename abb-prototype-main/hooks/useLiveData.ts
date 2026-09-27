@@ -23,7 +23,7 @@ import {
   isEarlyWarning,
   zoneFor,
 } from '@/lib/adapter';
-import { fetchTelemetrySnapshot, BASE_URL as API_BASE } from '@/lib/tasksApi';
+import { fetchTelemetrySnapshot, handleUnauthorized, BASE_URL as API_BASE } from '@/lib/tasksApi';
 
 // ======================================================================
 // SWAPPABLE DATA SOURCE
@@ -168,8 +168,20 @@ function makeMockRecord(seq: number): TelemetryRecord {
   };
 }
 
-// Backend WebSocket bridge. Override per-environment with NEXT_PUBLIC_WS_URL.
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws';
+// Backend WebSocket bridge. By default this is SAME-ORIGIN (`/api/ws`): the Next
+// server proxies the upgrade to the backend exactly like the REST calls, so the
+// browser never needs to reach the backend directly, there is no CORS, and the
+// scheme follows the page (wss:// behind HTTPS — a hard-coded ws:// URL would be
+// blocked as mixed content). NEXT_PUBLIC_WS_URL overrides it: either an absolute
+// ws(s):// URL or a path resolved against the current origin.
+function resolveWsUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_WS_URL || '/api/ws';
+  if (/^wss?:\/\//i.test(configured)) return configured;
+  if (typeof window === 'undefined') return configured;
+  const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const path = configured.startsWith('/') ? configured : `/${configured}`;
+  return `${scheme}//${window.location.host}${path}`;
+}
 
 function subscribe(
   onRecord: (record: TelemetryRecord) => void,
@@ -206,6 +218,13 @@ function subscribe(
     let ticket: string | null = null;
     try {
       const res = await fetch(`${API_BASE}/auth/ws-ticket`, { credentials: 'include' });
+      if (res.status === 401) {
+        // Session expired/revoked: reconnecting can never succeed. Hand off to
+        // the shared 401 handling (clear local session + bounce to /login).
+        stopped = true;
+        handleUnauthorized();
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         ticket = typeof data?.ticket === 'string' ? data.ticket : null;
@@ -214,7 +233,7 @@ function subscribe(
       /* no ticket -> the WS will fail auth and the close handler retries */
     }
     if (stopped) return;
-    ws = new WebSocket(WS_URL);
+    ws = new WebSocket(resolveWsUrl());
 
     ws.onopen = () => {
       if (stopped) return;
@@ -223,11 +242,13 @@ function subscribe(
       } catch {
         /* if the handshake send fails, the server times out and closes -> retry */
       }
-      retryCount = 0; // reset backoff on successful connect
       onStatus?.(true);
     };
 
     ws.onmessage = (event) => {
+      // Only a delivered frame proves the auth handshake succeeded, so the
+      // backoff resets here (not on open — an auth-rejected socket also opens).
+      retryCount = 0;
       try {
         const record = JSON.parse(event.data) as TelemetryRecord;
         onRecord(record);

@@ -13,8 +13,8 @@ import paho.mqtt.client as mqtt
 from publisher import MQTT_HOST, MQTT_PORT, MQTT_TOPIC
 
 
-def on_connect(client, userdata, flags, rc):
-    print(f"[sub] connected (rc={rc}); subscribing to {MQTT_TOPIC}/#")
+def on_connect(client, userdata, flags, reason_code, properties=None):
+    print(f"[sub] connected ({reason_code}); subscribing to {MQTT_TOPIC}/#")
     client.subscribe(f"{MQTT_TOPIC}/#")
 
 
@@ -22,7 +22,7 @@ def on_message(client, userdata, msg):
     print(f"[{msg.topic}] {msg.payload.decode('utf-8', 'replace')}")
 
 
-client = mqtt.Client()
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
 client.on_message = on_message
 client.connect(MQTT_HOST, MQTT_PORT)

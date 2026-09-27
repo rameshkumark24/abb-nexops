@@ -17,6 +17,7 @@ schema.
 
 import json
 import os
+import signal
 import time
 
 from simulator import generate_next_record, INTERVAL_SECONDS
@@ -32,17 +33,25 @@ from simulator import generate_next_record, INTERVAL_SECONDS
 PUBLISHER = os.environ.get("PUBLISHER", "console").strip().lower()
 
 # How long to run. None = run forever, or set an integer record limit.
-TOTAL_RECORDS = None
+TOTAL_RECORDS = int(os.environ["TOTAL_RECORDS"]) if os.environ.get("TOTAL_RECORDS") else None
 
 # Seconds between records. Defaults to the simulator's own interval so the
 # feed rate matches `python simulator.py`.
-PUBLISH_INTERVAL_SECONDS = INTERVAL_SECONDS
+PUBLISH_INTERVAL_SECONDS = float(os.environ.get("PUBLISH_INTERVAL_SECONDS", INTERVAL_SECONDS))
 
 # --- MQTT broker settings (used by MqttPublisher) ---
-MQTT_HOST = "localhost"      # broker hostname / IP
-MQTT_PORT = 1883             # broker port (1883 = plain MQTT, 8883 = TLS)
-MQTT_TOPIC = "nexops/refinery/telemetry"   # base topic; per-machine suffix added
-MQTT_QOS = 1                 # at-least-once delivery
+# Env-overridable so the publisher runs unchanged in a container / on another
+# host (e.g. MQTT_HOST=mosquitto under docker compose).
+MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")    # broker hostname / IP
+MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))    # 1883 plain, 8883 TLS
+MQTT_TOPIC = os.environ.get("MQTT_BASE_TOPIC", "nexops/refinery/telemetry")  # per-machine suffix added
+MQTT_QOS = int(os.environ.get("MQTT_QOS", "1"))         # at-least-once delivery
+MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
+MQTT_TLS = os.environ.get("MQTT_TLS", "").strip().lower() in ("1", "true", "yes")
+# Seconds to keep retrying the FIRST connection (the broker may still be
+# starting). 0 = fail immediately, as before.
+MQTT_CONNECT_WAIT_SECONDS = float(os.environ.get("MQTT_CONNECT_WAIT_SECONDS", "60"))
 
 # ----------------------------------------------------------------------
 # Optional dependency guard
@@ -113,7 +122,12 @@ class MqttPublisher(Publisher):
         self.base_topic = topic
         self.qos = qos
         self.connected = False
-        self.client = mqtt.Client()
+        # paho-mqtt 2.x callback API (VERSION1 is deprecated).
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        if MQTT_USERNAME:
+            self.client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD or None)
+        if MQTT_TLS:
+            self.client.tls_set()
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         # paho retries the connection automatically between these bounds
@@ -122,33 +136,45 @@ class MqttPublisher(Publisher):
 
     # -- callbacks --------------------------------------------------------
 
-    def _on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def _on_connect(self, client, userdata, flags, reason_code, properties=None):
+        if not reason_code.is_failure:
             self.connected = True
             print(f"[mqtt] connected to {self.host}:{self.port}")
         else:
             self.connected = False
-            print(f"[mqtt] connect failed (rc={rc})")
+            print(f"[mqtt] connect failed ({reason_code})")
 
-    def _on_disconnect(self, client, userdata, rc):
+    def _on_disconnect(self, client, userdata, flags, reason_code, properties=None):
         self.connected = False
-        if rc != 0:
-            print(f"[mqtt] unexpected disconnect (rc={rc}); auto-reconnecting...")
+        if reason_code.is_failure:
+            print(f"[mqtt] unexpected disconnect ({reason_code}); auto-reconnecting...")
         else:
             print("[mqtt] disconnected")
 
     # -- lifecycle --------------------------------------------------------
 
     def connect(self):
-        """Connect to the broker and start the background network loop."""
-        try:
-            self.client.connect(self.host, self.port)
-        except Exception as exc:
-            raise RuntimeError(
-                f"[mqtt] could not reach broker at {self.host}:{self.port}: {exc}\n"
-                "Is a broker running? See the 'Stage 2: Running with MQTT' "
-                "section of README.md."
-            )
+        """Connect to the broker and start the background network loop.
+
+        Retries for up to MQTT_CONNECT_WAIT_SECONDS so the publisher can start
+        alongside the broker (e.g. under docker compose) instead of crashing."""
+        deadline = time.monotonic() + MQTT_CONNECT_WAIT_SECONDS
+        delay = 1.0
+        while True:
+            try:
+                self.client.connect(self.host, self.port)
+                break
+            except Exception as exc:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        f"[mqtt] could not reach broker at {self.host}:{self.port}: {exc}\n"
+                        "Is a broker running? See the 'Stage 2: Running with MQTT' "
+                        "section of README.md."
+                    )
+                print(f"[mqtt] broker {self.host}:{self.port} not reachable yet "
+                      f"({exc}); retrying in {delay:.0f}s...")
+                time.sleep(delay)
+                delay = min(delay * 2, 10.0)
         # loop_start runs the network loop (incl. auto-reconnect) in a thread.
         self.client.loop_start()
 
@@ -195,7 +221,14 @@ def make_publisher(name=PUBLISHER):
 # Main loop: pull records from the simulator, send them to the publisher
 # ----------------------------------------------------------------------
 
+def _raise_keyboard_interrupt(signum, frame):
+    raise KeyboardInterrupt
+
+
 def main():
+    # `docker stop` / systemd send SIGTERM: treat it like CTRL+C so the loop
+    # exits through the same clean-disconnect path.
+    signal.signal(signal.SIGTERM, _raise_keyboard_interrupt)
     publisher = make_publisher(PUBLISHER)
     publisher.connect()
     print(f"Publishing simulator feed via {type(publisher).__name__} "

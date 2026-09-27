@@ -31,7 +31,7 @@ export function FaultDonut({ data }: { data: FaultSlice[] }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         {/* Donut + centre label */}
         <div style={{ position: 'relative', width: 180, height: 180, flexShrink: 0 }}>
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
             <PieChart>
               <Pie
                 data={data}

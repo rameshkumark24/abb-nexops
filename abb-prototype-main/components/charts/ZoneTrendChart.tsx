@@ -24,7 +24,7 @@ export function ZoneTrendChart({ data }: { data: TrendBin[] }) {
       {!hasData && (
         <div className="abb-data" style={{ fontSize: 9, color: 'var(--abb-ink-3)', marginBottom: 2 }}>Collecting 10-min buckets this session…</div>
       )}
-      <ResponsiveContainer width="100%" height={hasData ? '100%' : 128} minWidth={0}>
+      <ResponsiveContainer width="100%" height={hasData ? '100%' : 128} minWidth={0} initialDimension={{ width: 1, height: 1 }}>
         <LineChart data={data} margin={{ top: 8, right: 10, bottom: 0, left: -20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_LINE} vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 8, fill: AXIS_TEXT, fontFamily: 'var(--abb-font-data)' }} interval={5} tickLine={false} axisLine={{ stroke: GRID_LINE }} />

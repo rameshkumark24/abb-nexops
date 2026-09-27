@@ -48,12 +48,25 @@ except Exception:  # pragma: no cover - config is optional for standalone use
     _CONFIG_URL = None
 
 DATABASE_URL = os.environ.get("DATABASE_URL") or _CONFIG_URL or "sqlite:///nexops.db"
+# Hosting providers (Heroku, Render, Railway, ...) hand out `postgres://` URLs,
+# a scheme SQLAlchemy 2.x no longer accepts. Normalize to the canonical name.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
 
+_IS_SQLITE = DATABASE_URL.startswith("sqlite")
 # SQLite + multithreaded access needs check_same_thread=False; harmless here and
-# omitted for Postgres.
-_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+# omitted for Postgres. A busy timeout lets the MQTT thread and request threads
+# wait briefly for the write lock instead of failing with "database is locked".
+_connect_args = {"check_same_thread": False, "timeout": 15} if _IS_SQLITE else {}
 
-engine = create_engine(DATABASE_URL, future=True, connect_args=_connect_args)
+engine = create_engine(
+    DATABASE_URL,
+    future=True,
+    connect_args=_connect_args,
+    # Networked DBs drop idle connections; ping before reuse so a long-running
+    # bridge never fails a request on a dead pooled connection.
+    pool_pre_ping=not _IS_SQLITE,
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, future=True)
 
 Base = declarative_base()
@@ -241,9 +254,18 @@ def _ensure_columns():
                         f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
+# Reference data that a roster reseed must NEVER wipe: the ARIA knowledge base
+# is loaded separately from the PDF (seed_qa.py) and is unrelated to the demo
+# roster, so dropping it on every reseed silently emptied ARIA's KB.
+_PRESERVED_ON_RESET = ("industrial_qa",)
+
+
 def reset_db():
-    """Drop and recreate all tables - used by seed.py for a clean reseed."""
-    Base.metadata.drop_all(engine)
+    """Drop and recreate the roster/auth/task tables - used by seed.py for a
+    clean reseed. Reference tables in _PRESERVED_ON_RESET are left intact."""
+    tables = [t for t in Base.metadata.sorted_tables
+              if t.name not in _PRESERVED_ON_RESET]
+    Base.metadata.drop_all(engine, tables=tables)
     Base.metadata.create_all(engine)
 
 

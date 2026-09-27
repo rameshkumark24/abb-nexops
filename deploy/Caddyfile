@@ -1,0 +1,15 @@
+# Public entry point for the NexOps compose stack.
+#
+# SITE_ADDRESS=":80" (default) serves plain HTTP on port 80.
+# SITE_ADDRESS="nexops.example.com" makes Caddy obtain and renew a Let's
+# Encrypt certificate automatically and serve HTTPS on 443 (the DNS record must
+# point at this host). Set COOKIE_SECURE=1 whenever you serve HTTPS.
+#
+# Everything goes to the Next.js frontend, which itself proxies /api/* (REST and
+# the /api/ws WebSocket) to the backend — so the browser only ever talks to one
+# origin. Caddy discards any client-supplied X-Forwarded-For and sets the real
+# client IP, which the backend uses for per-IP login throttling.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}

@@ -57,6 +57,10 @@ const ZONE_MAP: Record<string, string> = {
 const ZONE_FALLBACK = ['Zone A', 'Zone B', 'Zone C', 'Zone D'];
 
 export function zoneFor(machine: string): string {
+  // Instance suffix first ("Compressor C1" -> Zone C), mirroring the backend's
+  // _derive_record_zone, so UI and server scoping never disagree.
+  const suffix = /\b([A-D])\d+\b/i.exec(machine);
+  if (suffix) return `Zone ${suffix[1].toUpperCase()}`;
   const lower = machine.toLowerCase();
   for (const key of Object.keys(ZONE_MAP)) {
     if (lower.includes(key.toLowerCase())) {

@@ -34,12 +34,66 @@ Key backend modules: `anomaly.py` (Isolation Forest), `risk.py` (risk fusion), `
 
 ## Prerequisites
 
-- **Python 3.11+** and **Node.js 18+**
-- **Docker** (only for the MQTT broker; optional — the backend runs without it, just with no live feed)
+- **Docker** with Compose v2 — for the one-command stack below, **or**
+- **Python 3.11+** and **Node.js 20.9+** (required by Next.js 16) for local development
 
 ---
 
-## Quickstart (4 terminals)
+## Run the whole stack with Docker (recommended)
+
+```bash
+cp .env.example .env          # optional — every setting has a working default
+docker compose up -d --build
+```
+
+Open **http://localhost** and log in (see *Demo logins*). This starts five containers:
+
+| Service | Role |
+|---------|------|
+| `caddy` | the ONLY public entry point (`:80`, and `:443` with automatic HTTPS when `SITE_ADDRESS` is a domain) |
+| `frontend` | Next.js app; proxies `/api/*` **and the `/api/ws` WebSocket** to the backend, so the browser talks to one origin |
+| `backend` | FastAPI bridge; private to the compose network; SQLite + JWT secret persisted on the `backend-data` volume |
+| `mosquitto` | MQTT broker; private to the compose network |
+| `publisher` | telemetry simulator feeding the broker |
+
+Health: `docker compose ps` (all `healthy`/`running`), backend readiness at `/api/healthz`.
+
+---
+
+## Deployment
+
+### Single host (VM / on-prem edge box)
+
+1. Point a DNS record at the host, then in `.env` set:
+   ```
+   SITE_ADDRESS=nexops.example.com   # Caddy fetches + renews a Let's Encrypt cert
+   COOKIE_SECURE=1                   # cookies only over HTTPS
+   NEXOPS_SEED_PASSWORD=<strong password>   # applied when the DB is first seeded
+   NEXOPS_JWT_SECRET=<python -c "import secrets; print(secrets.token_hex(32))">
+   ```
+2. `docker compose up -d --build`. Data survives redeploys (`backend-data` volume).
+   To reseed from scratch: `docker compose down -v` (deletes the volume).
+
+Notes:
+- The backend runs **one worker by design** (live machine state, WebSocket clients,
+  MQTT subscription and the login rate limiter are in-process).
+- For Postgres, set `DATABASE_URL` on the backend (`postgres://` URLs are accepted).
+- To connect a real gateway instead of the simulator, drop the `publisher` service and
+  secure the broker (see `deploy/mosquitto.conf`: credentials + TLS, then
+  `MQTT_USERNAME`/`MQTT_PASSWORD`/`MQTT_TLS=1` on the backend).
+
+### Split hosting (e.g. frontend on Vercel, backend on a container host)
+
+- Deploy `nexops-backend/` with its `Dockerfile` (mount a volume at `/data`, or use
+  Postgres via `DATABASE_URL`) and point `MQTT_HOST` at your broker.
+- Deploy `abb-prototype-main/` with **build-time** env `BACKEND_ORIGIN=https://<backend>`.
+  Vercel's rewrites don't carry WebSockets, so also set
+  `NEXT_PUBLIC_WS_URL=wss://<backend>/ws` (ticket-authenticated; the CSP allows it
+  automatically). Set `COOKIE_SECURE=1` on the backend.
+
+---
+
+## Local development (4 terminals)
 
 ### 1. MQTT broker (optional but needed for the live feed)
 ```bash
@@ -53,9 +107,9 @@ docker run -d --name nexops-broker -p 1883:1883 eclipse-mosquitto
 ```bash
 cd nexops-backend
 pip install -r requirements.txt
-python seed_qa.py          # one-time: load the ARIA industrial-QA knowledge base
 uvicorn main:app --host 0.0.0.0 --port 8000
-# (auto-creates + seeds the demo roster on first run)
+# First run auto-creates + seeds the demo roster AND loads the ARIA
+# industrial-QA knowledge base from NexOps-Industrial-QA.pdf (background).
 ```
 
 ### 3. Telemetry publisher
@@ -91,8 +145,10 @@ Password for **all** users: `nexops123` (override with `NEXOPS_SEED_PASSWORD`).
 ## Configuration
 
 Copy `*.env.example` files and adjust as needed — **everything has localhost defaults, so the demo runs with nothing set**:
-- `nexops-backend/.env.example` — JWT secret, cookie/proxy flags, ARIA keys, DB, CORS
-- `abb-prototype-main/.env.example` — backend origin, WS URL
+- `.env.example` — docker compose: public address/HTTPS, secrets, seed password, ARIA keys
+- `nexops-backend/.env.example` — JWT secret, cookie/proxy flags, ARIA keys, MQTT, DB, CORS
+- `abb-prototype-main/.env.example` — backend origin (build-time), optional WS URL override
+- `nexops-data-generator` — `MQTT_HOST`, `MQTT_PORT`, `PUBLISH_INTERVAL_SECONDS` env vars
 
 For production set at minimum: `NEXOPS_JWT_SECRET`, `COOKIE_SECURE=1`, `CORS_ORIGINS`, and (for live ARIA) `GEMINI_API_KEY` / `GROQ_API_KEY`. Without LLM keys, ARIA serves a deterministic offline template.
 
@@ -102,10 +158,10 @@ For production set at minimum: `NEXOPS_JWT_SECRET`, `COOKIE_SECURE=1`, `CORS_ORI
 
 ```bash
 cd nexops-backend
-python -m pytest -q          # 82 tests: anomaly, risk, assignment, scoping, auth, ARIA, lifecycle …
+python -m pytest -q          # 93 tests: anomaly, risk, assignment, scoping, auth, ARIA, lifecycle, hardening …
 python test_assignment.py    # readable role-allocation scenarios
 cd ../abb-prototype-main
-npx tsc --noEmit             # frontend type check
+npm run typecheck            # frontend type check (npm run build for the full build)
 ```
 
 ---
@@ -115,4 +171,10 @@ npx tsc --noEmit             # frontend type check
 - Auth is JWT in an **httpOnly cookie** (XSS-safe), with **CSRF double-submit** and **server-side revocation** (logout / deactivation). The Next proxy keeps the cookie first-party.
 - Demo password is shared and printed at seed time — **demo only**.
 - LLM keys are read from the environment (never hardcode them in source).
-- The live WebSocket feed and REST snapshot are **zone-scoped** server-side.
+- The live WebSocket feed and REST snapshot are **zone-scoped** server-side. WebSocket
+  sessions are re-validated against the DB, so logout / deactivation also cut off an
+  already-open live feed.
+- ARIA answers are rendered through an allow-list formatter (only `<b> <i> <u> <br>`
+  survive), since they are built from LLM output and telemetry text.
+- CI (`.github/workflows/ci.yml`) runs the backend tests, the frontend typecheck/build and
+  the Docker image builds on every PR.

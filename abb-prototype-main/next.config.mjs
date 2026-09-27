@@ -1,42 +1,78 @@
 /** @type {import('next').NextConfig} */
 
 // Security headers applied to EVERY route. These harden the app shell itself —
-// the deepest defence against an XSS that would try to read the auth token from
-// localStorage is to stop injected markup from doing damage in the first place.
+// the deepest defence against an XSS is to stop injected markup from doing
+// damage in the first place.
 //
-// The CSP here is a DELIBERATELY SAFE SUBSET: it restricts framing, the <base>
-// tag, plugins, and form targets — none of which touch script/style/connect, so
-// it cannot break Next's inline hydration scripts, Tailwind's injected styles,
-// or the cross-origin API/WebSocket calls. A full script-src/connect-src CSP is
-// the real XSS lockdown but is env-specific (it must whitelist the backend
-// origin) and needs browser testing, so it is tracked as a follow-up rather than
-// shipped blind.
+// Because the browser now talks ONLY to this origin (REST via /api/* and the
+// live feed via /api/ws, both proxied below), the CSP can lock script and
+// connect targets to 'self'. 'unsafe-inline' stays for scripts/styles because
+// Next's hydration bootstrap and the app's inline styles need it; 'unsafe-eval'
+// is only added in `next dev` (React Refresh needs it). If NEXT_PUBLIC_WS_URL
+// points the live feed at ANOTHER origin, that origin is allowed in connect-src.
+const isDev = process.env.NODE_ENV !== 'production';
+
+function externalWsOrigin() {
+  const url = process.env.NEXT_PUBLIC_WS_URL;
+  if (!url || !/^wss?:\/\//i.test(url)) return '';
+  try {
+    return new URL(url).origin;
+  } catch {
+    return '';
+  }
+}
+
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  `connect-src 'self'${isDev ? ' ws: wss:' : ''} ${externalWsOrigin()}`.trim(),
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "form-action 'self'",
+].join('; ');
+
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'geolocation=(), microphone=(), camera=()' },
-  {
-    key: 'Content-Security-Policy',
-    value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
-  },
+  { key: 'Content-Security-Policy', value: csp },
 ];
 
 // Same-origin API proxy: the browser calls /api/* on THIS origin and Next
 // forwards to the backend. This is what makes the httpOnly auth cookie work —
 // a cookie the backend sets on a /api/* response is first-party to the frontend
-// origin (so the SPA sends it automatically and the Next middleware can read it),
-// instead of being a cross-origin cookie the browser would block. Override the
-// target with BACKEND_ORIGIN in other environments.
-const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN || 'http://localhost:8000';
+// origin (so the SPA sends it automatically and the Next proxy can read it),
+// instead of being a cross-origin cookie the browser would block. The same
+// rewrite also proxies the WebSocket upgrade for /api/ws.
+//
+// NOTE: rewrites are resolved at BUILD time — set BACKEND_ORIGIN when running
+// `next build` (the Dockerfile takes it as a build arg; on Vercel, set it as a
+// project env var). The value is normalized because a bare host
+// ("api.example.com") makes `next build` abort with "Invalid rewrite found",
+// and a trailing slash would produce `//path` URLs.
+function normalizeOrigin(raw) {
+  let origin = (raw || '').trim() || 'http://localhost:8000';
+  if (!/^https?:\/\//i.test(origin)) origin = `https://${origin}`;
+  return origin.replace(/\/+$/, '');
+}
+const BACKEND_ORIGIN = normalizeOrigin(process.env.BACKEND_ORIGIN);
 
 const nextConfig = {
+  // Self-contained server bundle (server.js + minimal node_modules) for a small
+  // production container image.
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: false,
   },
   images: {
     unoptimized: true,
   },
+  poweredByHeader: false,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

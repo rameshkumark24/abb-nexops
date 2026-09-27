@@ -1,4 +1,5 @@
-// Server-side route guard (runs on the edge BEFORE a page is rendered or sent).
+// Server-side route guard (Next 16 "proxy", formerly middleware) — runs BEFORE
+// a page is rendered or sent.
 //
 // WHY: the in-app <RoleGuard> is client-side only — the browser downloads the
 // page first and JS then redirects, so typing a role URL while logged out still
@@ -36,7 +37,7 @@ interface JwtClaims {
   exp?: number;
 }
 
-// Decode (NOT verify) the JWT payload. `atob` is available in the edge runtime.
+// Decode (NOT verify) the JWT payload. `atob` is available in the proxy runtime.
 function decodeClaims(token: string): JwtClaims | null {
   try {
     const part = token.split('.')[1];
@@ -55,7 +56,7 @@ function redirectTo(req: NextRequest, pathname: string): NextResponse {
   return NextResponse.redirect(url);
 }
 
-export function middleware(req: NextRequest): NextResponse {
+export function proxy(req: NextRequest): NextResponse {
   const required = ROUTE_ROLE[req.nextUrl.pathname];
   if (!required) return NextResponse.next();
 
@@ -75,7 +76,7 @@ export function middleware(req: NextRequest): NextResponse {
   return NextResponse.next();
 }
 
-// Only run on the guarded role routes (keeps the edge function off every asset).
+// Only run on the guarded role routes (keeps the proxy off every asset).
 export const config = {
   matcher: ['/admin', '/engineer', '/technician'],
 };

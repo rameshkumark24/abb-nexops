@@ -1,0 +1,81 @@
+# NexOps — full stack in one command:
+#
+#   cp .env.example .env        # optional: set a JWT secret, domain, LLM keys
+#   docker compose up -d --build
+#   open http://localhost       # (or https://$SITE_ADDRESS)
+#
+# Topology (only Caddy is published to the host):
+#
+#   browser ──► caddy :80/:443 ──► frontend :3000 ──/api/*, /api/ws──► backend :8000
+#                                                                        ▲
+#                            publisher (simulator) ──► mosquitto :1883 ──┘
+name: nexops
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    volumes:
+      - ./deploy/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  backend:
+    build: ./nexops-backend
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      # Blank -> a random secret is generated once and kept on the data volume.
+      NEXOPS_JWT_SECRET: ${NEXOPS_JWT_SECRET:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-0}
+      NEXOPS_SEED_PASSWORD: ${NEXOPS_SEED_PASSWORD:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      # Only needed for DIRECT browser->backend calls; the default setup proxies.
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      # Uncomment to use Postgres instead of the SQLite file on the volume:
+      # DATABASE_URL: postgresql://nexops:nexops@postgres:5432/nexops
+    volumes:
+      - backend-data:/data
+    # No `ports:` on purpose — the backend is private to the compose network.
+
+  publisher:
+    build: ./nexops-data-generator
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      PUBLISHER: mqtt
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+
+  frontend:
+    build:
+      context: ./abb-prototype-main
+      args:
+        BACKEND_ORIGIN: http://backend:8000
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  backend-data:
+  caddy-data:
+  caddy-config:
