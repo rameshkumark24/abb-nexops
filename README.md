@@ -90,6 +90,13 @@ Notes:
   Vercel's rewrites don't carry WebSockets, so also set
   `NEXT_PUBLIC_WS_URL=wss://<backend>/ws` (ticket-authenticated; the CSP allows it
   automatically). Set `COOKIE_SECURE=1` on the backend.
+- **Free-tier sleep (Render etc.):** the backend spins down after ~15 min idle.
+  `.github/workflows/keepalive.yml` pings `/api/healthz` every 10 min to keep it
+  awake (set the repo variable `KEEPALIVE_URL` to ping the backend directly). If it
+  does sleep, the login page wakes it and retries automatically ("WAKING SERVER…")
+  instead of failing with 503. Note that Render's free disk is ephemeral: with the
+  default SQLite, data resets on every restart/redeploy — attach a disk at `/data`
+  or use Postgres via `DATABASE_URL` for persistence.
 
 ---
 

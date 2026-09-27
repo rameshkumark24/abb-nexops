@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'next/navigation';
 
 import { BASE_URL } from '@/lib/tasksApi';
+import { WAKE_TIMEOUT_MS, isWakingResponse, wakeBackend } from '@/lib/backendWake';
 import {
   clearSession,
   getCsrfToken,
@@ -43,7 +44,8 @@ export type LoginResult =
 interface AuthState {
   user: AuthUser | null;
   ready: boolean; // rehydration finished (avoids guard flicker on first paint)
-  login: (username: string, password: string) => Promise<LoginResult>;
+  // onWaking(true) fires while the backend is cold-starting and login is retrying.
+  login: (username: string, password: string, onWaking?: (waking: boolean) => void) => Promise<LoginResult>;
   logout: () => void;
 }
 
@@ -62,14 +64,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (username: string, password: string): Promise<LoginResult> => {
-      try {
-        const res = await fetch(`${BASE_URL}/auth/login`, {
+    async (
+      username: string,
+      password: string,
+      onWaking?: (waking: boolean) => void,
+    ): Promise<LoginResult> => {
+      // The backend may be asleep (free-tier hosting). While it wakes, the proxy
+      // answers 502/503/504 (or a plain-text 500) or the request fails outright: wait for /healthz and
+      // retry instead of showing "Login failed (503)".
+      const deadline = Date.now() + WAKE_TIMEOUT_MS;
+      const attempt = () =>
+        fetch(`${BASE_URL}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
           credentials: 'include', // receive + store the httpOnly session cookie
         });
+      try {
+        let res: Response | null = null;
+        while (true) {
+          try {
+            res = await attempt();
+            if (!isWakingResponse(res)) break;
+          } catch {
+            res = null; // network error: backend unreachable / waking
+          }
+          if (Date.now() >= deadline) break;
+          onWaking?.(true);
+          await wakeBackend();
+        }
+        onWaking?.(false);
+        if (!res) {
+          return { ok: false, error: 'Cannot reach the server — please try again shortly' };
+        }
+        if (isWakingResponse(res)) {
+          return { ok: false, error: 'Server is still starting up — please try again in a moment' };
+        }
         if (res.status === 401) {
           return { ok: false, error: 'Invalid username or password' };
         }
@@ -92,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(u);
         return { ok: true, user: u };
       } catch {
+        onWaking?.(false);
         return { ok: false, error: 'Cannot reach the auth service' };
       }
     },

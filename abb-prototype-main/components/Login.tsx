@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NavBar, MicroLabel, Field, Button } from './Shared';
 import { IconShield } from './Icons';
 import { useAuth, ROLE_ROUTE } from '@/context/AuthContext';
+import { wakeBackend } from '@/lib/backendWake';
 
 // Each tab PREFILLS a real backend demo username (all share password
 // 'nexops123'). The actual destination is decided by the role the SERVER returns
@@ -30,8 +31,15 @@ export default function Login({
   const [opPw, setOpPw] = useState(ROLE_LOGIN[selectedRole].pw);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [waking, setWaking] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
+
+  // Start waking a sleeping backend as soon as the page opens, so it is
+  // usually ready by the time the operator signs in.
+  useEffect(() => {
+    void wakeBackend();
+  }, []);
 
   function switchRole(r: 'admin' | 'engineer' | 'technician') {
     setSelectedRole(r);
@@ -46,7 +54,7 @@ export default function Login({
     if (submitting) return;
     setError(null);
     setSubmitting(true);
-    const res = await login(opId.trim().toLowerCase(), opPw);
+    const res = await login(opId.trim().toLowerCase(), opPw, setWaking);
     setSubmitting(false);
     if (res.ok) {
       router.push(ROLE_ROUTE[res.user.role] ?? '/');
@@ -178,7 +186,7 @@ export default function Login({
 
           {/* Submit -> POST /auth/login, then auto-route by the returned role. */}
           <Button variant="primary" onClick={handleSubmit} disabled={submitting} style={{ width: '100%' }}>
-            {submitting ? 'AUTHENTICATING…' : meta.btnLabel}
+            {submitting ? (waking ? 'WAKING SERVER — UP TO A MINUTE…' : 'AUTHENTICATING…') : meta.btnLabel}
           </Button>
         </div>
       </div>

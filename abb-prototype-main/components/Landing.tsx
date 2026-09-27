@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NavBar, MicroLabel, Field, Button } from './Shared';
 import { IconShield } from './Icons';
 import { useAuth, ROLE_ROUTE } from '@/context/AuthContext';
+import { wakeBackend } from '@/lib/backendWake';
 
 const ROLE_LOGIN = {
   admin: { tab: 'Plant', btnLabel: 'Enter Plant Manager Console', id: 'plant', pw: 'nexops123' },
@@ -20,8 +21,15 @@ export default function Landing() {
   const [opPw, setOpPw] = useState(ROLE_LOGIN.admin.pw);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [waking, setWaking] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
+
+  // Start waking a sleeping backend as soon as the page opens, so it is
+  // usually ready by the time the operator signs in.
+  useEffect(() => {
+    void wakeBackend();
+  }, []);
 
   function switchRole(r: 'admin' | 'engineer' | 'technician') {
     setSelectedRole(r);
@@ -34,7 +42,7 @@ export default function Landing() {
     if (submitting) return;
     setError(null);
     setSubmitting(true);
-    const res = await login(opId.trim().toLowerCase(), opPw);
+    const res = await login(opId.trim().toLowerCase(), opPw, setWaking);
     setSubmitting(false);
     if (res.ok) {
       router.push(ROLE_ROUTE[res.user.role] ?? '/');
@@ -215,7 +223,7 @@ export default function Landing() {
               disabled={submitting}
               style={{ width: '100%', padding: '12px 16px' }}
             >
-              {submitting ? 'AUTHENTICATING…' : ROLE_LOGIN[selectedRole].btnLabel.toUpperCase()}
+              {submitting ? (waking ? 'WAKING SERVER — UP TO A MINUTE…' : 'AUTHENTICATING…') : ROLE_LOGIN[selectedRole].btnLabel.toUpperCase()}
             </Button>
           </div>
         </div>
