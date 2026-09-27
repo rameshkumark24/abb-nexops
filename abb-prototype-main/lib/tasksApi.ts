@@ -28,7 +28,7 @@ export type ApiResult<T> =
 // On a 401 (expired/invalid token) we auto-logout and bounce to /login so an
 // expired session never leaves a broken, half-rendered page. Hard redirect keeps
 // this module React-free (AuthProvider rehydrates as empty on /login).
-function handleUnauthorized(): void {
+export function handleUnauthorized(): void {
   clearSession();
   if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
     window.location.href = '/login';
@@ -98,7 +98,6 @@ export function startTask(id: number): Promise<ApiResult<LifecycleTask>> {
 }
 
 // POST /tasks/{id}/resolve -> resolved, frees engineer capacity, returns the
-// POST /tasks/{id}/resolve -> resolved, frees engineer capacity, returns the
 // summary incl. resolution_minutes + engineer_active_tasks.
 export function resolveTask(id: number): Promise<ApiResult<ResolvedTask>> {
   return request<ResolvedTask>(`/tasks/${id}/resolve`, { method: 'POST' });
@@ -134,6 +133,7 @@ export interface Engineer {
   zone: string;
   skills: string[];
   active: boolean;
+  available?: boolean; // on shift (false = off shift; never auto/manually assigned)
   stats?: { assigned_tasks?: number; resolved_tasks?: number };
   max_capacity?: number;
   active_tasks?: number;

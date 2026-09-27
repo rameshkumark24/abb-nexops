@@ -61,37 +61,54 @@ def parse_qa_from_pdf(pdf_path: str) -> list[dict]:
     return all_qa
 
 
-def seed_qa(pdf_path: str | None = None) -> None:
-    if pdf_path is None:
-        pdf_path = os.path.join(os.path.dirname(__file__), "NexOps-Industrial-QA.pdf")
+DEFAULT_PDF = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "NexOps-Industrial-QA.pdf")
 
+
+def ensure_qa_seeded(pdf_path: str | None = None) -> int:
+    """Load the knowledge base if the table is empty. Idempotent and safe to
+    call on every startup. Returns the number of rows inserted (0 = skipped).
+    Raises FileNotFoundError if the PDF is missing."""
+    pdf_path = pdf_path or DEFAULT_PDF
     if not os.path.exists(pdf_path):
-        print(f"PDF not found at: {pdf_path}")
-        sys.exit(1)
+        raise FileNotFoundError(f"PDF not found at: {pdf_path}")
 
     init_db()
     session = get_session()
     try:
         existing = session.query(IndustrialQA).count()
         if existing > 0:
-            print(f"industrial_qa already contains {existing} rows — skipping seed.")
-            return
+            print(f"[seed_qa] industrial_qa already contains {existing} rows — skipping seed.")
+            return 0
 
-        print(f"Parsing Q&A pairs from: {pdf_path}")
+        print(f"[seed_qa] parsing Q&A pairs from: {pdf_path}")
         qa_pairs = parse_qa_from_pdf(pdf_path)
-        print(f"Parsed {len(qa_pairs)} Q&A pairs across 38 sections.")
+        sections = len({qa["section_number"] for qa in qa_pairs})
 
         for qa in qa_pairs:
             session.add(IndustrialQA(**qa))
 
         session.commit()
-        print(f"Seeded {len(qa_pairs)} industrial Q&A entries into industrial_qa table.")
-    except Exception as e:
+        print(f"[seed_qa] seeded {len(qa_pairs)} industrial Q&A entries "
+              f"across {sections} sections.")
+        return len(qa_pairs)
+    except Exception:
         session.rollback()
-        print(f"Seed failed: {e}")
         raise
     finally:
         session.close()
+
+
+def seed_qa(pdf_path: str | None = None) -> None:
+    """CLI entry point: like ensure_qa_seeded, but exits non-zero on failure."""
+    try:
+        ensure_qa_seeded(pdf_path)
+    except FileNotFoundError as e:
+        print(e)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Seed failed: {e}")
+        raise
 
 
 if __name__ == "__main__":

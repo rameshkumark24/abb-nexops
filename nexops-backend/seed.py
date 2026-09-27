@@ -56,8 +56,11 @@ from db import Engineer, FaultMTTR, User, get_session, reset_db
 # to the console) so the operator can log in as any role instantly — NOT
 # production-safe. Real deployments should set NEXOPS_SEED_PASSWORD (or move to
 # per-user provisioning).
-DEV_PASSWORD = os.environ.get("NEXOPS_SEED_PASSWORD", "nexops123")
-_SEED_PASSWORD_IS_DEFAULT = "NEXOPS_SEED_PASSWORD" not in os.environ
+# A SET-BUT-EMPTY value (e.g. `NEXOPS_SEED_PASSWORD=` copied from .env.example)
+# must count as UNSET: treating "" as the password made every seeded account —
+# plant manager included — log in with an EMPTY password.
+DEV_PASSWORD = os.environ.get("NEXOPS_SEED_PASSWORD") or "nexops123"
+_SEED_PASSWORD_IS_DEFAULT = not os.environ.get("NEXOPS_SEED_PASSWORD")
 
 
 # (name, role, skills, active_tasks, available, experience_years, max_capacity, zone)

@@ -1,0 +1,22 @@
+# Keep the image lean and free of local state / secrets.
+.env
+.env.*
+!.env.example
+.jwt_secret
+*.db
+*.sqlite
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+test_*.py
+conftest.py
+report.html
+report.xml
+test_report.docx
+test_ws.html
+generate_docx.py
+assets/
+Dockerfile
+.dockerignore

@@ -1,6 +1,6 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist, Geist_Mono, JetBrains_Mono, Outfit, Space_Grotesk } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
@@ -11,6 +11,14 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
 })
+// The ABB UI fonts are SELF-HOSTED via next/font (downloaded at build time and
+// served from this origin) instead of a runtime Google Fonts @import: no
+// render-blocking third-party request, and the UI renders correctly on an
+// air-gapped plant network.
+const outfit = Outfit({ variable: '--font-outfit', subsets: ['latin'], weight: ['300', '400', '500', '600', '700', '800'] })
+const spaceGrotesk = Space_Grotesk({ variable: '--font-space-grotesk', subsets: ['latin'], weight: ['300', '400', '500', '600', '700'] })
+const jetbrainsMono = JetBrains_Mono({ variable: '--font-jetbrains-mono', subsets: ['latin'], weight: ['300', '400', '500', '600', '700'] })
+const fontVars = [geistSans, geistMono, outfit, spaceGrotesk, jetbrainsMono].map((f) => f.variable).join(' ')
 
 export const metadata: Metadata = {
   title: 'NexOps',
@@ -53,7 +61,7 @@ export default function RootLayout({
     // already paint their own opaque .abb-page (light), so they're unaffected.
     // Restyled dashboards (Plant) inherit this light base; Field/Technician keep
     // their own dark body styling (set on their page roots) until their passes.
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={fontVars} suppressHydrationWarning>
       <head>
         {/* Runs before first paint — prevents flash of wrong theme on reload. */}
         <Script
@@ -74,7 +82,8 @@ export default function RootLayout({
             <AuthProvider>{children}</AuthProvider>
           </ThemeProvider>
         </div>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {/* Vercel Analytics only exists on Vercel; elsewhere its script 404s. */}
+        {process.env.VERCEL === '1' && <Analytics />}
       </body>
     </html>
   )

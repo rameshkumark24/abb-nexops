@@ -5,7 +5,7 @@
 #
 # The MQTT publish path (publisher.py PUBLISHER=mqtt and subscriber_test.py)
 # needs paho-mqtt:
-paho-mqtt>=1.6
+paho-mqtt>=2.0,<3   # uses the paho 2.x CallbackAPIVersion.VERSION2 API
 #
 # Optional, only if you want a no-Docker pure-Python broker for testing:
 # amqtt

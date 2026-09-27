@@ -18,6 +18,19 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 # Wildcard subscription: every per-machine topic under the base.
 MQTT_TOPIC = os.environ.get("MQTT_TOPIC", "nexops/refinery/telemetry/#")
 
+
+def _flag(name: str, default: str = "") -> bool:
+    return os.environ.get(name, default).strip().lower() in ("1", "true", "yes")
+
+
+# Set MQTT_ENABLED=0 to run the API without any broker (no live feed).
+MQTT_ENABLED = _flag("MQTT_ENABLED", "1")
+# Optional broker credentials / TLS (a production broker should require both).
+MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
+MQTT_TLS = _flag("MQTT_TLS")
+MQTT_CLIENT_ID = os.environ.get("MQTT_CLIENT_ID", "")
+
 # --- WebSocket / HTTP server (what the browser connects to) ---
 WS_HOST = os.environ.get("WS_HOST", "0.0.0.0")
 WS_PORT = int(os.environ.get("WS_PORT", "8000"))
@@ -45,7 +58,7 @@ CORS_ORIGINS = [
 # --- Auth cookies ---
 # Set COOKIE_SECURE=1 in production so the session/CSRF cookies are only sent over
 # HTTPS. Default OFF so the cookies work on plain-http localhost during dev.
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "").strip().lower() in ("1", "true", "yes")
+COOKIE_SECURE = _flag("COOKIE_SECURE")
 
 # --- Reverse-proxy trust (login rate limiting) ---
 # When the app sits behind a trusted reverse proxy / load balancer, the direct
@@ -53,4 +66,4 @@ COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "").strip().lower() in ("1", "tr
 # together (lock everyone out, or be meaningless). Set TRUST_PROXY=1 to instead
 # read the real client IP from the left-most X-Forwarded-For entry. Default OFF,
 # because X-Forwarded-For is client-spoofable unless a trusted proxy sets it.
-TRUST_PROXY = os.environ.get("TRUST_PROXY", "").strip().lower() in ("1", "true", "yes")
+TRUST_PROXY = _flag("TRUST_PROXY")

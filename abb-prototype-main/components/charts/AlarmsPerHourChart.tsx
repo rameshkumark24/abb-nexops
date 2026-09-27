@@ -34,7 +34,7 @@ export function AlarmsPerHourChart({ data }: { data: HourBin[] }) {
           Collecting hourly alarms this session…
         </div>
       )}
-      <ResponsiveContainer width="100%" height={hasData ? '100%' : 196} minWidth={0}>
+      <ResponsiveContainer width="100%" height={hasData ? '100%' : 196} minWidth={0} initialDimension={{ width: 1, height: 1 }}>
         <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
           <defs>
             <linearGradient id="rawGrad" x1="0" y1="0" x2="0" y2="1">

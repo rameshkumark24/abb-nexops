@@ -27,9 +27,11 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 const hhmm = (ts: number) => { const d = new Date(ts); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 
 function engStatus(e: Engineer): Exclude<TeamFilter, 'all'> {
-  if (!e.active) return 'offshift';
+  // Deactivated OR not on shift (backend `available=false`) both mean the
+  // engineer can't take work right now.
+  if (!e.active || e.available === false) return 'offshift';
   const active = e.active_tasks ?? 0;
-  const max = e.max_capacity ?? 3;
+  const max = e.max_capacity ?? 6;
   return active >= max ? 'atcap' : 'available';
 }
 
@@ -262,7 +264,7 @@ function FieldManagerConsole() {
                       <div className="abb-data" style={{ fontSize: 11, fontWeight: 700, color: 'var(--abb-alarm)', marginBottom: 8, letterSpacing: '0.05em' }}>UNASSIGNED ALERTS IN QUEUE</div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         {unassignedTasks.map((t) => {
-                          const activeEngs = zoneEngineers.filter((e) => e.active);
+                          const activeEngs = zoneEngineers.filter((e) => engStatus(e) !== 'offshift');
                           const selectedId = selectedEngineers[t.id] || 0;
                           const isAssigning = assigningId === t.id;
                           return (

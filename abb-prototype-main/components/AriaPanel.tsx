@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Dot, MicroLabel } from './Shared';
 import { askAria, type AriaEvidence } from '@/lib/tasksApi';
+import { formatAriaAnswer } from '@/lib/safeHtml';
 import { useAuth } from '@/context/AuthContext';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 
@@ -236,10 +237,17 @@ export default function AriaPanel({
                 lineHeight: 1.55,
               }}
             >
-              <div 
-                style={{ whiteSpace: 'pre-wrap' }} 
-                dangerouslySetInnerHTML={{ __html: m.text }}
-              />
+              {m.role === 'user' ? (
+                // The operator's own input is ALWAYS plain text.
+                <div style={{ whiteSpace: 'pre-wrap' }}>{m.text}</div>
+              ) : (
+                // ARIA text is untrusted (LLM + telemetry); only allow-listed
+                // formatting tags survive formatAriaAnswer's escaping.
+                <div
+                  style={{ whiteSpace: 'pre-wrap' }}
+                  dangerouslySetInnerHTML={{ __html: formatAriaAnswer(m.text) }}
+                />
+              )}
             </div>
             <MicroLabel style={{ marginTop: 4, textAlign: m.role === 'user' ? 'right' : 'left' }}>
               {m.role === 'user'

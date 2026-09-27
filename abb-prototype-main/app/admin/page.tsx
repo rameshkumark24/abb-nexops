@@ -1059,12 +1059,14 @@ function AddTechnicianForm({ onCreated }: { onCreated: () => Promise<void> }) {
           <option value="general">General</option>
           <option value="mechanical">Mechanical</option>
           <option value="electrical">Electrical</option>
-          <option value="instrumentation">Instrumentation</option>
           <option value="thermal">Thermal</option>
+          {/* Must match the backend fault categories (assignment.FAULT_KEYWORDS):
+              strict skill matching never dispatches a skill it can't categorize. */}
+          <option value="hydraulic">Hydraulic</option>
         </select>
       </label>
       <Field label="Username" value={username} onChange={(e) => setUsername(e.currentTarget.value)} />
-      <Field label="Password" type="password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} />
+      <Field label="Password (min 8 chars)" type="password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} />
       {error && <div className="abb-data" style={{ color: 'var(--abb-high)', fontSize: 12 }}>{error}</div>}
       {success && <div className="abb-data" style={{ color: 'var(--abb-early)', fontSize: 12 }}>{success}</div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

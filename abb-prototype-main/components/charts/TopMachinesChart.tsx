@@ -52,7 +52,7 @@ export function TopMachinesChart({
 
   return (
     <div style={{ width: '100%', height: Math.max(data.length * 42, 160) }}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 1, height: 1 }}>
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 56, bottom: 4, left: 8 }}>
           <XAxis type="number" hide allowDecimals={false} />
           <YAxis

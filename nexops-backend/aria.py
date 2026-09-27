@@ -2,6 +2,7 @@
 ARIA AI Assistant logic: scoping, linear trends, API integration, and template fallbacks.
 """
 
+import asyncio
 import json
 import os
 import re
@@ -58,6 +59,11 @@ def is_out_of_domain(query: str) -> bool:
 # template (render_fallback_answer), so the demo still runs with zero setup.
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+# Model names are env-overridable so a deprecated model can be swapped without
+# a code change.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+LLM_TIMEOUT_S = float(os.environ.get("ARIA_LLM_TIMEOUT", "8"))
 
 class AriaLLMUnavailable(Exception):
     """Raised when all LLM services fail or time out."""
@@ -376,13 +382,20 @@ def build_context(query: str, role: str, scope_zone: str | None, latest: dict[st
             ).order_by(Assignment.assigned_at.desc()).first()
             
             if current_task:
+                # The dispatch reasoning lives on the live record, not the DB
+                # row; attach it only when it describes THIS task's engineer.
+                live = snapshot or {}
+                reason = (live.get("assignment_reason")
+                          if live.get("assigned_engineer_id") == current_task.engineer_id
+                          else None)
                 context["current_assignment"] = {
                     "id": current_task.id,
                     "engineer_name": current_task.engineer_name,
                     "fault_category": current_task.fault_category,
                     "status": current_task.status,
                     "assigned_at": current_task.assigned_at.isoformat() if current_task.assigned_at else None,
-                    "score": current_task.score
+                    "score": current_task.score,
+                    "assignment_reason": reason,
                 }
         except Exception as e:
             print(f"[aria-context] failed to load current assignment: {e}")
@@ -514,10 +527,16 @@ def render_fallback_answer(ctx: dict, key_failed: bool = False) -> str:
     if is_out_of_domain(query):
         return "I am ARIA, an AI assistant trained only for NexOps refinery telemetry and dispatch. I cannot assist with out-of-domain topics."
         
+    if ctx.get("scope_violation"):
+        # The asked-about machine is in another zone: say so instead of
+        # silently answering a different question.
+        prefix += ("That machine is outside your zone scope, so I can't share its "
+                   "details. Here is your own zone instead.\n\n")
+
     if not focus:
         zone = ctx.get("scope_zone") or "ALL"
         role = ctx.get("role")
-        
+
         # Intent D: ML_CORROBORATION
         if any(k in query for k in ("corroboration rate", "corroboration")):
             rate = ctx.get("live_metrics", {}).get("ml_corroboration_rate", "0%")
@@ -757,19 +776,37 @@ async def call_llm(query: str, ctx: dict) -> tuple[str, str]:
     # 1. Primary: Gemini API (only if a key is configured)
     if GEMINI_API_KEY:
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+            url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
+                   f"{GEMINI_MODEL}:generateContent")
+            # The key travels in a header, never the URL: URLs are echoed into
+            # exception messages and proxy/access logs, which would leak it.
+            headers = {"x-goog-api-key": GEMINI_API_KEY}
             body = {
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 600},
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": 600,
+                    # 2.5-series models "think" by default and those tokens
+                    # count against maxOutputTokens, which can leave no text
+                    # at all. Short grounded answers don't need it.
+                    "thinkingConfig": {"thinkingBudget": 0},
+                },
             }
             async with httpx.AsyncClient() as client:
-                res = await client.post(url, json=body, timeout=6.0)
+                res = await client.post(url, headers=headers, json=body,
+                                        timeout=LLM_TIMEOUT_S)
                 if res.status_code == 200:
                     data = res.json()
-                    text = data["candidates"][0]["content"]["parts"][0]["text"]
-                    return text.strip(), "llm"
+                    parts = data["candidates"][0]["content"].get("parts") or []
+                    text = "".join(p.get("text", "") for p in parts).strip()
+                    if text:
+                        return text, "llm"
+                    print("[aria-llm] Gemini returned no text (finishReason="
+                          f"{data['candidates'][0].get('finishReason')})")
+                else:
+                    print(f"[aria-llm] Gemini API HTTP {res.status_code}")
         except Exception as e:
-            print(f"[aria-llm] Gemini API failed or timed out: {e}")
+            print(f"[aria-llm] Gemini API failed or timed out: {type(e).__name__}")
 
     # 2. Secondary fallback: Groq API (only if a key is configured)
     if GROQ_API_KEY:
@@ -780,19 +817,23 @@ async def call_llm(query: str, ctx: dict) -> tuple[str, str]:
                 "Content-Type": "application/json",
             }
             body = {
-                "model": "llama-3.3-70b-versatile",
+                "model": GROQ_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.2,
                 "max_tokens": 600,
             }
             async with httpx.AsyncClient() as client:
-                res = await client.post(url, headers=headers, json=body, timeout=6.0)
+                res = await client.post(url, headers=headers, json=body,
+                                        timeout=LLM_TIMEOUT_S)
                 if res.status_code == 200:
                     data = res.json()
-                    text = data["choices"][0]["message"]["content"]
-                    return text.strip(), "llm"
+                    text = (data["choices"][0]["message"].get("content") or "").strip()
+                    if text:
+                        return text, "llm"
+                else:
+                    print(f"[aria-llm] Groq API HTTP {res.status_code}")
         except Exception as e:
-            print(f"[aria-llm] Groq API failed or timed out: {e}")
+            print(f"[aria-llm] Groq API failed or timed out: {type(e).__name__}")
 
     raise AriaLLMUnavailable("All configured LLM pipelines failed.")
 
@@ -817,8 +858,13 @@ async def answer(query: str, role: str, scope_zone: str | None, latest: dict, hi
             }
         }
 
-    ctx = build_context(query, role, scope_zone, latest, history, session, username=username, engineer_id=engineer_id)
-    
+    # build_context does synchronous DB queries; run it in a worker thread so a
+    # slow query never stalls the event loop (and with it every live WebSocket).
+    ctx = await asyncio.to_thread(
+        build_context, query, role, scope_zone, latest, history, session,
+        username=username, engineer_id=engineer_id,
+    )
+
     try:
         text, source = await call_llm(query, ctx)
     except AriaLLMUnavailable:
@@ -843,7 +889,10 @@ async def answer(query: str, role: str, scope_zone: str | None, latest: dict, hi
             "eta_minutes_low": time_proj["eta_minutes_low"],
             "eta_minutes_high": time_proj["eta_minutes_high"]
         } if time_proj else None,
-        "assigned_engineer": current.get("engineer_name") if current else "Unassigned",
+        # An open task can be UNASSIGNED (engineer_name NULL, e.g. no skilled
+        # engineer had capacity); the response schema requires a string, so a
+        # None here used to turn the whole answer into an HTTP 500.
+        "assigned_engineer": (current.get("engineer_name") if current else None) or "Unassigned",
         "assignment_reason": current.get("assignment_reason") if current else None,
         "incident_matches": past.get("times_resolved", 0) if past else 0
     }

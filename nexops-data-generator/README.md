@@ -194,6 +194,21 @@ $env:PUBLISHER="mqtt"; python publisher.py
 (You can also just set `PUBLISHER = "mqtt"` in the CONFIG block of
 `publisher.py` instead of using the env var.)
 
+### Environment variables
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `PUBLISHER` | `console` | `mqtt` to publish to a broker |
+| `MQTT_HOST` / `MQTT_PORT` | `localhost` / `1883` | broker address (e.g. `mosquitto` under docker compose) |
+| `MQTT_BASE_TOPIC` | `nexops/refinery/telemetry` | base topic; a per-machine suffix is added |
+| `MQTT_USERNAME` / `MQTT_PASSWORD` / `MQTT_TLS` | unset | broker credentials / TLS for a secured broker |
+| `MQTT_CONNECT_WAIT_SECONDS` | `60` | keep retrying the first connection this long (broker still starting) |
+| `PUBLISH_INTERVAL_SECONDS` | `1` | delay between records |
+| `TOTAL_RECORDS` | unset (forever) | stop after this many records |
+
+A `Dockerfile` is included; the root `docker-compose.yml` runs it against the
+bundled Mosquitto broker.
+
 ### What success looks like
 
 - Terminal 3 (publisher) prints `[mqtt] connected to localhost:1883`.
@@ -205,5 +220,6 @@ $env:PUBLISHER="mqtt"; python publisher.py
   [nexops/refinery/telemetry/pump] {"Machine": "Pump", ...}
   ```
 
-If the broker is not running, the publisher exits with a clear "could not reach
-broker" message; start the broker first.
+If the broker is not reachable within `MQTT_CONNECT_WAIT_SECONDS` (default 60s),
+the publisher exits with a clear "could not reach broker" message; start the
+broker first.

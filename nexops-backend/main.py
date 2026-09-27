@@ -22,6 +22,7 @@ state is touched across threads except via this scheduling call.
 
 import asyncio
 from collections import deque
+from contextlib import asynccontextmanager
 import json
 import os
 import re
@@ -36,10 +37,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import paho.mqtt.client as mqtt
 from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 import config
 from adapter import normalize
@@ -56,10 +58,12 @@ from assignment import (
 from lifecycle import start_task, resolve_task, get_active_assignments
 from db import Assignment, Engineer, User, get_session, init_db
 from seed import seed, DEV_PASSWORD
+from seed_qa import ensure_qa_seeded
 # Stage 3a auth foundation.
 from auth_jwt import (
     verify_password, create_token, get_current_user, CurrentUser, hash_password,
-    decode_token, warn_insecure_secret, revoke_user_tokens, create_ws_ticket,
+    decode_token, user_from_claims, warn_insecure_secret, revoke_user_tokens,
+    create_ws_ticket,
     check_rate_limit, record_failed_attempt, clear_rate_limit,
     require_role,
     AUTH_COOKIE, CSRF_COOKIE, CSRF_HEADER, JWT_EXPIRE_HOURS,
@@ -71,7 +75,16 @@ from scoping import can_write_assignment, scope_engineer_query
 # ARIA system logic helper
 import aria
 
-app = FastAPI(title="NexOps MQTT->WebSocket Bridge")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    await startup()
+    try:
+        yield
+    finally:
+        await shutdown()
+
+
+app = FastAPI(title="NexOps MQTT->WebSocket Bridge", lifespan=lifespan)
 
 # Warn loudly at startup if the JWT secret is still the insecure dev default.
 warn_insecure_secret()
@@ -169,6 +182,18 @@ latest_machine_states: dict[str, dict] = {}
 # Thread-safe cache containing history of records per machine for linear extrapolation.
 history_machine_states: dict[str, deque] = {}
 _states_lock = threading.Lock()
+
+
+def forget_cached_assignment(machine, fault_category) -> None:
+    """Drop ONLY the in-memory dedupe entry (no recovery cooldown). Called when a
+    still-open task changes hands outside on_message — manual assignment,
+    deactivation rotation, engineer deletion — so the next telemetry tick re-reads
+    the task from the DB (find_open_assignment) and the live feed shows the NEW
+    engineer instead of the stale cached one ("Unassigned" / a removed person)."""
+    if not machine:
+        return
+    with _assign_lock:
+        active_assignments.pop((machine, fault_category), None)
 
 
 def clear_dedupe_for(machine, fault_category) -> bool:
@@ -344,7 +369,9 @@ app.add_middleware(
     allow_origins=config.CORS_ORIGINS,  # env-driven; set CORS_ORIGINS in production
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    # X-CSRF-Token must be allowed too: a cookie-authed cross-origin mutation
+    # carries it, and without it the preflight fails before CSRF is checked.
+    allow_headers=["Authorization", "Content-Type", CSRF_HEADER],
 )
 
 
@@ -438,13 +465,29 @@ mqtt_client: mqtt.Client | None = None
 # MQTT callbacks (these run on paho's background thread, NOT asyncio)
 # ----------------------------------------------------------------------
 
-def on_connect(client, userdata, flags, rc):
-    if rc == 0:
+# Broker link state, surfaced by /healthz (set from paho's thread; a plain bool
+# assignment is atomic in CPython).
+mqtt_connected = False
+
+
+def on_connect(client, userdata, flags, reason_code, properties=None):
+    # paho-mqtt 2.x CallbackAPIVersion.VERSION2 signature. Subscribing HERE (not
+    # once after connect()) means every automatic reconnect re-subscribes too.
+    global mqtt_connected
+    if not reason_code.is_failure:
+        mqtt_connected = True
         print(f"[mqtt] connected to {config.MQTT_HOST}:{config.MQTT_PORT}")
         client.subscribe(config.MQTT_TOPIC)
         print(f"[mqtt] subscribed to {config.MQTT_TOPIC}")
     else:
-        print(f"[mqtt] connect failed (rc={rc})")
+        mqtt_connected = False
+        print(f"[mqtt] connect failed ({reason_code})")
+
+
+def on_disconnect(client, userdata, flags, reason_code, properties=None):
+    global mqtt_connected
+    mqtt_connected = False
+    print(f"[mqtt] disconnected ({reason_code}); paho will reconnect")
 
 
 def on_message(client, userdata, msg):
@@ -685,7 +728,16 @@ def on_message(client, userdata, msg):
 # FastAPI lifecycle: start/stop the MQTT network loop
 # ----------------------------------------------------------------------
 
-@app.on_event("startup")
+def _load_knowledge_base() -> None:
+    """Background: make sure ARIA's knowledge base is loaded (parsing the PDF
+    takes a few seconds, so it never delays startup). Fail-safe: ARIA simply
+    answers without KB matches if this fails."""
+    try:
+        ensure_qa_seeded()
+    except Exception as exc:
+        print(f"[seed_qa] knowledge base not loaded: {exc} (ARIA runs without it)")
+
+
 async def startup():
     global event_loop, mqtt_client
     # Capture the loop the WebSocket sends must run on.
@@ -711,22 +763,32 @@ async def startup():
         print(f"[assignment] DB init/seed failed: {exc} "
               f"(assignments will fall back to Unassigned)")
 
-    mqtt_client = mqtt.Client()
+    # AFTER the roster seed (which recreates tables), load the KB if empty.
+    threading.Thread(target=_load_knowledge_base, name="kb-seed", daemon=True).start()
+
+    if not config.MQTT_ENABLED:
+        print("[mqtt] MQTT_ENABLED=0 -> not connecting to a broker (no live feed)")
+        return
+
+    mqtt_client = mqtt.Client(
+        mqtt.CallbackAPIVersion.VERSION2,
+        client_id=config.MQTT_CLIENT_ID or "",
+    )
+    if config.MQTT_USERNAME:
+        mqtt_client.username_pw_set(config.MQTT_USERNAME, config.MQTT_PASSWORD or None)
+    if config.MQTT_TLS:
+        mqtt_client.tls_set()
     mqtt_client.on_connect = on_connect
+    mqtt_client.on_disconnect = on_disconnect
     mqtt_client.on_message = on_message
     mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
-    try:
-        mqtt_client.connect(config.MQTT_HOST, config.MQTT_PORT)
-    except Exception as exc:
-        # Don't crash the API if the broker isn't up yet; paho will retry
-        # once it can reach the host.
-        print(f"[mqtt] initial connect to {config.MQTT_HOST}:{config.MQTT_PORT} "
-              f"failed: {exc} (will keep retrying)")
-    # Run paho's network loop on its own background thread.
+    # connect_async never blocks or raises here: the network thread connects
+    # (and keeps retrying) in the background, so the API comes up even when
+    # the broker isn't reachable yet (e.g. container start order).
+    mqtt_client.connect_async(config.MQTT_HOST, config.MQTT_PORT)
     mqtt_client.loop_start()
 
 
-@app.on_event("shutdown")
 async def shutdown():
     if mqtt_client is not None:
         mqtt_client.loop_stop()
@@ -741,6 +803,36 @@ async def shutdown():
 async def health():
     """Simple health check - open in a browser to confirm the service is up."""
     return {"status": "ok", "clients": len(manager.active)}
+
+
+def _db_ok() -> bool:
+    session = get_session()
+    try:
+        session.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
+    finally:
+        session.close()
+
+
+@app.get("/healthz")
+async def healthz():
+    """Liveness/readiness probe for containers and load balancers. 503 only when
+    the database is unreachable (the API can't serve anything useful then). A
+    down broker is REPORTED but not fatal: the API, auth, tasks and ARIA still
+    work, only the live feed pauses while paho reconnects."""
+    db_ok = await run_in_threadpool(_db_ok)
+    with _states_lock:
+        machines = len(latest_machine_states)
+    body = {
+        "status": "ok" if db_ok else "degraded",
+        "database": db_ok,
+        "mqtt": {"enabled": config.MQTT_ENABLED, "connected": mqtt_connected},
+        "machines_seen": machines,
+        "ws_clients": len(manager.active),
+    }
+    return JSONResponse(status_code=200 if db_ok else 503, content=body)
 
 
 @app.get("/telemetry/snapshot")
@@ -928,6 +1020,7 @@ def http_engineer_stats(engineer_id: int,
 # ----------------------------------------------------------------------
 
 _VALID_ZONES = ("A", "B", "C", "D")
+_MIN_PASSWORD_LEN = 8
 
 
 class CreateEngineerRequest(BaseModel):
@@ -1002,6 +1095,9 @@ def http_create_engineer(body: CreateEngineerRequest,
         return JSONResponse(status_code=400, content={"error": f"zone must be one of {list(_VALID_ZONES)}"})
     if not isinstance(body.skills, list):
         return JSONResponse(status_code=400, content={"error": "skills must be a list"})
+    if body.password and len(body.password) < _MIN_PASSWORD_LEN:
+        return JSONResponse(status_code=400, content={
+            "error": f"password must be at least {_MIN_PASSWORD_LEN} characters"})
 
     session = get_session()
     try:
@@ -1139,6 +1235,11 @@ def _set_engineer_active(engineer_id, active, current):
             engineer.active_tasks = 0
 
         session.commit()
+        if not active:
+            # Those tasks changed hands: stop broadcasting the deactivated
+            # engineer from the live-feed cache.
+            for task in open_tasks:
+                forget_cached_assignment(task.machine, task.fault_category)
         result = {"engineer_id": engineer.id, "name": engineer.name, "active": engineer.active}
         if not active:
             result["tasks_unassigned"] = unassigned_count
@@ -1180,12 +1281,16 @@ def http_delete_engineer(engineer_id: int,
         engineer = session.get(Engineer, engineer_id)
         if engineer is None:
             return JSONResponse(status_code=404, content={"error": f"engineer {engineer_id} not found"})
+        doomed = [(a.machine, a.fault_category) for a in
+                  session.query(Assignment).filter(Assignment.engineer_id == engineer_id).all()]
         # Remove linked User rows first (FK constraint)
         session.query(User).filter(User.engineer_id == engineer_id).delete()
         # Remove assignment rows referencing this engineer
         session.query(Assignment).filter(Assignment.engineer_id == engineer_id).delete()
         session.delete(engineer)
         session.commit()
+        for machine, category in doomed:
+            forget_cached_assignment(machine, category)
         return {"deleted": True, "engineer_id": engineer_id}
     except Exception as exc:
         session.rollback()
@@ -1222,11 +1327,16 @@ def http_assign_task(assignment_id: int, body: AssignTaskRequest,
         if task.engineer_id is not None:
             return JSONResponse(status_code=409, content={"error": "task is already assigned to an engineer"})
 
+        if task.status == "resolved":
+            return JSONResponse(status_code=409, content={"error": "task is already resolved"})
+
         engineer = session.get(Engineer, body.engineer_id)
         if engineer is None:
             return JSONResponse(status_code=404, content={"error": f"engineer {body.engineer_id} not found"})
         if not engineer.active:
             return JSONResponse(status_code=400, content={"error": "cannot assign to a deactivated engineer"})
+        if not engineer.available:
+            return JSONResponse(status_code=400, content={"error": "cannot assign to an off-shift engineer"})
 
         # Zone scoping for field_manager
         if role == "field_manager":
@@ -1248,6 +1358,9 @@ def http_assign_task(assignment_id: int, body: AssignTaskRequest,
 
         session.commit()
         session.refresh(task)
+        # The live feed caches the (previously unassigned) result for this
+        # fault; drop it so the next tick shows the newly assigned engineer.
+        forget_cached_assignment(task.machine, task.fault_category)
 
         return {
             "id": task.id,
@@ -1333,7 +1446,9 @@ def auth_login(body: LoginRequest, request: Request, response: Response):
         # Unified 401: bad username, wrong password, OR deactivated account.
         # Never reveal which condition failed.
         active = getattr(user, "active", True)  # default True for plant_manager rows
-        if user is None or not active or not verify_password(body.password, user.password_hash):
+        # An empty password is never a valid credential, whatever is stored.
+        if (user is None or not active or not body.password
+                or not verify_password(body.password, user.password_hash)):
             record_failed_attempt(client_ip, uname)
             print(f"[auth] failed login for {uname!r} from {client_ip}")
             return JSONResponse(status_code=401, content={"error": "invalid credentials"})
@@ -1489,6 +1604,21 @@ def _extract_ws_token(message: str) -> str | None:
 # Seconds to wait for the WS auth handshake before giving up (avoids a hung,
 # never-authenticated socket holding a connection open).
 _WS_AUTH_TIMEOUT_S = 10
+# How often an OPEN socket re-checks its user against the DB, so logout /
+# deactivation also cut off an already-connected live feed (not just new ones).
+_WS_REVALIDATE_S = 30
+
+
+async def _ws_session_watchdog(websocket: WebSocket, claims: dict) -> None:
+    """Close the socket (4003) once its user is revoked or deactivated."""
+    while True:
+        await asyncio.sleep(_WS_REVALIDATE_S)
+        if await run_in_threadpool(user_from_claims, claims) is None:
+            try:
+                await websocket.close(code=4003, reason="session revoked")
+            except Exception:
+                pass
+            return
 
 
 @app.websocket("/ws")
@@ -1519,21 +1649,26 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=4001, reason="authentication required")
         return
     claims = decode_token(token)
-    if not claims:
-        await websocket.close(code=4003, reason="invalid or expired token")
+    # Signature/expiry alone is not enough: the user must still exist, be
+    # active, and the token must not be revoked (logout bumps token_version).
+    user = await run_in_threadpool(user_from_claims, claims) if claims else None
+    if user is None:
+        await websocket.close(code=4003, reason="invalid, expired or revoked token")
         return
 
-    # SCOPE the live feed by the token's role + zone (mirrors /telemetry/snapshot).
-    # Default fails CLOSED to a zone-less technician if claims are malformed.
-    role = claims.get("role") or "technician"
-    zone = claims.get("zone")
-    manager.register(websocket, role=role, zone=zone)  # already accepted above
+    # SCOPE the live feed by the user's CURRENT role + zone from the DB (mirrors
+    # /telemetry/snapshot), not by possibly-stale token claims.
+    manager.register(websocket, role=user.role, zone=user.zone)  # accepted above
+    watchdog = asyncio.create_task(_ws_session_watchdog(websocket, claims))
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        pass
     except Exception:
+        pass
+    finally:
+        watchdog.cancel()
         manager.disconnect(websocket)
 
 

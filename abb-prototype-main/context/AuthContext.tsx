@@ -141,7 +141,7 @@ function GuardSplash() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: 'var(--abb-font-mono)',
         fontSize: 12,
         letterSpacing: '0.12em',
         color: '#475569',

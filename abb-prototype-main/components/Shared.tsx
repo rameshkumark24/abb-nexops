@@ -172,7 +172,9 @@ export const NavBar = ({ onBack, onLogout }: { onBack?: () => void; onLogout?: (
           <IconLock size={12} color="var(--abb-ink-3)" /> LOG OUT
         </button>
       )}
-      {onBack ? (
+      {/* The login badge only belongs on the login flow — once a session exists
+          (onLogout provided) the LOG OUT button replaces it. */}
+      {onLogout ? null : onBack ? (
         <div
           style={{
             display: 'flex',
