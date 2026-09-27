@@ -8,6 +8,9 @@ Stage 1:  ConsolePublisher - just prints each record.
 Stage 2:  MqttPublisher    - pushes each record to an MQTT broker so
                              downstream NexOps services can subscribe.
                              Now fully implemented (needs paho-mqtt).
+Stage 3:  HttpPublisher    - POSTs each record to the NexOps backend's HTTPS
+                             ingest endpoint (PUBLISHER=http). No broker
+                             needed; stdlib only. For cloud deployments.
 
 The record-pulling logic lives entirely in the simulator: we import
 `generate_next_record` and feed whatever it returns into the selected
@@ -18,7 +21,11 @@ schema.
 import json
 import os
 import signal
+import threading
 import time
+import urllib.error
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from simulator import generate_next_record, INTERVAL_SECONDS
 
@@ -52,6 +59,19 @@ MQTT_TLS = os.environ.get("MQTT_TLS", "").strip().lower() in ("1", "true", "yes"
 # Seconds to keep retrying the FIRST connection (the broker may still be
 # starting). 0 = fail immediately, as before.
 MQTT_CONNECT_WAIT_SECONDS = float(os.environ.get("MQTT_CONNECT_WAIT_SECONDS", "60"))
+
+# --- HTTPS ingest settings (used by HttpPublisher, PUBLISHER=http) ---
+# POST each record straight to the NexOps backend — no MQTT broker needed, which
+# suits cloud deployments. INGEST_TOKEN must match the backend's INGEST_TOKEN.
+INGEST_URL = os.environ.get("INGEST_URL", "").strip()
+INGEST_TOKEN = os.environ.get("INGEST_TOKEN", "").strip()
+INGEST_TIMEOUT_SECONDS = float(os.environ.get("INGEST_TIMEOUT_SECONDS", "20"))
+
+# Optional health endpoint. When PORT (or HEALTH_PORT) is set, a tiny HTTP server
+# answers GET / and /healthz with the publisher's status — required to run as a
+# web service on hosts that expect a bound port (e.g. Render), and usable by
+# uptime monitors. Unset = no server.
+HEALTH_PORT = os.environ.get("HEALTH_PORT") or os.environ.get("PORT")
 
 # ----------------------------------------------------------------------
 # Optional dependency guard
@@ -209,11 +229,101 @@ class MqttPublisher(Publisher):
 # Publisher selection
 # ----------------------------------------------------------------------
 
+class HttpPublisher(Publisher):
+    """POST each record to the NexOps backend's HTTPS ingest endpoint
+    (POST /ingest/telemetry, `Authorization: Bearer <INGEST_TOKEN>`).
+
+    Stdlib only. Failures never stop the feed: a sleeping/restarting backend
+    (e.g. a free-tier host waking up) just drops those ticks, and each failure
+    streak is logged once plus a summary when delivery recovers."""
+
+    def __init__(self, url=INGEST_URL, token=INGEST_TOKEN,
+                 timeout=INGEST_TIMEOUT_SECONDS):
+        if not url or not token:
+            raise RuntimeError(
+                "PUBLISHER=http needs INGEST_URL (e.g. https://<backend>/ingest/telemetry) "
+                "and INGEST_TOKEN (the backend's INGEST_TOKEN).")
+        self.url = url
+        self.token = token
+        self.timeout = timeout
+        self.failures = 0  # consecutive failed publishes
+
+    def connect(self):
+        print(f"[http] publishing to {self.url}")
+
+    def publish(self, record):
+        req = urllib.request.Request(
+            self.url,
+            data=json.dumps(record).encode("utf-8"),
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.token}",
+                "User-Agent": "nexops-data-generator",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as res:
+                res.read()
+            if self.failures:
+                print(f"[http] delivery restored after {self.failures} failed record(s)")
+            self.failures = 0
+            STATUS["published"] += 1
+            STATUS["last_error"] = None
+        except urllib.error.HTTPError as exc:
+            reason = {401: "backend rejected INGEST_TOKEN",
+                      404: "ingest disabled on backend (INGEST_TOKEN not set there)",
+                      413: "batch too large"}.get(exc.code, f"HTTP {exc.code}")
+            self._failed(reason)
+        except Exception as exc:  # URLError, timeout, connection reset...
+            self._failed(f"{type(exc).__name__}: {getattr(exc, 'reason', exc)}")
+
+    def _failed(self, reason):
+        self.failures += 1
+        STATUS["failed"] += 1
+        STATUS["last_error"] = reason
+        if self.failures == 1:
+            print(f"[http] publish failed: {reason} (will keep retrying each tick)")
+
+
+# Shared publisher status, served by the optional health endpoint.
+STATUS = {"published": 0, "failed": 0, "last_error": None, "started": time.time()}
+
+
+def start_health_server(port):
+    """Serve GET / and /healthz with the publisher status on 0.0.0.0:<port>."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path not in ("/", "/healthz"):
+                self.send_error(404)
+                return
+            body = json.dumps({"status": "ok", "publisher": PUBLISHER,
+                               "uptime_s": int(time.time() - STATUS["started"]),
+                               **{k: v for k, v in STATUS.items() if k != "started"}})
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body.encode("utf-8"))
+
+        do_HEAD = do_GET
+
+        def log_message(self, *args):  # keep stdout for the feed logs
+            pass
+
+    server = ThreadingHTTPServer(("0.0.0.0", int(port)), Handler)
+    threading.Thread(target=server.serve_forever, name="health", daemon=True).start()
+    print(f"[health] status endpoint on :{port}/healthz")
+    return server
+
+
 def make_publisher(name=PUBLISHER):
     """Return a publisher instance for the configured name.
     Defaults to ConsolePublisher for any unknown value."""
     if name == "mqtt":
         return MqttPublisher(MQTT_HOST, MQTT_PORT, MQTT_TOPIC, MQTT_QOS)
+    if name == "http":
+        return HttpPublisher()
     return ConsolePublisher()
 
 
@@ -229,6 +339,8 @@ def main():
     # `docker stop` / systemd send SIGTERM: treat it like CTRL+C so the loop
     # exits through the same clean-disconnect path.
     signal.signal(signal.SIGTERM, _raise_keyboard_interrupt)
+    if HEALTH_PORT:
+        start_health_server(HEALTH_PORT)
     publisher = make_publisher(PUBLISHER)
     publisher.connect()
     print(f"Publishing simulator feed via {type(publisher).__name__} "

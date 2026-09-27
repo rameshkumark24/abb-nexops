@@ -42,6 +42,28 @@ SIMULATOR_DIR = os.environ.get("SIMULATOR_DIR") or os.path.join(
 # Seconds between records; 0/unset = the simulator's own INTERVAL_SECONDS.
 SIMULATOR_INTERVAL_SECONDS = float(os.environ.get("SIMULATOR_INTERVAL_SECONDS") or 0)
 
+# --- HTTPS telemetry ingest (external generator / gateway without a broker) ---
+# Shared secret for POST /ingest/telemetry. Unset = the endpoint is disabled.
+INGEST_TOKEN = os.environ.get("INGEST_TOKEN", "").strip()
+INGEST_MAX_BATCH = int(os.environ.get("INGEST_MAX_BATCH", "200"))
+
+# --- Public WebSocket URL handed to browsers with their WS ticket ---
+# When the frontend is served by a host that cannot proxy WebSockets (Vercel),
+# the browser must connect straight to the backend. PUBLIC_WS_URL sets that
+# address explicitly; on Render it is derived from RENDER_EXTERNAL_URL, which
+# Render sets automatically. Empty = the browser uses its same-origin /api/ws.
+def _public_ws_url() -> str:
+    explicit = os.environ.get("PUBLIC_WS_URL", "").strip()
+    if explicit:
+        return explicit
+    external = os.environ.get("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
+    if external.startswith(("https://", "http://")):
+        return "ws" + external[len("http"):] + "/ws"
+    return ""
+
+
+PUBLIC_WS_URL = _public_ws_url()
+
 # --- WebSocket / HTTP server (what the browser connects to) ---
 WS_HOST = os.environ.get("WS_HOST", "0.0.0.0")
 WS_PORT = int(os.environ.get("WS_PORT", "8000"))

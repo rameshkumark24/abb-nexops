@@ -240,3 +240,89 @@ def test_knowledge_base_json_matches_pdf():
 def test_health_endpoints_accept_head():
     assert client.head("/").status_code == 200
     assert client.head("/healthz").status_code == 200
+
+
+# ---- ingest + live-feed URL -----------------------------------------------------
+
+def test_ingest_disabled_without_token(monkeypatch):
+    monkeypatch.setattr(main.config, "INGEST_TOKEN", "")
+    r = client.post("/ingest/telemetry", json={"Machine": "Pump A1"})
+    assert r.status_code == 404
+
+
+def test_ingest_requires_token_and_processes_records(monkeypatch):
+    monkeypatch.setattr(main.config, "INGEST_TOKEN", "s3cret-token")
+    sim = main._load_simulator()
+    batch = [sim.generate_next_record(i) for i in range(1, 4)] + ["junk"]
+
+    assert client.post("/ingest/telemetry", json=batch).status_code == 401
+    assert client.post("/ingest/telemetry", json=batch,
+                       headers={"Authorization": "Bearer wrong"}).status_code == 401
+
+    r = client.post("/ingest/telemetry", json=batch,
+                    headers={"Authorization": "Bearer s3cret-token"})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"accepted": 3, "rejected": 1}
+    with main._states_lock:
+        assert batch[0]["Machine"] in main.latest_machine_states
+
+
+def test_ws_ticket_includes_public_ws_url(monkeypatch):
+    monkeypatch.setattr(main.config, "PUBLIC_WS_URL", "wss://api.example.com/ws")
+    tok = _token("plant")
+    body = client.get("/auth/ws-ticket", headers=_auth(tok)).json()
+    assert body["ws_url"] == "wss://api.example.com/ws" and body["ticket"]
+
+
+def test_public_ws_url_derived_from_render(monkeypatch):
+    monkeypatch.delenv("PUBLIC_WS_URL", raising=False)
+    monkeypatch.setenv("RENDER_EXTERNAL_URL", "https://svc.onrender.com/")
+    assert main.config._public_ws_url() == "wss://svc.onrender.com/ws"
+
+
+def test_groq_retired_model_is_replaced(monkeypatch):
+    """Groq answers 404 for a retired model: ARIA must discover a current model,
+    retry once, and keep using it."""
+    import asyncio
+    import aria
+
+    calls = []
+
+    class Resp:
+        def __init__(self, status, body):
+            self.status_code, self._body = status, body
+
+        def json(self):
+            return self._body
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            calls.append(("GET", url))
+            return Resp(200, {"data": [{"id": "whisper-large-v3", "active": True},
+                                       {"id": "openai/gpt-oss-120b", "active": True}]})
+
+        async def post(self, url, json=None, **kw):
+            calls.append(("POST", json["model"]))
+            if json["model"] == "retired-model":
+                return Resp(404, {"error": {"code": "model_not_found"}})
+            return Resp(200, {"choices": [{"message": {"content": "grounded answer"}}]})
+
+    monkeypatch.setattr(aria.httpx, "AsyncClient", lambda *a, **k: FakeClient())
+    monkeypatch.setattr(aria, "GROQ_API_KEY", "k")
+    monkeypatch.setattr(aria, "GROQ_MODEL", "retired-model")
+    monkeypatch.setattr(aria, "_groq_model_override", None)
+
+    assert asyncio.run(aria._call_groq("q")) == "grounded answer"
+    assert calls == [("POST", "retired-model"),
+                     ("GET", "https://api.groq.com/openai/v1/models"),
+                     ("POST", "openai/gpt-oss-120b")]
+    # Remembered: the next call goes straight to the working model.
+    calls.clear()
+    asyncio.run(aria._call_groq("q2"))
+    assert calls == [("POST", "openai/gpt-oss-120b")]

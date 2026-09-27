@@ -31,24 +31,20 @@ function normalizeOrigin(raw) {
 }
 const BACKEND_ORIGIN = normalizeOrigin(process.env.BACKEND_ORIGIN);
 
-// Live-feed WebSocket URL baked into the client bundle. Vercel's rewrites do not
-// carry WebSocket upgrades, so on a Vercel build (with a real backend origin)
-// the browser connects straight to the backend's /ws instead of /api/ws — no
-// separate NEXT_PUBLIC_WS_URL needed. The WS is ticket-authenticated, so
-// cross-origin is fine. An explicit NEXT_PUBLIC_WS_URL always wins.
-function resolveWsUrl() {
-  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
-  const localBackend = /\/\/(localhost|127\.0\.0\.1)(:|$|\/)/.test(BACKEND_ORIGIN);
-  if (process.env.VERCEL === '1' && !localBackend) {
-    return `${BACKEND_ORIGIN.replace(/^http/i, 'ws')}/ws`;
-  }
-  return '';
-}
-const WS_URL = resolveWsUrl();
+// Live-feed WebSocket URL baked into the client bundle. An HTTPS backend origin
+// is a separately hosted, public backend (e.g. Render behind a Vercel
+// frontend, whose rewrites cannot carry WebSocket upgrades), so the browser
+// connects straight to its /ws. An internal http:// origin (docker compose,
+// local dev) keeps the same-origin /api/ws proxy. At runtime the backend's own
+// ws_url (sent with the WS ticket) takes precedence; NEXT_PUBLIC_WS_URL
+// overrides the build-time default. The WS is ticket-authenticated, so
+// cross-origin is fine.
+const PUBLIC_BACKEND = /^https:\/\//i.test(BACKEND_ORIGIN);
+const BACKEND_WS_URL = PUBLIC_BACKEND ? `${BACKEND_ORIGIN.replace(/^http/i, 'ws')}/ws` : '';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || BACKEND_WS_URL;
 
 
-function externalWsOrigin() {
-  const url = WS_URL;
+function wsOrigin(url) {
   if (!url || !/^wss?:\/\//i.test(url)) return '';
   try {
     return new URL(url).origin;
@@ -56,6 +52,8 @@ function externalWsOrigin() {
     return '';
   }
 }
+// Every WS origin the page may use: the configured one and the public backend.
+const externalWsOrigins = [...new Set([wsOrigin(WS_URL), wsOrigin(BACKEND_WS_URL)].filter(Boolean))].join(' ');
 
 const csp = [
   "default-src 'self'",
@@ -63,7 +61,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self'${isDev ? ' ws: wss:' : ''} ${externalWsOrigin()}`.trim(),
+  `connect-src 'self'${isDev ? ' ws: wss:' : ''} ${externalWsOrigins}`.trim(),
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "object-src 'none'",

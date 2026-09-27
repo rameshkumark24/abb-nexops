@@ -63,6 +63,21 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 # a code change.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Providers retire model names (Groq answers 404 / "model_decommissioned").
+# When the configured model is rejected we ask Groq which models exist and pick
+# the first available one from this preference list (else any chat model), and
+# remember it for the life of the process.
+_GROQ_PREFERRED_MODELS = (
+    "llama-3.3-70b-versatile",
+    "openai/gpt-oss-120b",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "openai/gpt-oss-20b",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "qwen/qwen3-32b",
+    "llama-3.1-8b-instant",
+)
+_GROQ_NON_CHAT = ("whisper", "tts", "guard", "embed", "playai", "orpheus", "compound")
+_groq_model_override: str | None = None
 LLM_TIMEOUT_S = float(os.environ.get("ARIA_LLM_TIMEOUT", "8"))
 
 class AriaLLMUnavailable(Exception):
@@ -811,31 +826,81 @@ async def call_llm(query: str, ctx: dict) -> tuple[str, str]:
     # 2. Secondary fallback: Groq API (only if a key is configured)
     if GROQ_API_KEY:
         try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json",
-            }
-            body = {
-                "model": GROQ_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2,
-                "max_tokens": 600,
-            }
-            async with httpx.AsyncClient() as client:
-                res = await client.post(url, headers=headers, json=body,
-                                        timeout=LLM_TIMEOUT_S)
-                if res.status_code == 200:
-                    data = res.json()
-                    text = (data["choices"][0]["message"].get("content") or "").strip()
-                    if text:
-                        return text, "llm"
-                else:
-                    print(f"[aria-llm] Groq API HTTP {res.status_code}")
+            text = await _call_groq(prompt)
+            if text:
+                return text, "llm"
         except Exception as e:
             print(f"[aria-llm] Groq API failed or timed out: {type(e).__name__}")
 
     raise AriaLLMUnavailable("All configured LLM pipelines failed.")
+
+def _groq_model_rejected(res) -> bool:
+    """True when Groq refused the request because of the MODEL (unknown or
+    decommissioned), as opposed to auth, rate-limit or server errors."""
+    if res.status_code == 404:
+        return True
+    if res.status_code == 400:
+        try:
+            err = res.json().get("error", {})
+        except Exception:
+            return False
+        blob = f"{err.get('code', '')} {err.get('message', '')}".lower()
+        return "model" in blob and ("decommission" in blob or "not found" in blob
+                                    or "does not exist" in blob)
+    return False
+
+
+async def _discover_groq_model(client, headers) -> str | None:
+    """Pick an available Groq chat model: first match from the preference list,
+    else any active chat-capable model."""
+    res = await client.get("https://api.groq.com/openai/v1/models",
+                           headers=headers, timeout=LLM_TIMEOUT_S)
+    if res.status_code != 200:
+        print(f"[aria-llm] Groq model list HTTP {res.status_code}")
+        return None
+    ids = [m.get("id", "") for m in res.json().get("data", [])
+           if m.get("active", True)]
+    chat = [i for i in ids if i and not any(t in i.lower() for t in _GROQ_NON_CHAT)]
+    for preferred in _GROQ_PREFERRED_MODELS:
+        if preferred in chat:
+            return preferred
+    return chat[0] if chat else None
+
+
+async def _call_groq(prompt: str) -> str | None:
+    """One Groq chat completion. If the configured model has been retired,
+    discover a current one, retry once, and keep using it."""
+    global _groq_model_override
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient() as client:
+        model = _groq_model_override or GROQ_MODEL
+        for attempt in range(2):
+            body = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2,
+                "max_tokens": 600,
+            }
+            res = await client.post(url, headers=headers, json=body,
+                                    timeout=LLM_TIMEOUT_S)
+            if res.status_code == 200:
+                data = res.json()
+                return (data["choices"][0]["message"].get("content") or "").strip()
+            if attempt == 0 and _groq_model_rejected(res):
+                replacement = await _discover_groq_model(client, headers)
+                if replacement and replacement != model:
+                    print(f"[aria-llm] Groq model '{model}' unavailable -> using '{replacement}'")
+                    _groq_model_override = model = replacement
+                    continue
+            print(f"[aria-llm] Groq API HTTP {res.status_code} (model '{model}')")
+            return None
+    return None
+
 
 async def answer(query: str, role: str, scope_zone: str | None, latest: dict, history: dict, session, username: str | None = None, engineer_id: int | None = None) -> dict:
     """The central orchestrator driving the context assembly, LLM/fallback rendering, and evidence footer binding."""

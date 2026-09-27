@@ -174,8 +174,11 @@ function makeMockRecord(seq: number): TelemetryRecord {
 // scheme follows the page (wss:// behind HTTPS — a hard-coded ws:// URL would be
 // blocked as mixed content). NEXT_PUBLIC_WS_URL overrides it: either an absolute
 // ws(s):// URL or a path resolved against the current origin.
-function resolveWsUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_WS_URL || '/api/ws';
+function resolveWsUrl(serverUrl?: string | null): string {
+  // 1) the backend's own public WS address (sent with the ticket) — correct
+  //    even when this frontend host can't proxy WebSockets (Vercel);
+  // 2) a build-time NEXT_PUBLIC_WS_URL; 3) same-origin /api/ws.
+  const configured = serverUrl || process.env.NEXT_PUBLIC_WS_URL || '/api/ws';
   if (/^wss?:\/\//i.test(configured)) return configured;
   if (typeof window === 'undefined') return configured;
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -209,6 +212,16 @@ function subscribe(
   let retryCount = 0;  // for exponential backoff
   const MAX_BACKOFF_MS = 30000;
 
+  const scheduleReconnect = () => {
+    if (stopped || reconnectTimer !== null) return;
+    const delay = Math.min(1000 * Math.pow(2, retryCount), MAX_BACKOFF_MS);
+    retryCount += 1;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, delay);
+  };
+
   const connect = async () => {
     if (stopped) return;
     // The session lives in an httpOnly cookie that can't be attached to a
@@ -216,6 +229,7 @@ function subscribe(
     // cookie-authed (same-origin) endpoint and pass THAT as the WS first message.
     // The ticket never lands in the URL (no log/history leak).
     let ticket: string | null = null;
+    let serverWsUrl: string | null = null;
     try {
       const res = await fetch(`${API_BASE}/auth/ws-ticket`, { credentials: 'include' });
       if (res.status === 401) {
@@ -228,12 +242,22 @@ function subscribe(
       if (res.ok) {
         const data = await res.json();
         ticket = typeof data?.ticket === 'string' ? data.ticket : null;
+        serverWsUrl = typeof data?.ws_url === 'string' && data.ws_url ? data.ws_url : null;
       }
     } catch {
       /* no ticket -> the WS will fail auth and the close handler retries */
     }
     if (stopped) return;
-    ws = new WebSocket(resolveWsUrl());
+    const wsUrl = resolveWsUrl(serverWsUrl);
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch (err) {
+      // e.g. blocked by CSP or a malformed URL: log it, then retry like a close.
+      console.error('[useLiveData] cannot open live feed at', wsUrl, err);
+      ws = null;
+      scheduleReconnect();
+      return;
+    }
 
     ws.onopen = () => {
       if (stopped) return;
@@ -260,15 +284,14 @@ function subscribe(
 
     // On an unexpected close, mark disconnected and retry after a short delay
     // so a backend restart doesn't permanently break the UI.
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       onStatus?.(false);
-      if (stopped || reconnectTimer !== null) return;
-      const delay = Math.min(1000 * Math.pow(2, retryCount), MAX_BACKOFF_MS);
-      retryCount += 1;
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        connect();
-      }, delay);
+      if (retryCount === 2) {
+        // Surface a persistent failure once (not on every retry) so a
+        // misconfigured feed URL is diagnosable from the browser console.
+        console.warn(`[useLiveData] live feed ${wsUrl} closed (code ${event.code}); retrying`);
+      }
+      scheduleReconnect();
     };
 
     // onerror is typically followed by onclose; route through the close path.

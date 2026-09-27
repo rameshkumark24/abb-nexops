@@ -94,7 +94,11 @@ The backend must be a Render **Web Service** (not a Static Site):
 | Env | `PYTHON_VERSION=3.11.11`, `EMBEDDED_SIMULATOR=1`, `MQTT_ENABLED=0`, `COOKIE_SECURE=1`, `FORWARDED_ALLOW_IPS=*`, `TZ=Asia/Kolkata` (the plant's timezone), optionally `NEXOPS_JWT_SECRET`, `GEMINI_API_KEY` / `GROQ_API_KEY` |
 
 `EMBEDDED_SIMULATOR=1` generates the telemetry inside the backend, so no MQTT broker or
-publisher service is needed. On Vercel set **`BACKEND_ORIGIN=https://<service>.onrender.com`**
+publisher service is needed. To run the generator as its **own service** instead
+(the [`abb-datagenerator`](https://github.com/rameshkumark24/abb-datagenerator) repo), set
+`INGEST_TOKEN=<long random secret>` and `EMBEDDED_SIMULATOR=0` on the backend, and run the
+generator with `PUBLISHER=http`, `INGEST_URL=https://<backend>/ingest/telemetry` and the same
+`INGEST_TOKEN`: it POSTs each record over HTTPS, so no broker is needed there either. On Vercel set **`BACKEND_ORIGIN=https://<service>.onrender.com`**
 and redeploy: the live-feed WebSocket then connects straight to `wss://<service>.onrender.com/ws`
 automatically (Vercel's proxy can't carry WebSockets).
 
