@@ -214,3 +214,29 @@ def test_healthz_reports_database_ok():
     r = client.get("/healthz")
     assert r.status_code == 200
     assert r.json()["database"] is True
+
+
+# ---- embedded simulator / fast KB seed -------------------------------------------
+
+def test_embedded_simulator_record_flows_through_pipeline():
+    """A simulator record fed to process_record() comes out enriched and cached,
+    exactly as an MQTT message would."""
+    sim = main._load_simulator()
+    record = main.process_record(sim.generate_next_record(1))
+    for key in ("anomaly_status", "nexops_risk", "is_early", "site_alert",
+                "assigned_engineer", "zone"):
+        assert key in record
+    with main._states_lock:
+        assert main.latest_machine_states[record["Machine"]] is record
+
+
+def test_knowledge_base_json_matches_pdf():
+    """The pre-parsed JSON used for fast startup seeding must stay in sync with
+    the PDF it was generated from."""
+    import seed_qa
+    assert seed_qa.load_qa_pairs() == seed_qa.parse_qa_from_pdf(seed_qa.DEFAULT_PDF)
+
+
+def test_health_endpoints_accept_head():
+    assert client.head("/").status_code == 200
+    assert client.head("/healthz").status_code == 200

@@ -82,6 +82,22 @@ Notes:
   secure the broker (see `deploy/mosquitto.conf`: credentials + TLS, then
   `MQTT_USERNAME`/`MQTT_PASSWORD`/`MQTT_TLS=1` on the backend).
 
+### Vercel (frontend) + Render (backend) — free tier
+
+The backend must be a Render **Web Service** (not a Static Site):
+
+| Setting | Value |
+|---------|-------|
+| Runtime | Python |
+| Build command | `pip install -r nexops-backend/requirements.txt` |
+| Start command | `cd nexops-backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers` |
+| Env | `PYTHON_VERSION=3.11.11`, `EMBEDDED_SIMULATOR=1`, `MQTT_ENABLED=0`, `COOKIE_SECURE=1`, `FORWARDED_ALLOW_IPS=*`, `TZ=Asia/Kolkata` (the plant's timezone), optionally `NEXOPS_JWT_SECRET`, `GEMINI_API_KEY` / `GROQ_API_KEY` |
+
+`EMBEDDED_SIMULATOR=1` generates the telemetry inside the backend, so no MQTT broker or
+publisher service is needed. On Vercel set **`BACKEND_ORIGIN=https://<service>.onrender.com`**
+and redeploy: the live-feed WebSocket then connects straight to `wss://<service>.onrender.com/ws`
+automatically (Vercel's proxy can't carry WebSockets).
+
 ### Split hosting (e.g. frontend on Vercel, backend on a container host)
 
 - Deploy `nexops-backend/` with its `Dockerfile` (mount a volume at `/data`, or use

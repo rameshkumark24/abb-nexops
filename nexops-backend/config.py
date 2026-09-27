@@ -31,6 +31,17 @@ MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
 MQTT_TLS = _flag("MQTT_TLS")
 MQTT_CLIENT_ID = os.environ.get("MQTT_CLIENT_ID", "")
 
+# --- Embedded simulator (deployments without an MQTT broker) ---
+# EMBEDDED_SIMULATOR=1 generates telemetry in-process with the stdlib-only
+# nexops-data-generator/simulator.py instead of subscribing to a broker — e.g.
+# a single free Render web service. Needs the simulator on disk (a full repo
+# checkout; the backend Docker image does not include it).
+EMBEDDED_SIMULATOR = _flag("EMBEDDED_SIMULATOR")
+SIMULATOR_DIR = os.environ.get("SIMULATOR_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "nexops-data-generator")
+# Seconds between records; 0/unset = the simulator's own INTERVAL_SECONDS.
+SIMULATOR_INTERVAL_SECONDS = float(os.environ.get("SIMULATOR_INTERVAL_SECONDS") or 0)
+
 # --- WebSocket / HTTP server (what the browser connects to) ---
 WS_HOST = os.environ.get("WS_HOST", "0.0.0.0")
 WS_PORT = int(os.environ.get("WS_PORT", "8000"))

@@ -496,7 +496,18 @@ def on_message(client, userdata, msg):
     except (ValueError, UnicodeDecodeError) as exc:
         print(f"[mqtt] skipping bad message on {msg.topic}: {exc}")
         return
+    if not isinstance(raw, dict):
+        print(f"[mqtt] skipping non-object message on {msg.topic}")
+        return
+    process_record(raw)
 
+
+def process_record(raw: dict) -> dict:
+    """Run ONE raw telemetry record through the full pipeline (normalize ->
+    anomaly -> risk -> EARLY -> assignment -> site alert), cache it, and
+    broadcast it. Shared by the MQTT handler and the embedded simulator, so both
+    telemetry sources behave identically. Runs on a background thread (paho's or
+    the simulator's), never on the event loop. Returns the enriched record."""
     # The ONE normalization choke point.
     record = normalize(raw)
 
@@ -719,13 +730,55 @@ def on_message(client, userdata, msg):
                 history_machine_states[record["Machine"]] = deque(maxlen=50)
             history_machine_states[record["Machine"]].append(record.copy())
 
-    # Hand off from this sync MQTT thread to the asyncio event loop.
+    # Hand off from this sync background thread to the asyncio event loop.
     if event_loop is not None:
         asyncio.run_coroutine_threadsafe(manager.broadcast(record), event_loop)
+    return record
 
 
 # ----------------------------------------------------------------------
-# FastAPI lifecycle: start/stop the MQTT network loop
+# Embedded simulator — the telemetry source for single-service deployments
+# with no MQTT broker (e.g. a free Render web service). It imports the
+# stdlib-only nexops-data-generator/simulator.py and feeds its records through
+# process_record(), exactly as if they had arrived over MQTT.
+# ----------------------------------------------------------------------
+_simulator_stop = threading.Event()
+simulator_running = False
+
+
+def _load_simulator():
+    sim_dir = config.SIMULATOR_DIR
+    if sim_dir not in sys.path:
+        sys.path.insert(0, sim_dir)
+    import simulator  # noqa: E402  (resolved from SIMULATOR_DIR)
+    return simulator
+
+
+def _run_embedded_simulator() -> None:
+    global simulator_running
+    try:
+        sim = _load_simulator()
+    except Exception as exc:
+        print(f"[simulator] cannot load simulator from {config.SIMULATOR_DIR}: {exc} "
+              f"(no live feed)")
+        return
+    interval = config.SIMULATOR_INTERVAL_SECONDS or float(sim.INTERVAL_SECONDS)
+    print(f"[simulator] embedded telemetry simulator running (one record every {interval}s)")
+    simulator_running = True
+    alarm_id = 1
+    try:
+        while not _simulator_stop.wait(interval):
+            try:
+                process_record(sim.generate_next_record(alarm_id))
+            except Exception as exc:  # one bad tick must never stop the feed
+                print(f"[simulator] record {alarm_id} failed: {exc} (feed continues)")
+            alarm_id += 1
+    finally:
+        simulator_running = False
+
+
+# ----------------------------------------------------------------------
+# FastAPI lifecycle: start/stop the telemetry source (MQTT or embedded simulator)
 # ----------------------------------------------------------------------
 
 def _load_knowledge_base() -> None:
@@ -766,6 +819,14 @@ async def startup():
     # AFTER the roster seed (which recreates tables), load the KB if empty.
     threading.Thread(target=_load_knowledge_base, name="kb-seed", daemon=True).start()
 
+    if config.EMBEDDED_SIMULATOR:
+        _simulator_stop.clear()
+        threading.Thread(target=_run_embedded_simulator, name="embedded-simulator",
+                         daemon=True).start()
+        print("[mqtt] EMBEDDED_SIMULATOR=1 -> telemetry is generated in-process; "
+              "not connecting to a broker")
+        return
+
     if not config.MQTT_ENABLED:
         print("[mqtt] MQTT_ENABLED=0 -> not connecting to a broker (no live feed)")
         return
@@ -790,6 +851,7 @@ async def startup():
 
 
 async def shutdown():
+    _simulator_stop.set()
     if mqtt_client is not None:
         mqtt_client.loop_stop()
         mqtt_client.disconnect()
@@ -799,7 +861,7 @@ async def shutdown():
 # HTTP + WebSocket endpoints
 # ----------------------------------------------------------------------
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def health():
     """Simple health check - open in a browser to confirm the service is up."""
     return {"status": "ok", "clients": len(manager.active)}
@@ -816,7 +878,7 @@ def _db_ok() -> bool:
         session.close()
 
 
-@app.get("/healthz")
+@app.api_route("/healthz", methods=["GET", "HEAD"])
 async def healthz():
     """Liveness/readiness probe for containers and load balancers. 503 only when
     the database is unreachable (the API can't serve anything useful then). A
@@ -828,7 +890,9 @@ async def healthz():
     body = {
         "status": "ok" if db_ok else "degraded",
         "database": db_ok,
-        "mqtt": {"enabled": config.MQTT_ENABLED, "connected": mqtt_connected},
+        "mqtt": {"enabled": config.MQTT_ENABLED and not config.EMBEDDED_SIMULATOR,
+                 "connected": mqtt_connected},
+        "simulator": {"enabled": config.EMBEDDED_SIMULATOR, "running": simulator_running},
         "machines_seen": machines,
         "ws_clients": len(manager.active),
     }
