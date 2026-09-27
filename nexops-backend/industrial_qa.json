@@ -1,0 +1,2420 @@
+[
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Why is the bearing overheating?",
+  "answer": "The most common cause is lubrication breakdown — either grease has degraded, dried out, run low, or got contaminated. Other typical causes are misalignment between shaft and coupling, excessive radial or axial load, or a worn bearing nearing end of life. Start by checking the lubrication port and feeling the bearing housing for the location of the hot spot. A localized hot spot usually means wear; uniform heat usually means lube or cooling problem."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What is a normal bearing operating temperature?",
+  "answer": "Most industrial rolling-element bearings run 20 to 40 degrees Celsius above ambient under normal load. Above 70°C ambient, increase monitoring. Above 80°C, plan inspection. Above 90°C, treat as urgent — risk of seizure rises rapidly. The exact safe limit depends on the bearing type, lubricant grade, and machine design."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "How fast can bearing temperature safely rise?",
+  "answer": "A slow rise of 1 to 2 degrees Celsius per hour during load increase is normal. A rise of 1°C per minute or faster is abnormal and warrants immediate investigation. Sudden temperature spikes — say, 5°C in a few minutes — usually mean lubrication has failed catastrophically or a foreign object has entered the bearing."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Can I keep running the machine if the bearing is hot?",
+  "answer": "Generally no. A hot bearing degrades faster the longer it runs hot. Every minute over 90°C is significant remaining life lost. Plan a controlled shutdown rather than running to failure. Run-to-failure is far more expensive and dangerous than a planned outage."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What lubricant should I use on this bearing?",
+  "answer": "Always use the spec-grade lubricant on the machine nameplate or the manufacturer manual. Never mix grease grades — different greases can chemically react, lose their thickener structure, and lose all protection. If you're unsure of the spec, ask the maintenance lead before applying anything."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "How often should I grease bearings?",
+  "answer": "Frequency depends on speed, load, and operating environment. A typical industrial pump bearing might need grease every 3 to 6 months; a dusty conveyor bearing might need it weekly. Follow the OEM schedule. Over-greasing is as harmful as under- greasing — too much grease creates churn, heat, and seal damage."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "How much grease should I add at each interval?",
+  "answer": "Calculate using the bearing formula: grams of grease equals 0.005 times outer diameter (in mm) times bearing width (in mm). For most medium-size bearings, that's only a few grams — not a full grease gun load. Always pump slowly to let the grease distribute and old grease push out."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "The bearing was just replaced and it is already getting hot. Why?",
+  "answer": "Three usual causes. Misalignment that was not corrected during installation — the new bearing dies fast on a misaligned shaft. Wrong bearing specification installed — easy to grab the wrong part number. Installation damage during pressing or hammering — even small dents in the race cause early failure. Check alignment first."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Should I use grease or oil for this bearing?",
+  "answer": "Grease is sealed, simpler, and good for low to moderate speeds. Oil cools better and handles higher speeds but requires a circulating system or oil bath. High-speed machines (above 3600 rpm) typically use oil. Conveyors, fans, and most pumps use grease. Follow the OEM recommendation."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What does grease contamination look like?",
+  "answer": "Healthy grease is uniform in color and texture. Contamination shows as color change (darker or with stripes), the presence of metal particles (silvery flecks when wiped on paper), water emulsion (cloudy or milky appearance), or hardening into a dry crust. Any of these means drain and refill, not just top up."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Why is the bearing making a grinding noise?",
+  "answer": "Grinding usually means metal-to-metal contact — the lubricant film has broken down, or there's debris in the bearing, or the race is spalled. Stop and investigate. Grinding bearings fail rapidly — typically within hours to days. Use a stethoscope or probe to localize which bearing is making the noise."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What is bearing fatigue and how does it appear?",
+  "answer": "Fatigue is the normal end of bearing life — cyclic stress eventually fractures the rolling surfaces. It appears as spalling (small flakes coming off the races), pitting (small craters), and progressive vibration increase. Fatigue is predictable — you can trend it and replace before catastrophic failure."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Why does the bearing make a clicking sound when starting?",
+  "answer": "Clicking on startup often means the lubricant film hasn't formed yet — common after a long shutdown. If the clicking persists during operation, suspect Brinelling (dents in the race from static load during shutdown) or rolling element damage. A few clicks on startup are normal; sustained clicking is not."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Can a bearing be repaired or only replaced?",
+  "answer": "Standard rolling-element bearings are replace-only — they're not designed to be rebuilt. Large precision bearings (spindles, gas turbine main bearings) can sometimes be re-lapped and reused if the damage is minor. For pumps, motors, fans, and conveyors, always replace."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "How do I press a bearing onto a shaft correctly?",
+  "answer": "Press only on the race that's being fitted — never through the rolling elements. For an inner race fit on a shaft, press on the inner race. For an outer race fit in a housing, press on the outer race. Use a proper bearing fitting tool. Hammering through the rolling elements causes immediate fatigue damage that shortens life dramatically."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What is the right bearing fit for a high-load application?",
+  "answer": "Heavy loads typically need interference fits on the inner race (loose race rotates and creeps) and slip fits on the outer race. The exact fit depends on shaft tolerance and bearing tolerance class. Use the bearing manufacturer's fit recommendation table — guessing at fits causes early failure."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "How do I know if my bearing housing is worn?",
+  "answer": "If the outer race fits loosely in a housing that should have light interference, the housing is worn. Measure the housing bore at three locations 60 degrees apart. If readings exceed bearing OD plus the tolerance, the housing needs sleeving or replacement. A loose outer race spins in the housing and destroys the bore further."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What is a thrust bearing and where is it used?",
+  "answer": "A thrust bearing carries axial load — load along the shaft's length, not radial. Used wherever shafts push or pull axially: pumps with high axial load, turbines, vertical motors carrying their own weight. Thrust bearings come as ball, roller, or hydrodynamic (oil film) types depending on load and speed."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Why do bearings fail more often on one side of a duplex pump?",
+  "answer": "Differential wear usually means the casing was assembled with one side carrying more load — misalignment, foundation distortion, or piping strain. Check pump-to-driver alignment, foundation grout condition, and pipe support near the suction and discharge flanges. Solve the root cause, not just replace the bearing repeatedly."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What is the difference between rolling-element and journal bearings?",
+  "answer": "Rolling-element bearings (ball, roller, needle) carry load on hardened steel elements rolling between races. Journal bearings (sleeve bearings) carry load on a fluid film of oil between the shaft and a metal sleeve. Rolling-element is simpler and self-contained. Journal handles much higher loads and speeds but needs continuous oil supply."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "How do I clean a bearing before installation?",
+  "answer": "Use clean, lint-free cloth and a clean solvent like a low-residue degreaser. Do not blow it out with compressed air — air carries moisture and contaminants, and spinning the bearing without lubrication damages the elements. Once clean, lubricate immediately to prevent corrosion."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What is bearing preload and when is it needed?",
+  "answer": "Preload is intentional internal pressure between the rolling elements and races — usually applied to angular contact bearings or paired bearings. It eliminates internal clearance, improves stiffness, and reduces vibration. Too much preload causes overheating and short life; too little causes runout and chatter. Set per OEM spec."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Why is my new bearing noisier than the old one?",
+  "answer": "Likely causes: incorrect storage caused brinelling before installation, debris entered during installation, the fit is wrong (too tight or too loose), or you're hearing normal break-in noise that will settle in a few hours. If noise persists after a day of operation, suspect installation damage."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "What does a brown discoloration on the race indicate?",
+  "answer": "Brown or blue heat discoloration means the bearing got hot enough to anneal the metal — usually from lubrication failure or excessive load. Heat-discolored races have reduced hardness and will fatigue early. Always replace any bearing showing heat discoloration, even if the damage looks superficial."
+ },
+ {
+  "section_number": 1,
+  "section_name": "Bearings and Lubrication",
+  "question": "Can I run a bearing slightly underloaded?",
+  "answer": "Surprisingly, no — under-loaded rolling-element bearings can suffer from sliding instead of rolling, which generates heat and damages the races. Manufacturers specify minimum loads. Under-loading is most common in lightly-loaded vertical pumps and large slow-speed motors. Some applications use spring loading to maintain minimum contact."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why is my motor running hot?",
+  "answer": "The most common causes are blocked ventilation (dust, dirt, or covers blocking airflow), overloading (motor working harder than rated), bearing problems, or electrical issues like winding insulation degrading or voltage imbalance. Feel the casing for the heat pattern — uniform heat usually means overload or ventilation, one hot spot points to bearings or a winding fault."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What is normal motor temperature?",
+  "answer": "Insulation classes determine motor temperature limits. Class B is 130°C, Class F is 155°C, Class H is 180°C — these are total temperature, not above ambient. A motor running near these limits is on the edge of failure. A good rule of thumb: surface temperature 40-60°C above ambient is normal for most industrial motors under load."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why does my motor trip on overload?",
+  "answer": "Either the motor is genuinely overloaded (driven machine seizing, blocked, or oversized for the application), the overload relay is set too low, the supply voltage is low (motor draws more current to maintain torque), or a phase is missing. Check the actual current and compare to nameplate amps."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What is voltage imbalance and why does it matter?",
+  "answer": "Voltage imbalance is when the three phase voltages aren't equal. Even a 2% voltage imbalance can cause a 15% current imbalance and significant heating. Beyond 5%, motors should not run. Check phases between L1-L2, L2-L3, and L1-L3. Imbalance is often caused by uneven single-phase loads on the building supply."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why is my motor humming but not starting?",
+  "answer": "Usually a missing phase (single-phasing), seized bearings or stuck rotor, broken rotor bar, or under-voltage. Trying to start a single-phasing motor burns out the windings in seconds. Check all three phases at the motor terminals first, with the motor de- energized, then trace upstream."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What causes motor windings to burn out?",
+  "answer": "Three main causes: overheating from prolonged overload, voltage imbalance, or blocked cooling; insulation breakdown from age, moisture, contamination, or voltage spikes; and mechanical damage like loose connections arcing inside the terminal box. Burnt windings smell like burnt varnish and discolor brown or black."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "How do I check insulation resistance on a motor?",
+  "answer": "Use a megger (insulation resistance tester) at 500 or 1000 volts depending on motor voltage. Test each winding to ground. For a healthy motor, expect at least 1 megohm per kV of rated voltage, plus 1 megohm — so a 480V motor should read at least 1.5 megohms. Below 1 megohm is suspect; below 0.5 megohms means dry and clean before energizing."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why is my motor vibrating?",
+  "answer": "Common causes: imbalance from a buildup of debris on rotating parts, misalignment to the driven machine, loose foot bolts, bent shaft, worn bearings, or rotor bar damage. Vibration at 1× shaft speed usually means imbalance. Vibration at 2× shaft speed usually means misalignment. Vibration at line frequency (50 or 60 Hz) often means electrical."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What is the difference between TEFC, ODP, and explosion-proof motors?",
+  "answer": "TEFC (Totally Enclosed Fan Cooled) keeps dust and moisture out — used in most industrial environments. ODP (Open Drip Proof) allows air to flow through for cooling — used in clean, dry indoor environments. Explosion-proof (XP) is built to contain an internal explosion without igniting the surrounding atmosphere — required in hazardous areas."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Can I run a 60Hz motor on 50Hz power?",
+  "answer": "Sometimes, with reduced performance. The motor will run 17% slower (since speed is proportional to frequency), and you must reduce the voltage proportionally (typically 380V instead of 460V). The motor will also produce less power. Check the nameplate — many international motors list both ratings."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why does the motor start fine but stall under load?",
+  "answer": "Likely under-voltage on the line during loading, broken rotor bars, or wrong motor sizing. Measure the voltage at the motor terminals while loaded — if it sags significantly, the supply is undersized. If voltage is fine, suspect rotor bar damage which doesn't show at no-load."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "How do I tell if a bearing failure is in the drive end or non-drive end?",
+  "answer": "Use a stethoscope or vibration probe on each bearing housing separately. The noisier or hotter end is the failed one. A vibration analyzer can also pinpoint by direction. The drive end typically has higher load, so it often fails first — but the non-drive end can fail from axial loads or thrust."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What does a humming noise from the motor terminal box mean?",
+  "answer": "Humming or buzzing from the terminal box is usually a loose connection arcing intermittently — dangerous and a fire risk. De-energize and lock out before opening the box. Check torque on all terminal lugs. Loose connections also damage windings from voltage transients."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why is my VFD-driven motor overheating?",
+  "answer": "VFDs create high-frequency switching that adds harmonic losses in the motor. Operating below rated speed reduces cooling fan effectiveness on TEFC motors. Solutions: use a VFD-rated motor (Class F or H insulation, inverter-grade), add a separate cooling fan for low-speed operation, or use a sine-wave filter on the VFD output."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What is a soft starter and when do I need one?",
+  "answer": "A soft starter reduces inrush current during motor starting — typically from 6-7x rated current to 3-4x. Used for large motors where the supply can't handle full inrush, or where the driven equipment (pumps, conveyors) shouldn't see sudden full torque. Cheaper than a VFD when you don't need speed control."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why do my motors fail in groups during summer?",
+  "answer": "High ambient temperature reduces motor capacity. A motor rated for 40°C ambient running at 50°C ambient effectively loses about 15% of its rating. Combined with reduced cooling efficiency and possibly higher load (more pumping, more refrigeration), summer failures cluster. Solutions: improve ventilation, derate motors, or upsize for hot environments."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "How often should motors be cleaned?",
+  "answer": "Depends on environment. A clean facility might be annual; a cement or sugar plant might be monthly. Watch the temperature trend — rising temperature at the same load means cooling is degrading. Dust buildup on the fins acts as insulation. Clean with a dry brush or low-pressure air, never high-pressure water."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What is the duty cycle of a motor?",
+  "answer": "Duty cycle defines how long a motor can run versus rest. S1 is continuous duty (the most common, runs forever at rated load). S2 is short-time (run X minutes, then cool). S3 is intermittent (cycle of on/off). Using a short-duty motor for continuous service overheats it. Check the nameplate duty rating."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Can I rewind a burned-out motor?",
+  "answer": "Yes, motors can be rewound, but quality varies dramatically. A good rewinder will match the original wire gauge, insulation class, and design. A bad rewind loses efficiency, runs hotter, and fails earlier. For motors below about 20 HP, replacing is often cheaper. Above 50 HP, rewinding is usually economic."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why is my motor singing or whining at certain speeds?",
+  "answer": "Usually electromagnetic noise from VFD harmonics, or mechanical resonance at a critical speed. VFDs with low switching frequency produce audible whine. Try changing the carrier frequency in the VFD. If mechanical, identify the resonant speed and avoid running there continuously."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What is motor slip and why does it matter?",
+  "answer": "Slip is the difference between synchronous speed (set by line frequency) and actual rotor speed. Induction motors require slip to produce torque. Typical slip is 1-5% at full load. Higher slip than nameplate means overload, low voltage, or rotor damage. Slip is how you know the motor is doing work."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "How do I measure motor efficiency in service?",
+  "answer": "Direct measurement requires input watts (clamp meter on supply) and output torque/speed (torque meter on the shaft). Indirect estimate: input watts minus iron loss minus copper loss minus mechanical loss equals output. Most plants don't measure routinely — they trend amps and temperature, and assume efficiency is constant."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why does my motor draw high current at no load?",
+  "answer": "Excessive no-load current usually means: shorted turns in the windings (insulation breakdown), low supply voltage, an air gap problem (bent shaft, worn bearings letting rotor rub stator), or a defective rotor. Compare no-load current to nameplate — usually 25-40% of full-load amps."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "What causes shaft current and shaft voltage damage?",
+  "answer": "VFDs generate common-mode voltage that capacitively couples to the shaft. The shaft voltage discharges through the bearings, pitting the races — called fluting damage or EDM damage. Solutions: bearing isolation rings (insulated bearings), shaft grounding brushes, or common-mode filters on the VFD output."
+ },
+ {
+  "section_number": 2,
+  "section_name": "Electric Motors",
+  "question": "Why is my motor noisy on startup but quiet at speed?",
+  "answer": "Likely the rotor is rubbing the stator briefly during startup (bent shaft, worn bearings, air gap eccentricity), or the cooling fan is hitting its shroud. At speed, centrifugal force may straighten things temporarily. Investigate before bearings or stator are damaged further."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why has the pump flow dropped?",
+  "answer": "Check upstream tank level first — running dry destroys a pump in minutes. Then check the inlet strainer and filter. Then verify the valve is actually open, not just commanded open. Cavitation sounds like marbles or gravel inside the casing and is distinctive. Also check if the impeller is worn or fouled."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What is cavitation and how do I recognize it?",
+  "answer": "Cavitation is the formation and collapse of vapor bubbles in the pump, caused by suction pressure dropping below the liquid's vapor pressure. Signs: distinctive gravel- like or marbles noise, vibration, erratic flow and pressure readings, and progressive impeller erosion. Cavitation destroys impellers progressively — repeated incidents shorten pump life dramatically."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "How do I know if my pump is cavitating?",
+  "answer": "Three signs: the gravel-like noise (distinctive once you've heard it), erratic flow and discharge pressure readings (gauge needle bouncing), and gradual erosion of the impeller (visible during maintenance — small pits in the suction side). A vibration analyzer shows high frequencies around 1-10 kHz."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why won't my pump prime?",
+  "answer": "Air in the suction line is the usual cause. Check the suction strainer is not blocked. Check the foot valve at the bottom of the suction line is sealing properly. Verify the priming line is open. Never run a dry pump for more than a few seconds — mechanical seals burn out from frictional heat almost instantly."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What is NPSH and why does it matter?",
+  "answer": "NPSH (Net Positive Suction Head) is the absolute pressure available at the pump suction above the liquid's vapor pressure. NPSH Available (NPSHa) must exceed NPSH Required (NPSHr) — the pump's design value — or cavitation begins. A 3-foot safety margin is typical. NPSHa increases with suction tank head, decreases with suction line friction and elevated temperature."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "How do I increase NPSH available to a pump?",
+  "answer": "Raise the suction tank level, lower the pump elevation, shorten or enlarge the suction piping, eliminate elbows and valves on suction, lower the liquid temperature (reduces vapor pressure), or pressurize the suction tank. Often the easiest fix is enlarging the suction piping — small suction pipes cause most NPSH problems."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why is my pump making a strange noise?",
+  "answer": "Gravel or marble sound is cavitation (suction problem). Whining or grinding is bearings (mechanical). Knocking is misalignment or loose coupling. Squealing is mechanical seal failure (dry running). Whoosh sound is normal pumping. Each noise points to a different problem — listen carefully and compare to other pumps if you have them."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What causes mechanical seal failures?",
+  "answer": "Five common causes: dry running (no liquid to lubricate the seal faces), contamination (particles get between faces and gouge them), thermal shock (sudden temperature change cracks the seal faces), improper installation (mismatched faces or wrong direction), and process upset (vapor in the seal chamber)."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why is my mechanical seal leaking?",
+  "answer": "Could be normal break-in leakage (small drip for first hours, stops on its own), worn seal faces (replace), wrong seal selection (chemical attack on the elastomers), or shaft runout exceeding spec. Acceptable leakage is typically a few drops per minute. A steady stream means replacement."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What is the difference between a centrifugal pump and a positive displacement pump?",
+  "answer": "A centrifugal pump uses an impeller spinning in a casing to add energy to the fluid as velocity, then converts it to pressure. Flow varies with head — high head, low flow. A positive displacement pump traps and pushes a fixed volume each cycle. Flow is nearly constant regardless of head. Centrifugal is best for water and thin liquids; positive displacement is for thick liquids, metering, or high pressure."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why does my pump vibrate when running?",
+  "answer": "Causes include cavitation, imbalance from impeller wear or buildup, misalignment between pump and motor, foundation problems, bent shaft, worn bearings, or resonance from coupled piping. Vibration spectrum analysis identifies which one. Vibration at 1× shaft speed is imbalance; at 2× is misalignment; at vane pass frequency is hydraulic."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "How do I correctly align a pump to its motor?",
+  "answer": "Use laser alignment if available; otherwise dial indicators on the coupling. Check both parallel offset (centerlines not coincident) and angular misalignment (centerlines at an angle). Tolerance is typically 0.05 to 0.1 mm at the coupling. Misalignment causes 70% of pump bearing failures. Check after install, after grouting, after piping connected, and after thermal soak."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why does the pump trip when I close the discharge valve?",
+  "answer": "Centrifugal pumps need flow to dissipate the heat they generate. Closing the discharge causes shutoff at zero flow — the energy goes into heating the liquid and the pump. Most pump trips on shutoff via thermal protection, vibration, or pressure. Never run a centrifugal pump shut-in for more than a minute or so."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What is the minimum flow for a pump?",
+  "answer": "Minimum continuous stable flow (MCSF) is the lowest rate at which a pump can run without internal recirculation damaging the impeller. Typically 10-30% of best efficiency point. Below MCSF, hydraulic instability erodes the impeller and shortens bearing life. Check pump curve for the manufacturer value."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why does my pump need to be re-primed every startup?",
+  "answer": "Either the foot valve at the bottom of the suction is leaking back, the check valve in the suction is failed, or the suction line is leaking air. Sometimes seal flushing setup is wrong. The pump should hold its prime indefinitely if the system is tight. Self-priming pumps avoid this but are less efficient."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "How long can a pump run dry?",
+  "answer": "Seconds to maybe a minute, depending on the design. A standard mechanical seal will burn out from frictional heat in under 30 seconds dry. Some pumps have dry- running protection or are specifically designed for short dry-run (positive displacement with PTFE seals). Assume no centrifugal pump can run dry safely."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What is the difference between a single-stage and multi-stage pump?",
+  "answer": "Single-stage has one impeller — used for moderate head, high flow. Multi-stage has several impellers in series, each adding pressure — used for high head, lower flow (boiler feed, reverse osmosis, deep wells). Each stage typically adds 50-150 feet of head depending on impeller size."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why is my discharge pressure lower than expected?",
+  "answer": "Worn impeller (most common over time — clearances open up), wrong rotation direction (centrifugal pumps may pump backwards weakly when reversed), air in the system, partial blockage downstream giving false reading, or pump operating off-curve (wrong flow rate). Check rotation first — easy to fix if wrong."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What is impeller balance and trimming?",
+  "answer": "Balance is removing material from the heavier side of the impeller to eliminate vibration. Trimming is reducing the impeller diameter to match the pump output to a smaller system. Trimming reduces flow, head, and power proportionally. Both must be done in a shop with proper tooling — field trim with grinder ruins the impeller."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "How do I tell if my pump is running off-curve?",
+  "answer": "Compare actual flow and discharge pressure to the pump curve. Operating far to the left (low flow) causes recirculation and damage. Operating far to the right (high flow, low head) causes cavitation. The best efficiency point (BEP) is the sweet spot — try to run within 80-110% of BEP for long life."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why does my pump need a balance line?",
+  "answer": "Multi-stage pumps and some single-stage designs build up axial thrust on the shaft. A balance line equalizes pressure to neutralize the thrust, protecting the thrust bearing. Plugged balance lines cause early thrust bearing failure. Check the balance line is clear during inspections."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What is the affinity law for pumps?",
+  "answer": "Affinity laws describe how pump performance scales with speed. Flow scales linearly with speed. Head scales with speed squared. Power scales with speed cubed. So a 10% speed reduction gives 10% less flow, 19% less head, and 27% less power — useful for energy savings with VFDs on oversized pumps."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "Why does my pump motor draw more current than expected?",
+  "answer": "Motor amps go up with flow on a centrifugal pump. Higher than expected amps usually means flow is higher than expected (less head than design, possibly worn casing wear rings letting flow recirculate). Could also be specific gravity higher than design, mechanical drag (bearings, seals), or motor problems."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "What does suction-side air ingress look like?",
+  "answer": "Symptoms include erratic flow and pressure, gulping noise from the pump, foamy or bubbly discharge, and visibly low discharge head. Check for leaks at all suction-side joints, the seal flushing if applicable, and any vortex at the suction tank (low level causing surface entrainment). Tighten flanges and check level."
+ },
+ {
+  "section_number": 3,
+  "section_name": "Centrifugal Pumps",
+  "question": "How do I know when to overhaul a centrifugal pump?",
+  "answer": "Trigger criteria: efficiency dropped more than 10% (more amps for same flow), vibration above the alert threshold (typically 4 mm/s rms for general purpose), bearing temperature trending up, mechanical seal leakage worsening, or hours since last overhaul exceeds the OEM interval. Plan overhaul — don't run to failure."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "What is the difference between a gear pump and a screw pump?",
+  "answer": "A gear pump uses meshing gears to trap and push fluid — simple, good for clean lubricating fluids, low to moderate pressure. A screw pump uses one or more helical screws — handles higher viscosity, generates smooth low-pulsation flow, used for heavy oils, polymers, and asphalt. Both are positive displacement."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "Why is my reciprocating pump pulsating?",
+  "answer": "All reciprocating pumps pulsate by nature — fluid flow stops and starts with each stroke. Excessive pulsation causes pipe vibration and damage. Solutions: pulsation dampener (accumulator) on the discharge, multiple cylinders 90 or 120 degrees out of phase, longer discharge piping to smooth pressure waves."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "What is slip in a positive displacement pump?",
+  "answer": "Slip is the small amount of fluid that leaks backward through clearances inside the pump — gear teeth, screw flanks, piston rings. Slip reduces actual flow below theoretical. Worn pumps have more slip and lower volumetric efficiency. New gear pumps typically have 5-10% slip; worn ones 20% or more."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "Why does my positive displacement pump need a relief valve?",
+  "answer": "Because positive displacement pumps will keep pushing flow no matter what — they will rupture the discharge piping or destroy themselves if blocked downstream. A relief valve at the pump discharge, set just above operating pressure, opens before damage occurs. Never operate a PD pump without functional relief protection."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "What viscosity is too high for a centrifugal pump?",
+  "answer": "Centrifugal pumps lose efficiency rapidly above about 200 centistokes (about 100 SSU). Above 500 cSt, switch to positive displacement. Heavy oils, syrups, polymers, and slurries all need PD. Centrifugal is best for water-like fluids up to about 50 cSt."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "Why is the discharge pressure on my PD pump fluctuating?",
+  "answer": "Air or vapor in the suction (PD pumps don't like air), partial blockage downstream causing relief valve to chatter, worn internals causing slip variation, or pulsation that's normal but seems excessive. Bleed any high points, verify the relief valve isn't chattering, check the pump for wear."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "What is a metering pump and where is it used?",
+  "answer": "A metering pump delivers a precise volume per stroke — used wherever exact dosing matters: chemical injection, water treatment chlorination, polymer addition, fuel injection. Typically diaphragm or piston design. Calibration matters — they're usually rated within 1% of setpoint, but only when in good condition."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "How do I prime a positive displacement pump?",
+  "answer": "Most PD pumps are self-priming, but only if seals and clearances are good. Fill the suction line, open the air vent on the pump, start the pump, and watch for steady discharge. If the pump won't prime, suspect worn internals, leaking suction line, or a stuck relief valve recirculating internally."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "Why do I need a strainer on the suction of a PD pump?",
+  "answer": "Solid particles wreck PD pump internals — they get pinched between tight clearances and gouge the surfaces. A 100-mesh strainer on the suction catches most damaging particles. Maintain it religiously. A torn strainer is worse than no strainer because you think you're protected."
+ },
+ {
+  "section_number": 4,
+  "section_name": "Positive Displacement Pumps",
+  "question": "Can I throttle the discharge of a PD pump to reduce flow?",
+  "answer": "No — throttling does nothing on a PD pump. Pressure simply rises until the relief valve opens or something breaks. To reduce flow, use a variable speed drive on the motor, or change the displacement (stroke length, gear set). Always size PD pumps for the actual flow needed."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "The valve isn't responding to the command. What do I check?",
+  "answer": "Three things in order: instrument air supply pressure (easiest fix if low or missing), the control signal at the valve terminal (should be 4-20 mA), and try a manual stroke. If it moves manually but not on command, the actuator or positioner is the problem. If it doesn't move at all, the stem may be seized."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "How do I know if a valve is stuck?",
+  "answer": "Look at the physical position indicator, not the panel display. The panel can lie. If the indicator says one thing and the panel says another, the position feedback sensor has failed. Stuck valves often show as a mismatch between command and actual position, or a slow response that worsens over time."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "A safety valve is leaking. What do I do?",
+  "answer": "Document it and report it immediately. A leaking relief valve has lost certification and protection — it needs bench testing. Do NOT try to test it by raising pressure on the live line — that can cause it to chatter open at low pressure or fail to open at high pressure. Depressurize through an alternate path and pull the valve for inspection."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "What is the difference between a globe valve and a ball valve?",
+  "answer": "A globe valve has a plug that moves up and down against a seat — good for throttling control, gives smooth flow modulation, but causes pressure drop even when fully open. A ball valve has a sphere with a hole that rotates — full open or full closed, low pressure drop, fast operation, but poor for throttling (most valve travel does little)."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "Why is my control valve hunting (oscillating)?",
+  "answer": "Causes: PID tuning too aggressive (gain or integral too high), valve has excessive friction or stiction, undersized positioner, or process loop has high gain. Slow down the controller (lower gain, longer integral time). If valve is sticky, it needs maintenance — packing too tight or contamination in the bonnet."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "What is valve stiction and how do I detect it?",
+  "answer": "Stiction (static friction) is when a valve resists movement until the signal pushes hard enough to overcome it, then jumps. Detected by a step response that overshoots, or limit cycling. Common in old valves with worn packing. Treatment: clean and lubricate the stem, replace packing, sometimes a smart positioner can compensate."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "Why does my pneumatic actuator stroke slowly?",
+  "answer": "Low air supply pressure, restricted air line, plugged exhaust port on the positioner, leaking diaphragm, or contamination in the actuator. Check supply pressure first — should be 60-120 psi typically. Check that the exhaust isn't blocked (often by ice in cold weather or by paint on the muffler)."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "What is the difference between fail-open, fail-closed, and fail-last?",
+  "answer": "Fail-open: valve goes to open on loss of signal or air — used where opening is safe (cooling water). Fail-closed: valve goes to closed — used where closing is safe (fuel gas to a furnace). Fail-last: valve stays where it was — used when neither extreme is safer. Choose based on process safety analysis, not convenience."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "Why is my valve cavitating?",
+  "answer": "Liquid valves cavitate when the pressure drops below the liquid's vapor pressure as it accelerates through the throttling area. Sounds like gravel inside the valve body. Causes severe trim erosion. Solutions: anti-cavitation trim (multistage pressure reduction), increase downstream pressure, change the valve location to higher pressure point."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "What is flashing in a valve and how is it different from cavitation?",
+  "answer": "Flashing is when liquid partially vaporizes through the valve and stays as vapor (because downstream pressure is below vapor pressure). Cavitation is vapor forming then collapsing back to liquid. Flashing erodes the valve body downstream of the seat. Cavitation erodes the seat itself. Different solutions: anti-flash trim or hardened materials."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "How often should relief valves be tested?",
+  "answer": "Typical: annually for steam and air service, every 2-5 years for clean services, more often for fouling services. Codes set the legal minimum (ASME Section VIII for pressure vessels). Test on a calibrated bench, not in service. A relief valve that's never tested is gambling with vessel integrity."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "What is set pressure versus blowdown on a relief valve?",
+  "answer": "Set pressure is when the valve starts to open. Blowdown is how far the pressure drops below set before the valve reseats. Typical blowdown is 7-10% below set. Excessive blowdown wastes product and energy; insufficient blowdown causes chatter. Both are adjustable on most relief valves."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "Why does my relief valve chatter?",
+  "answer": "Chatter (rapid open-close oscillation) is caused by oversized valves on inadequate inlet piping, excessive backpressure on the discharge, or insufficient blowdown setting. Chatter destroys the seat in minutes and is dangerous. Causes severe vibration. Address by resizing, fixing inlet piping, or adjusting blowdown."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "What is a pilot-operated relief valve and when is it used?",
+  "answer": "A pilot-operated valve uses pressure-balanced design — a small pilot valve senses pressure and operates the main valve. Used for high backpressure applications (typical spring-loaded valves don't handle backpressure well) and for tight shutoff requirements. More expensive but more accurate and stable."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "Why is my valve packing leaking?",
+  "answer": "Packing wears with stroking and time. Causes: normal wear (replace), packing gland too loose (tighten), galled or scored stem (rebuild needed), wrong packing material for the service, or temperature/pressure beyond packing rating. Don't keep over-tightening — that gouges the stem and causes worse leaks."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "How do I know if a check valve is leaking back?",
+  "answer": "Signs: discharge pressure bleeds down after pump shutoff, the suction temperature rises (hot product flowing backward), audible flow when the system should be static. Verify by isolating downstream and watching upstream pressure. Leaking check valves cause reverse pump rotation, water hammer, and contamination."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "What causes water hammer in valves?",
+  "answer": "Sudden valve closure stops the moving fluid column. The fluid's kinetic energy converts to pressure shock — can be enormously high. Solutions: slower valve closure (use actuators with controlled closing time), check valves that close before reverse flow develops, hammer arrestors (pressure accumulators), or system redesign to reduce fluid velocity."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "Why is my motor-operated valve (MOV) tripping on torque?",
+  "answer": "Either it's seized and the torque limit is doing its job (good — investigate the cause), or the torque limit is set wrong (too low), or the torque switch is faulty. Never increase torque setting without investigating — a stuck valve forced open or closed by extra torque can destroy itself or the piping."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "What is the Cv of a valve?",
+  "answer": "Cv is the flow coefficient — the gallons per minute of water at 60°F that flow through the valve with a 1 psi pressure drop. Used to size valves. Higher Cv = bigger valve = more flow at the same pressure drop. Manufacturer publishes Cv at various openings. Process engineer calculates required Cv from flow rate, density, and pressure drop."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "How tight should valve packing be?",
+  "answer": "Tight enough to seal, loose enough to stroke without binding. After installation, tighten gradually while stroking the valve. A small drip (5-10 drops per minute) is acceptable on some packings; zero leak requires specific live-loaded designs. Over- tightening galls the stem and accelerates wear."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "Why is my actuator's positioner inaccurate?",
+  "answer": "Loose linkage between positioner and valve stem, contamination in the positioner (especially with traditional pneumatic positioners), wrong setpoint range, mechanical play in the actuator, or air pressure variation. Smart positioners self-diagnose and can be re-zeroed via HART; pneumatic positioners need manual recalibration."
+ },
+ {
+  "section_number": 5,
+  "section_name": "Valves",
+  "question": "Should I lubricate valve stems?",
+  "answer": "Some yes, some no. Most rising-stem globe and gate valves benefit from periodic stem lubrication. Quarter-turn (ball, butterfly, plug) usually don't need it. Ball valves with PTFE seats explicitly should not be lubricated — it contaminates the seat. Follow the manufacturer's manual."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "Why is my compressor running hot?",
+  "answer": "Common causes: blocked or fouled intercooler/aftercooler reducing heat removal, low coolant flow, high ambient temperature, dirty inlet filter increasing compression work, internal leakage from worn seals or valves, oil carryover (lubricated compressors). Check coolers first — most thermal problems trace there."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "What is surge in a centrifugal compressor?",
+  "answer": "Surge is flow reversal in a centrifugal compressor when flow drops below a critical minimum. The compressor can't maintain discharge pressure, gas reverses direction violently, then forward flow resumes — cycling at low frequency. Surge damages bearings, seals, blades, and is potentially catastrophic. Anti-surge controls prevent it."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "How does anti-surge control work?",
+  "answer": "An anti-surge controller monitors flow and pressure to detect approach to the surge line. When too close, it opens a recycle valve sending discharge gas back to suction, increasing flow through the compressor. Properly tuned, it operates before surge occurs. Tuning takes specialized expertise — vendor commissioning typically."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "What is the difference between reciprocating and centrifugal compressors?",
+  "answer": "Reciprocating uses pistons in cylinders — high pressure, lower flow, pulsating output, oil carryover possible. Centrifugal uses impellers — moderate pressure, high flow, smooth output, oil-free options available. Reciprocating handles wide range of pressures; centrifugal needs to operate close to design point."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "Why is the discharge pressure on my compressor dropping?",
+  "answer": "Causes: worn or stuck valves (reciprocating), worn seals (any type), internal leakage path opening up, surge in centrifugals, cooling system letting suction temperature rise, or a leak downstream that doesn't show on inlet flow. Check valves first on reciprocating compressors — usually the first to fail."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "What is the function of a compressor intercooler?",
+  "answer": "Between stages, the intercooler removes heat of compression. Cooler inlet gas means lower discharge temperature, less compression work, and protects downstream equipment. Fouled intercoolers cascade problems: each stage gets hotter inlet, runs hotter discharge, and overall power consumption rises while capacity falls."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "Why is oil carrying over from my lubricated compressor?",
+  "answer": "Worn rings or cylinders, oil level too high, worn oil scraper rings, oversized oil pump delivering too much, valves failing letting oil into cylinders, or a degraded oil separator on the discharge. Oil downstream causes problems in dryers, instruments, and processes. Address quickly."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "What is a non-lubricated compressor and when is it used?",
+  "answer": "A non-lube (oil-free) compressor uses PTFE rings, water-cooled cylinders, or labyrinth seals to compress without oil contact. Used where oil contamination is unacceptable: medical air, food processing, instrument air, semiconductor gas. More expensive and slightly less efficient, but eliminates downstream oil problems."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "Why is my reciprocating compressor knocking?",
+  "answer": "Knocking is bad. Causes: loose connecting rod bearings, loose crosshead, valve damage allowing slap, hydraulic lock from liquid carryover into the cylinder (catastrophic — destroys the head), or worn crankshaft bearings. Stop and investigate. Continued running can wreck the frame."
+ },
+ {
+  "section_number": 6,
+  "section_name": "Compressors",
+  "question": "What is volumetric efficiency in a reciprocating compressor?",
+  "answer": "Volumetric efficiency is the ratio of actual mass flow to theoretical (swept volume × density). Always less than 100% due to clearance volume (gas re-expands), valve losses, and heating. Typical 70-90%. Falls with worn valves, leaking rings, and rising clearance volume. A trended efficiency drop predicts overhaul timing."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "Why is my heat exchanger not transferring heat efficiently?",
+  "answer": "Most common cause is fouling — deposits on the tubes reducing heat transfer. Other causes: tube-side or shell-side flow lower than design, air or vapor pockets, tubes plugged with debris, wrong flow arrangement after maintenance (cross-flow instead of counter-flow), or bypass leakage around the tubes. Track inlet/outlet temperatures and pressure drop to diagnose."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "How do I know when a heat exchanger needs cleaning?",
+  "answer": "Monitor approach temperature (the smallest temperature difference between the two streams) and pressure drop. Approach temperature increasing means fouling is reducing heat transfer. Pressure drop increasing means flow path is restricting. Either trending wrong by 30% or more usually justifies cleaning at the next opportunity."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "What is fouling and what causes it?",
+  "answer": "Fouling is unwanted deposit buildup on heat transfer surfaces. Types: scaling (mineral deposits from hard water), biofouling (algae, bacteria, mussels in once-through cooling), corrosion product (rust scale), particulate (silt, suspended solids), chemical reaction product (coking, polymerization). Each type needs a different cleaning approach."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "How do I clean a fouled heat exchanger?",
+  "answer": "Mechanical: brush tubes, hydroblast, or rotor-jet for hard scale. Chemical: acid clean for mineral scale, alkaline clean for organic deposits, chelants for specific deposits. Always identify the deposit type first — wrong chemical can damage tubes. Plant chemists or vendor specialists guide chemical selection."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "Why is my heat exchanger leaking between shell and tube sides?",
+  "answer": "Tube leaks — a tube has corroded through, cracked from thermal stress, or pulled from the tubesheet joint. Detected by chemistry crossover (cooling water in process or vice versa) or by pressure test. Solutions: plug the failed tube (lose one tube's capacity), or pull and replace bundle if many tubes are failing."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "How do I plug a leaking tube?",
+  "answer": "Most plants use tapered metal plugs hammered into both ends of the failed tube. Welded plugs for higher pressure or critical service. Each plugged tube loses some capacity — plugging more than 10-15% of tubes usually means time to retube. Document every plug location for the next inspection."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "What is the difference between shell and tube versus plate heat exchangers?",
+  "answer": "Shell-and-tube has tubes inside a shell — robust, handles high pressure and temperature, easy to inspect and clean. Plate-and-frame has thin corrugated plates with gaskets — much higher heat transfer per unit area, compact, but limited pressure and temperature, and gasket failure causes leaks. Choose based on service and footprint."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "Why is the approach temperature on my exchanger getting worse?",
+  "answer": "Approach temperature widening means heat transfer is degrading. Causes: fouling (most common, gradual), flow reduction on either side, air binding (trapped non- condensable gas), tube wall thinning, or wrong flow rate balance. Track over weeks — sudden change means something changed; gradual means fouling."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "What is the LMTD and why does it matter?",
+  "answer": "LMTD (Log Mean Temperature Difference) is the effective driving force for heat transfer. Calculated from the temperature differences at both ends of the exchanger. Heat transferred equals U × A × LMTD. If duty stays the same but LMTD rises (or wall metal temperatures rise), heat transfer coefficient (U) is falling — fouling."
+ },
+ {
+  "section_number": 7,
+  "section_name": "Heat Exchangers",
+  "question": "How do I prevent fouling in a heat exchanger?",
+  "answer": "Maintain proper flow velocity (low velocity allows deposition, very high causes erosion). Treat cooling water (corrosion inhibitor, biocide, dispersant). Use strainers on dirty service. Operate at design temperatures (cold streams encourage fouling on the hot side). Periodic flushing during shutdowns slows long-term fouling."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "Why is my boiler not making rated steam pressure?",
+  "answer": "Causes: insufficient fuel firing, dirty heat transfer surfaces (fireside fouling, waterside scale), excess air ratio too high (cooling the flame), tube leak letting water in (lowering temperature), feedwater temperature lower than design, or steam demand exceeding boiler capacity. Check fuel flow and stack temperature first."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "What does black smoke from my boiler stack mean?",
+  "answer": "Incomplete combustion — fuel is leaving unburned. Causes: insufficient combustion air, fuel-rich mixture, poor atomization (oil-fired), worn burner tip, blocked air register, wet fuel. Reduce fuel or increase air immediately — black smoke is wasted fuel and a pollution violation."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "What does white smoke from my boiler stack mean?",
+  "answer": "Usually water vapor — normal for gas-fired or any boiler in cold weather (vapor condensing in cold air). Excessive white smoke at warm weather can indicate tube leak (steam venting through firebox) or excessive moisture in fuel. Verify by checking water levels and tube pressure test if suspected."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "How often should I blow down my boiler?",
+  "answer": "Bottom blowdown every shift typically (removes settled sludge). Surface blowdown continuous via a low-flow control valve (manages dissolved solids). Frequency depends on feedwater quality — softer water needs less blowdown. Excessive blowdown wastes energy; insufficient causes scale and carryover."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "What is steam carryover and why is it bad?",
+  "answer": "Carryover is water droplets carried with steam out of the boiler. Causes: high water level, foaming from contaminants, high steam load relative to boiler size, or worn steam separator. Carryover damages turbines and steam users — water in superheater can cause tube failure. Maintain proper water level and chemistry."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "Why does my boiler safety valve keep popping?",
+  "answer": "Pressure is rising above set pressure. Causes: control system not modulating fuel properly, sudden load drop, controller failure, or the safety valve set pressure has drifted low. Check the control loop response. A safety valve operating frequently wears out quickly — root cause first, then re-test the valve."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "What is the right water level in a boiler?",
+  "answer": "Per the gauge glass — typically half full at the centerline. Too high causes carryover; too low exposes tubes (catastrophic — tubes overheat and rupture). Modern boilers have low-low water level cutoffs that shut off fuel automatically. Test the cutoff periodically — many tragic boiler accidents trace to failed cutoffs."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "How do I test the low-water cutoff?",
+  "answer": "Slowly drain water out of the boiler (manual valve or controlled drain) while the boiler is firing at low load. The cutoff should trip fuel before water falls below the lowest visible level on the gauge glass. Test monthly typically; weekly for critical boilers. Document every test."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "Why is my boiler feedwater pump cavitating?",
+  "answer": "Feedwater is near boiling temperature, so NPSH margin is tight. Causes: deaerator level too low, feedwater temperature too high (vaporizing in the pump), suction strainer plugged, or pump impeller worn. Check deaerator level first. Cavitation destroys impellers fast at boiler feed pressures."
+ },
+ {
+  "section_number": 8,
+  "section_name": "Boilers and Steam Systems",
+  "question": "What is deaeration and why is it required?",
+  "answer": "Deaeration removes dissolved oxygen and CO2 from feedwater — both cause severe corrosion in the boiler and steam lines. Done by heating water to near-boiling and sparging with steam to drive off gases. Properly deaerated water has below 7 ppb oxygen. Skip deaeration and the boiler corrodes from inside."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "Why is my steam turbine vibrating excessively?",
+  "answer": "Causes: imbalance from buildup (silica, salt) on blades, misalignment with driven equipment, bearing wear, foundation movement, thermal distortion of casing, or critical speed problem from operating change. High vibration in turbines is serious — they spin at high speed and consequences are severe. Trip on vibration alarm."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "What is a turbine overspeed and why is it dangerous?",
+  "answer": "Overspeed is when the turbine runs faster than design — typically caused by sudden load loss and governor failure. At 110-120% speed, blade stresses exceed design and blades can fail catastrophically — fragments penetrate the casing. All turbines have mechanical and electronic overspeed trips. Test these regularly."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "How do I test the turbine overspeed trip?",
+  "answer": "Overspeed testing raises actual speed until the trip activates — usually done with reduced load and careful supervision. Alternative is to simulate the trip electronically via the protection system, less authoritative but safer. Per IEEE and OEM standards, full overspeed test annually or per code requirement."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "Why is my turbine making a high-pitched whistling sound?",
+  "answer": "Usually steam leaking through a seal or gland — labyrinth seals, packing, valve stem packing. Leaking steam represents lost work and possible damage from steam impingement. Hear before see — small leaks can cause significant damage over time. Investigate at next opportunity."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "What is blade fouling and how does it affect performance?",
+  "answer": "Blade fouling is deposit buildup on turbine blades — typically salt, silica, copper from boiler carryover. Reduces capacity (deposits block steam path), increases axial thrust (unbalanced blading), and can cause stress corrosion cracking. Symptoms: reduced output at same steam conditions, rising blade temperatures, increased vibration."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "How is a steam turbine cleaned of fouling?",
+  "answer": "On-line water washing for soluble deposits (only on suitable turbines, with vendor approval). Off-line blade cleaning during outage: mechanical for hard deposits, mild chemical for chemical deposits. Severe fouling may require blade removal and shop cleaning. Address root cause — boiler chemistry — to prevent recurrence."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "What is condenser vacuum and why is it important?",
+  "answer": "Condenser vacuum is the low pressure (high vacuum) maintained on the turbine exhaust. Lower exhaust pressure means more work extracted from the steam — higher efficiency. Lost vacuum dramatically reduces output and overloads the turbine thermally. Monitor vacuum continuously; air ingress is the most common cause of vacuum loss."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "Why is my condenser vacuum deteriorating?",
+  "answer": "Air ingress on the vacuum side — leaking flanges, valves, instrument tubing — is most common. Other causes: ejector or vacuum pump capacity reduced, fouled condenser tubes (reduced cooling), high circulating water temperature, or tube leak (process side leaking in). Search for air leaks first."
+ },
+ {
+  "section_number": 9,
+  "section_name": "Steam Turbines",
+  "question": "What is steam quality and why does it matter for turbines?",
+  "answer": "Steam quality is the dryness fraction — pure dry saturated steam is 100%, wet steam has water droplets. Water droplets erode turbine blades at high velocity. Most turbines specify >99.5% dry steam. Wet steam comes from carryover, condensation in steam piping, or upset boiler operation. Critical for blade life."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "Why is my gearbox running hot?",
+  "answer": "Common causes: low oil level, wrong oil grade for the load and speed, blocked cooler if present, contamination, overload, misalignment causing extra friction, or worn gears/bearings creating more heat. Check oil level and condition first. Run hand on gear teeth (if accessible and safe) — uniform contact pattern means alignment is good."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "What is the right oil for my gearbox?",
+  "answer": "Use the OEM-specified grade. Industrial gearboxes typically use ISO VG 220, 320, or 460 EP (extreme pressure) oils. Wrong viscosity causes wear: too thin doesn't carry load, too thick churns and overheats. EP additives are essential for hardened gears. Never mix grades or brands without checking compatibility."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "Why is my gear oil discolored?",
+  "answer": "Brown or black is normal aging from heat and oxidation — change per condition monitoring or hours. Milky white means water contamination — find the source (seal leak, breather, condensation). Metallic glitter means wear particles — schedule inspection. Foamy oil means air ingress or too much agitation."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "How often should I change gear oil?",
+  "answer": "Per OEM schedule and condition. Typical industrial gearbox: every 5,000 hours or annually, whichever comes first. Synthetic oils can extend to 8,000-12,000 hours. Oil analysis (particle count, wear metals, viscosity) tells you when to change rather than guessing. A small lab program pays for itself."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "What does a 'spectrographic oil analysis' tell me?",
+  "answer": "It detects wear metal concentrations in parts per million — iron from gears, bronze from bearings, lead from bushings. Rising trends predict failure before it happens. Combined with particle count and viscosity, it's the standard for gearbox condition monitoring. A sample costs little; the information saves real money."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "Why is my gearbox noisy?",
+  "answer": "Causes: tooth wear (rumbling), tooth contact pattern off (whining at gear mesh frequency), bearing failure (high-frequency rumble or grinding), insufficient lubrication, foreign object, or resonance with structure. Vibration analysis identifies the source — gear mesh frequencies are characteristic and traceable to specific stages."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "What is gear mesh frequency and how do I find it?",
+  "answer": "Gear mesh frequency equals the number of teeth on a gear times the rotational frequency of that gear. So a pinion with 25 teeth running at 30 Hz produces a gear mesh tone at 750 Hz. Vibration at that frequency points to that gear pair. Sidebands around it indicate problems (modulation from a defect)."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "Why does my coupling keep failing?",
+  "answer": "Almost always misalignment — couplings are designed to handle a small amount, but persistent misalignment fatigues the elastomer or the metal grids. Other causes: undersized coupling for the application, overloading, missing or wrong lubrication on lube-type couplings. Address alignment before replacing the coupling again."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "What is gear backlash and how is it measured?",
+  "answer": "Backlash is the clearance between meshing teeth — needed to prevent jamming from thermal expansion, but excess causes shock and noise. Measured with a dial indicator on one gear while holding the other. Typical 0.001-0.005 inch for fine pitch, more for coarse. Excessive backlash means worn teeth — schedule inspection."
+ },
+ {
+  "section_number": 10,
+  "section_name": "Gearboxes and Power Transmission",
+  "question": "How do I align a gearbox to a motor?",
+  "answer": "Same process as pump-to-motor. Use laser alignment or dial indicators. Check parallel and angular alignment in horizontal and vertical planes. Account for thermal growth — running hot gearbox grows; corrected by 'cold alignment' offset. Soft foot must be eliminated before alignment is meaningful."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "Why is my fan vibrating?",
+  "answer": "Most common: imbalance from dust or material buildup on blades (clean and check), missing or loose blade (immediate shutdown if blade lost), misalignment to driver, foundation movement, or bearing wear. Fan vibration at 1× shaft speed almost always means imbalance. Beyond a few mm/s, take seriously — failing fans throw blades dangerously."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "How do I clean fan blade buildup?",
+  "answer": "Most fans need shutdown and lockout for cleaning. Soft buildup can be brushed or scraped. Hard scale may need hydroblast or chemical cleaning. Always check blade thickness after cleaning — blade erosion is hidden under deposits. Cracked or thinned blades must be replaced, not just cleaned."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "Why has my fan flow decreased?",
+  "answer": "Causes: damper position off (verify physical position), inlet filter loading (high pressure drop), blade fouling reducing effective area, system resistance increased downstream (filter loading elsewhere, additional equipment), motor speed dropped (VFD or slip), or wheel wear from erosion. Check easy stuff first."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "What is fan surge and stall?",
+  "answer": "Stall is when airflow over the blades separates and becomes turbulent — fan loses performance abruptly. Surge in fans is similar to compressors: flow reverses cyclically at low flow conditions. Both happen when fan operates far left on its curve. Solutions: don't throttle a forward-curved fan too low; use inlet vanes or VFD for proper turndown."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "Why is my fan making a barking or pulsating noise?",
+  "answer": "Usually pulsation from stall or surge, or interaction with system resonance. Blade pass tone is normal but should be steady. Pulsating noise indicates intermittent flow disruption. Check operating point against the fan curve. Reduce damper restriction if at low flow; increase if at high flow stall point."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "What is the difference between a fan and a blower?",
+  "answer": "Loose convention: a fan develops less than 1 psi pressure rise; a blower develops 1- 15 psi; a compressor above 15 psi. Centrifugal fans, axial fans, and roots blowers are common types. Selection depends on flow and pressure requirements. Fans are typically lower pressure, higher flow than blowers."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "Why has my fan motor amperage increased?",
+  "answer": "Centrifugal fans draw more current at higher flow. Increasing amps usually means flow increased (less system resistance — gate opened, filter cleared) or fan is operating further to the right on its curve. Could also be density increased (cold air, more pressure), or mechanical drag (bearings going). Check operating point and conditions."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "What is the AMCA classification of fans?",
+  "answer": "AMCA classes fans by pressure capability and material strength: Class I (light duty, 5 inches H2O max), Class II (10 inches), Class III (20 inches), Class IV (>20 inches). Class determines plate thickness, shaft size, and bearing rating. Using a Class I fan for Class III duty causes early failure."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "Why is my axial fan blowing the wrong direction at startup?",
+  "answer": "Three-phase motors can rotate either direction depending on phase sequence. Swap any two phase wires to reverse rotation. Axial fans only work in their designed direction — backwards they push very little air. Always verify rotation matches the directional arrow on the fan housing."
+ },
+ {
+  "section_number": 11,
+  "section_name": "Fans and Blowers",
+  "question": "How do I measure fan performance in service?",
+  "answer": "Measure flow (pitot traverse on the duct, or anemometer if access), static pressure at inlet and outlet, and motor input power. Plot against the fan curve. Performance lower than the curve means worn impeller, blade fouling, or off-design operation. Performance higher than curve usually means duct measurement error."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "Why is my belt conveyor slipping?",
+  "answer": "Slipping means drive pulley can't grip the belt. Causes: belt tension too low, drive pulley worn smooth, water or oil contamination on belt, overload (more material than rated), or wrong lagging on drive pulley. Tighten the take-up, replace pulley lagging, and check load. Slipping belts wear out fast and dump material."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "Why is my conveyor belt tracking off-center?",
+  "answer": "Tracking problems come from: improperly adjusted training idlers, worn or out-of- round pulleys, belt splice issues, loading point off-center (heaviest cause), or structural misalignment. Adjust training idlers in small increments, watching belt response. Always solve loading issues first — chasing tracking on a poorly-loaded belt never ends."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "What is conveyor 'spillage' and how do I reduce it?",
+  "answer": "Spillage is material falling off the belt — at the loading point, transfer points, or along the conveyor. Causes: belt over-loaded, belt cupping wrong (worn skirtboards), poor transfer chute design, off-center loading, belt sag between idlers. Each cause has a different fix — observe where spillage occurs and trace it."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "Why is my conveyor making a thumping noise?",
+  "answer": "Usually a belt splice passing over a pulley or idler — splices are slightly thicker than the belt. Other causes: damaged belt with a flat spot, worn idler with flat or out-of-round, or pulley out of round. A regular thumping at belt speed is splice; irregular is a damaged belt area."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "How do I tension a belt conveyor correctly?",
+  "answer": "Use the take-up — manual screw-type, gravity weight, or hydraulic. Target the manufacturer's specified tension. Too loose: belt slips on drive, sags excessively between idlers, jumps off pulleys. Too tight: bearings overload, splice fails early, motor draws excessive current. Adjust gradually and check belt response."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "Why are my conveyor idlers failing prematurely?",
+  "answer": "Bearings fail from: contamination (water, dust ingress through seals), overload from belt tension or material weight, misalignment causing skewed loading, lack of lubrication for greasable types. Most modern idlers are lifetime-lubricated — when they fail, replace. High failure rate indicates installation or environment problem."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "What is the difference between troughed and flat conveyor belts?",
+  "answer": "Troughed (3-roll or 5-roll idler arrangement) carries more material per belt width — used for most bulk handling. Flat belts (single horizontal roller) carry packages, palletized loads, or process flow. Troughing increases capacity dramatically but requires the belt to be flexible enough to form the trough."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "Why is my screw conveyor torque rising?",
+  "answer": "Causes: material wedging in the trough, foreign object jammed in the screw, material has packed and become harder to push, screw flight worn down causing higher friction, or motor at the start trying to overcome a frozen load. Torque rise means resistance is rising — investigate before motor trips or screw breaks."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "How do I balance loading on multiple conveyors?",
+  "answer": "Belt scales on each conveyor, controllers adjusting feeder speeds, or simple gate adjustments at transfer points. Modern plants use weight-based control. Manual systems require observation and adjustment. Imbalanced loading wears one conveyor while another runs underutilized — and risks spillage at transfer points."
+ },
+ {
+  "section_number": 12,
+  "section_name": "Conveyors and Material Handling",
+  "question": "What protective devices does a conveyor need?",
+  "answer": "Belt rip detection, belt sway switches, zero-speed switches at the tail, emergency pull-cord along the length, blocked chute detectors at transfer points, motor overload, and limit switches on dampers or gates. Each prevents a specific failure mode. Many plant accidents involve conveyors — protection systems save lives."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "Why is my hydraulic system running hot?",
+  "answer": "Heat in a hydraulic system means energy is being lost as heat instead of doing work. Causes: internal leakage (worn pump, leaking valves, worn seals), undersized cooler, pump cavitation, oil viscosity too low (thin from heat), or system running over relief valve continuously. Oil over 60°C accelerates degradation; over 80°C is critical."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "What is the right hydraulic oil for my system?",
+  "answer": "Mineral oil (HM grade) for most general industrial use. Anti-wear (HV) for variable- vane pumps. Fire-resistant for hot environments (water-glycol or phosphate ester). Synthetic for extreme temperatures or food contact. Match viscosity to operating temperature range. Wrong oil causes premature wear and varnish formation."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "Why is my hydraulic oil getting dark?",
+  "answer": "Darkening means oxidation — heat plus oxygen plus catalyst (copper, iron) degrade the oil. Causes: running too hot, air ingress, excessive water content, or contamination. Dark oil has reduced lubricity and forms varnish. Oil analysis (acid number, particle count) determines if it's still serviceable or needs replacement."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "What is varnish and why is it bad?",
+  "answer": "Varnish is a hard, lacquer-like deposit from degraded oil — sticks to valves, servos, and tight clearances. Causes erratic valve operation, stuck spools, and progressive performance loss. Once varnish forms, removing it requires special flushing fluids or full oil change with system cleaning. Prevention is far cheaper than cure."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "Why is my hydraulic pump making a whining noise?",
+  "answer": "Cavitation — most common cause. Low fluid level, restricted suction (plugged strainer, closed valve), high oil viscosity (cold start), or oversized pump suction lift. Listen for the distinctive whine that changes with operating conditions. Sustained cavitation destroys pump internals in hours."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "What is the difference between gear, vane, and piston pumps?",
+  "answer": "Gear pumps are simple, cheap, moderate pressure, fixed displacement — used for general hydraulics. Vane pumps offer variable displacement, smoother flow, moderate pressure. Piston pumps (axial or radial) handle highest pressures, variable displacement, most efficient — used for demanding industrial and mobile applications. Higher complexity, higher cost."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "Why is my cylinder drifting under load?",
+  "answer": "Internal leakage past the piston seals, leaking valve allowing pressure to bleed, or check valve in the load-holding circuit not sealing. Test by isolating the cylinder ports — if it still drifts, seal is the issue. Counterbalance valves can become a problem when worn. Drifting cylinders are safety hazards on heavy loads."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "What is the function of a hydraulic accumulator?",
+  "answer": "Accumulators store hydraulic energy under pressure — using gas (nitrogen) backed by a piston or bladder. Functions: smooth pump pulsations, supply peak flow demand briefly, hold pressure during pump idling, absorb shock. Maintenance: check nitrogen pre-charge regularly; bladder ruptures are a common failure mode."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "Why does my hydraulic system slow down when it warms up?",
+  "answer": "Hot oil is thinner, so internal leakage increases — pump output drops as more flow goes around internal clearances instead of out the discharge. Symptom of worn pump or internal leakage. New pumps should not significantly slow down with temperature. Check pump volumetric efficiency by measuring flow at temperature."
+ },
+ {
+  "section_number": 13,
+  "section_name": "Hydraulic Systems",
+  "question": "What is the role of a hydraulic filter?",
+  "answer": "Filters remove particles that damage pump and valves. Three types: suction (coarse, protects pump from large debris), pressure line (fine, protects sensitive valves), and return (fine, catches generated wear particles). Filters should be sized for the system flow with adequate dirt-holding capacity. Change at the indicator."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "Why is my plant air pressure dropping?",
+  "answer": "Causes: leaks in the distribution system (most common — a plant typically loses 20- 30% of air to leaks), compressor undersized for demand, demand spike (large user kicking in), receiver tank too small, or compressor capacity falling (worn valves, leaking aftercooler). Find leaks with an ultrasonic detector — cheap survey saves significant energy."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "How do I find compressed air leaks?",
+  "answer": "Ultrasonic leak detector picks up the high-frequency hiss inaudible to human ear. Soap solution on fittings shows visible bubbles. Listen with a stethoscope at fittings, threaded joints, and valve stems. The biggest leaks are usually at quick-disconnect fittings, drain valves stuck open, and dead-leg branches. Tag and fix systematically."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "What is the right pressure for instrument air?",
+  "answer": "Standard is 100 psi (7 bar) at the user. ANSI/ISA recommends supply pressure at least 100 psi for general use; some pneumatic actuators need 60-80 psi to stroke. Higher than 100 psi wastes energy without benefit. Lower than 80 psi causes valve sluggishness and instrument malfunction."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "Why does my pneumatic actuator stroke slowly?",
+  "answer": "Low supply pressure, restricted air line (small tubing, kinks, fittings), plugged exhaust port on the positioner or solenoid, leaking diaphragm or piston seal, contamination in the actuator. Check supply pressure first. Cold weather can freeze moisture in the air, blocking flow — air dryers prevent this."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "What is the dewpoint of instrument air and why does it matter?",
+  "answer": "Dewpoint is the temperature at which water vapor in the air would condense to liquid. ISA recommends dewpoint at least 10°C below the lowest operating temperature. Wet air corrodes instrument tubing, freezes in cold weather, and contaminates pneumatic components. Refrigerated or desiccant dryers maintain dewpoint."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "Why is my pneumatic system using more air than expected?",
+  "answer": "Leaks first — almost always. Then check for excessive consumption: stuck-open drain valves, oversized actuators, blow-off being misused for cleaning, or processes using air where electric would work. A compressed air audit identifies these. Compressed air is one of the most expensive utilities — every leak is paid for daily."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "What is the difference between filter, regulator, and lubricator (FRL)?",
+  "answer": "Filter removes water and particles from the air supply. Regulator drops supply pressure to the user's required pressure. Lubricator adds oil mist for tools that need it (most cylinders and modern instruments don't). FRL units are standard on the air supply to any pneumatic device. Drain the filter regularly."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "Why does my air-operated diaphragm pump pulse and not pump?",
+  "answer": "Diaphragm pumps need cycling supply air to alternate between chambers. Causes: air pressure too low, exhaust muffler clogged with debris or ice, diaphragm ruptured (air goes through to process side), or the pilot valve stuck. Listen for normal cycling — uneven cycle indicates valve or diaphragm problem."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "What is a pneumatic positioner and how does it work?",
+  "answer": "A positioner accurately positions a pneumatic actuator based on a control signal. Inputs a 4-20 mA signal and outputs precisely controlled air pressure to the actuator. Compares command to actual position via feedback and corrects. Modern smart positioners do diagnostics, auto-calibration, and partial-stroke testing."
+ },
+ {
+  "section_number": 14,
+  "section_name": "Pneumatic Systems",
+  "question": "How do I size compressed air piping?",
+  "answer": "Use the largest pipe practical — pressure drop in air pipes wastes energy continuously. Rule of thumb: 1-3 psi drop maximum across the entire distribution. Main headers should run at 6-10 fps velocity at maximum flow. Undersized headers cost more in lost energy than the larger pipe would have."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "Why is my flange leaking?",
+  "answer": "Causes: bolts not torqued properly (uneven loading), gasket damaged or wrong type, flange faces not parallel (pipe stress), worn or pitted flange faces, or thermal cycling that loosened bolts over time. Retorque only after depressurizing if safe to do so; never tighten a leaking flange under pressure."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "What is the right torque for flange bolts?",
+  "answer": "Per the gasket manufacturer's recommendation — depends on bolt size, lubricant, and gasket type. Spiral-wound gaskets have specific torque requirements. Hand calculation: F = 0.75 × yield stress × bolt cross-section area. Always torque in a star pattern, in 3-5 stages, gradually building to final torque."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "Why does my flange keep loosening?",
+  "answer": "Thermal cycling causes bolt creep and gasket relaxation. Solutions: hot-bolt the joint (retorque while at operating temperature), use through-hardened bolts and washers, use live-loaded bolting (Belleville washers), or change to a flexible gasket type. Some service is inherently demanding on flanges."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "What is a spiral-wound gasket?",
+  "answer": "A spiral-wound gasket alternates layers of metal winding and filler (typically graphite or PTFE) — handles high pressure, high temperature, and pressure cycling well. The most common gasket for serious industrial service. Available in various ratings; size to flange standard."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "How do I tell if pipe is corroding from inside?",
+  "answer": "External signs: wet spots, scale or rust streaks on the outside, weeping at fittings. Better methods: ultrasonic thickness measurement at multiple locations (track over time), inline inspection tools for pipelines, X-ray for inaccessible points. Internal corrosion is often invisible until failure — predict by inspection."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "What causes pipe vibration?",
+  "answer": "Causes: flow-induced vibration (acoustic resonance at certain flow rates), pulsation from positive displacement pumps, machinery vibration transmitted through pipe supports, water hammer, or undersized pipe causing high velocity. Excessive vibration fatigue-cracks welds and breaks fittings. Add supports, dampers, or pulsation suppressors."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "Why do my pipe supports break?",
+  "answer": "Pipe supports must accommodate thermal expansion and movement. Broken supports usually mean: support was rigid where it needed to be flexible, expansion loops missing or undersized, pipe stress higher than support rating, or pipe vibration transmitted through the support. Stress analysis identifies these issues during design."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "What is the difference between Schedule 40 and Schedule 80 pipe?",
+  "answer": "Schedule defines pipe wall thickness for a given nominal size. Sch 40 is standard wall (older 'standard weight' pipe). Sch 80 is extra heavy. Higher schedule = thicker wall = higher pressure rating but smaller internal diameter. Selection depends on service pressure and corrosion allowance."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "Why do welded joints crack?",
+  "answer": "Causes: hydrogen embrittlement from improper welding procedure, residual stress, fatigue from cyclic loading or vibration, stress corrosion cracking from environment, or original weld defects that propagated. Cracking welds need NDT inspection. Crack repair requires proper procedure — patching often makes it worse."
+ },
+ {
+  "section_number": 15,
+  "section_name": "Piping and Flanges",
+  "question": "What does a hammer sound in pipes mean?",
+  "answer": "Water hammer — sudden flow change causes pressure shock waves. Causes: rapid valve closure, pump shutdown, check valve slamming on reverse flow. Solutions: slower valve actuation, hammer arrestors, check valves that close before reverse flow, redesigned piping to lower velocity. Hammer fatigues fittings and breaks supports."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "Why is my temperature reading drifting?",
+  "answer": "Causes: thermocouple junction degraded (especially Type K in oxidizing atmospheres), RTD lead resistance changing with temperature, transmitter drift, wiring resistance from corroded terminals, or sensor location changed (e.g., deposit buildup over the sensor). Calibrate against a known reference. Many drifts trace to wiring, not the sensor."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "What is the difference between a thermocouple and an RTD?",
+  "answer": "Thermocouple uses voltage difference between two dissimilar metal junctions — fast response, wide range (-200 to 2300°C depending on type), inexpensive, less accurate. RTD uses resistance change with temperature in a precision wire (usually platinum) — more accurate, more stable, narrower range, more expensive. Use RTD for accuracy, thermocouple for range."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "Why is my pressure transmitter reading wrong?",
+  "answer": "Causes: process connection plugged (sluggish or no response), tubing slope causing trapped liquid in gas service or vapor lock in liquid service, transmitter not vented (for gauge type), wrong zero (re-zero the transmitter), or transmitter drift. Calibrate against a reference gauge. Most pressure problems are in the connection, not the device."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "How often should I calibrate transmitters?",
+  "answer": "Depends on service criticality and trend. Process measurement: typically annually. Safety-critical (interlocks, custody transfer): per regulation, often quarterly. Trend the as- found and as-left readings — drift rate tells you actual calibration interval needed. Many plants over-calibrate; some under-calibrate. Risk-based approach is right."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "What is HART communication?",
+  "answer": "HART is a digital signal superimposed on the standard 4-20 mA analog loop — lets you access transmitter diagnostics, ranges, and configuration through the same wires. Most modern transmitters are HART-capable. A handheld communicator or asset management software talks HART. Saves running separate cables and unlocks diagnostic data."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "Why is my level gauge showing wrong reading?",
+  "answer": "Depends on technology. Float-type: float hung up on tank wall, lost float, mechanism worn. DP (differential pressure): isolation valves closed or partially closed, condensate not full in wet leg, gas in liquid filled leg. Radar: foam interference, agitator pattern, mounting too close to wall. Each technology has specific failure modes."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "What is a 'wet leg' in a level transmitter?",
+  "answer": "On a DP level transmitter on a vessel with vapor space, the low side reference is filled with liquid — called a wet leg or condensate pot. Calibration accounts for the wet leg's column. If wet leg drains or vaporizes, level reading goes wrong. Maintain wet leg filling — automatic fill systems prevent the problem."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "Why is my flow meter reading negative?",
+  "answer": "Reverse flow is real on the meter — flow direction has reversed. Possible causes: check valve failed, pump tripped letting downstream pressure backflow, control valve overshooting, or wrong meter zero. Verify by checking other indicators of flow direction. Some meter types (orifice, vortex) can't read reverse flow; others (Coriolis, magnetic) can."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "How does a magnetic flow meter work?",
+  "answer": "Faraday's law: a conductive fluid passing through a magnetic field generates a voltage proportional to velocity. Two electrodes measure the voltage. Works only on conductive fluids (water, most aqueous solutions); doesn't work on hydrocarbons or gases. No moving parts, full bore (no pressure drop), highly accurate."
+ },
+ {
+  "section_number": 16,
+  "section_name": "Instrumentation",
+  "question": "What is loop tuning and why does it matter?",
+  "answer": "Loop tuning sets the PID controller parameters (proportional gain, integral time, derivative time) for stable, responsive control. Untuned loops oscillate, overshoot, or respond too slowly — wasting energy and product. Tune using software or methods like Ziegler-Nichols. Re-tune when process or equipment changes."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "Why is my control loop oscillating?",
+  "answer": "Three common causes: PID tuning too aggressive (gain too high, integral too short), valve stiction causing limit cycling, or process gain higher than expected (often after a process change). Slow down the controller and observe — if oscillation stops, tuning was the problem. If it persists at low gain, valve or process issue."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "What is the difference between PID and on/off control?",
+  "answer": "On/off control switches the output fully on or off based on setpoint crossing — used for simple processes (refrigeration, room temperature). PID modulates the output continuously — used for processes where smooth, accurate control matters. PID is more complex but gives much tighter control on temperature, flow, pressure, level."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "How do I tune a PID loop?",
+  "answer": "Methods: Ziegler-Nichols (manual, identifies natural frequency), Cohen-Coon (manual, response-based), auto-tune (controller computes settings from a test step). Start with proportional only, add integral for offset, add derivative carefully for fast processes. Tuning software simplifies this enormously."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "What is cascade control and when is it used?",
+  "answer": "Cascade is two controllers in series — outer controls the slow process variable (temperature) by adjusting the setpoint of the inner controller for a fast variable (flow). Provides faster disturbance rejection than single-loop. Standard for tight temperature control on heated/cooled equipment. Requires more setup but much better performance."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "Why is my control loop in manual when it should be auto?",
+  "answer": "Operator put it in manual usually because automatic control wasn't working. Reasons: poor tuning causing oscillation, valve stuck preventing control action, sensor problem giving bad input, or process upset where operator wants direct control. Find out why before just switching back to auto — the problem comes back."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "What is the difference between a PLC and a DCS?",
+  "answer": "PLC (Programmable Logic Controller) is discrete, fast, designed for machine control and interlocks — simple, reliable, low cost. DCS (Distributed Control System) is integrated, focused on continuous process control with many loops, advanced control, historian, and HMI — more capable but more complex and expensive. Boundary is blurring with modern hybrid systems."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "Why is my HMI screen frozen?",
+  "answer": "Common causes: network connection lost to the controller (check cable and switches), HMI software hung (restart), graphics card or driver issue, or controller itself stopped responding. The HMI is the window; freezing usually means either the window or the data path. Check whether the process itself is still controlled — that determines urgency."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "What is a safety instrumented system (SIS)?",
+  "answer": "SIS is a separate, independent system that takes the process to a safe state when defined hazardous conditions occur — overpressure, high temperature, level out of range. Designed per IEC 61511 with specified Safety Integrity Levels (SIL). Independent from the control system so a control failure doesn't disable safety. Required for major hazard processes."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "How often should I test interlocks?",
+  "answer": "Per IEC 61511 and site policy. Typical: high-integrity SIL 2 interlocks tested annually, SIL 3 every 6 months. Testing simulates the trigger condition and verifies the trip action. Skipping interlock tests is a major safety violation — incidents have been traced to overdue SIS tests."
+ },
+ {
+  "section_number": 17,
+  "section_name": "Control Systems",
+  "question": "What is sequence of events recording?",
+  "answer": "SOE captures the millisecond-precise time-stamped sequence of input changes during an event — invaluable for post-incident analysis. Lets investigators see which signal changed first and what cascaded. Modern DCS and PLC systems have SOE built in. Configure it before you need it."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "Why did my breaker trip?",
+  "answer": "Three possibilities: overload (sustained current above breaker rating), short circuit (instantaneous fault current), or ground fault (current to ground). The breaker indicator shows which. Always investigate before reset — repeated reset on a real fault makes things worse. Lockout and check the circuit for faults before re-energizing."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "What is the difference between a fuse and a breaker?",
+  "answer": "A fuse is sacrificial — opens once and must be replaced. Faster, simpler, cheaper, but maintenance attention required. A breaker can be reset after a trip. Most modern systems use breakers. Fuses remain for very high current, very fast action, or specific code requirements. Both must be properly coordinated for protection."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "Why is my transformer humming louder than usual?",
+  "answer": "Causes: core saturation from overvoltage or DC offset, loose laminations from vibration, mechanical resonance with mounting, or harmonic content from nonlinear loads. Excessive hum is concerning — check load, voltage, and harmonics. Some hum is normal (60 Hz fundamental); louder than baseline indicates change."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "What is power factor and why does it matter?",
+  "answer": "Power factor is the ratio of real power to apparent power. Inductive loads (motors, transformers) shift current behind voltage, lowering power factor. Low PF means utility supplies more current than the work requires — utilities charge penalties for poor PF. Improve with capacitor banks sized for the system."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "Why does my variable frequency drive (VFD) keep faulting?",
+  "answer": "Common faults: overvoltage (regenerative load with no brake resistor), overcurrent (output short or ground fault), thermal (drive overheated or motor over-temperature), and ground fault. Each fault means something specific. Drive manual decodes fault codes. Repeated faults trace to underlying cause — fix the cause, not the trip."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "What is arc flash and how do I protect against it?",
+  "answer": "Arc flash is a high-energy electrical explosion when a fault arc develops — can kill at several feet. Protection: arc-rated PPE per the incident energy at the location (calorie rating), maintenance to prevent faults, and current-limiting devices that minimize fault energy. Arc flash labels show required PPE for each panel."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "Why does my motor capacitor keep failing?",
+  "answer": "Single-phase motor start capacitors fail from: too many starts per hour (heat), wrong capacitance, voltage above rating, or aging electrolytic. Run capacitors fail from voltage spikes, harmonics, or heat. Match replacement spec exactly. Capacitor failures often trace to a centrifugal start switch staying closed — it should open at full speed."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "What is megger testing?",
+  "answer": "Megger (megohmmeter) testing measures insulation resistance at high test voltage (500-5000V depending on equipment rating). Healthy insulation reads many megohms. Falling readings predict winding failure. Test motors annually or when problems suspected. Also tests cables and transformers. Never megger semiconductors (drives, electronics) — destroys them."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "Why does the lighting flicker when a big motor starts?",
+  "answer": "Motor starting current (6-7× rated) sags the supply voltage briefly. If the supply transformer is undersized or distribution is long, the voltage dip is visible as flickering. Solutions: soft starter on the motor, larger supply transformer, dedicated motor branch circuit, or VFD (which limits starting current)."
+ },
+ {
+  "section_number": 18,
+  "section_name": "Electrical Equipment",
+  "question": "What is grounding and why does it matter?",
+  "answer": "Grounding gives fault current a controlled path back to the source — making breakers trip on faults and limiting touch voltage. Without proper grounding, fault current can flow through people. All metal enclosures of electrical equipment must be grounded. Annual ground continuity testing per code. Grounding is a life-safety system, not optional."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "What does vibration at 1× shaft speed mean?",
+  "answer": "1× indicates imbalance — the most common rotating equipment problem. The unbalanced mass creates a force that rotates with the shaft, producing vibration at exactly the shaft frequency. Confirm by checking phase between horizontal and vertical readings (typically 90° apart for imbalance). Fix by field balancing or shop overhaul."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "What does vibration at 2× shaft speed mean?",
+  "answer": "2× usually indicates misalignment — the misaligned shafts produce a twice-per- revolution force as they fight each other. Often shows higher axial vibration than radial. Confirm with phase analysis: horizontal and vertical on the same bearing typically 180° apart for misalignment. Fix by realigning shafts."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "What does high-frequency vibration mean?",
+  "answer": "High frequencies (above gear mesh, above bearing fundamentals) point to specific defects: bearing element defects produce characteristic frequencies, gear tooth wear produces sidebands, cavitation produces broadband high frequency. Spectrum analysis identifies the source. High-frequency content is the earliest warning of many problems."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "What are bearing defect frequencies?",
+  "answer": "Each bearing produces specific frequencies when a defect develops on a particular component. BPFO (outer race), BPFI (inner race), BSF (ball spin), FTF (cage). Calculated from shaft speed and bearing geometry. Modern analyzers show these calculated frequencies as cursors — peaks at those frequencies pinpoint the defect."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "How often should I take vibration data?",
+  "answer": "Risk-based: critical equipment monthly, important equipment quarterly, balance-of- plant semi-annually. Online continuous monitoring on the most critical assets. The right frequency catches trending before failure but doesn't drown the analyst in data. Establish baselines, then track trends."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "What is the difference between vibration velocity, displacement, and acceleration?",
+  "answer": "Displacement (microns or mils) is good for low-speed measurements and rotor problems below ~10 Hz. Velocity (mm/s or ips) is the general standard for machinery overall vibration — covers most fault types. Acceleration (g's) emphasizes high- frequency issues like bearings and gears. Most analyzers measure acceleration and integrate to velocity and displacement."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "What vibration level is too high?",
+  "answer": "ISO 10816 standards define limits by machine class and mounting. For typical industrial machinery class III (medium machines on rigid foundation), 2.8 mm/s is good, 4.5 mm/s is alert, 7.1 mm/s is danger. Critical machinery has tighter limits. Establish your own baselines — trends from baseline are more important than absolute numbers."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "How do I do simple field balancing?",
+  "answer": "Two-plane balancing on most rotating equipment: install accelerometer and phase reference (tach mark on shaft), measure baseline, add trial weight at known angle, measure response, calculate correction weight and angle from vectors. Software handles math. Field balancing fixes about 80% of imbalance without removing the rotor."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "What is the difference between absolute and relative phase?",
+  "answer": "Absolute phase is from a fixed reference (usually a tach mark on the shaft) to the vibration peak — used for balancing and most diagnostics. Relative phase compares two vibration signals — used to identify shaft motion patterns and structural issues. Modern analyzers handle both; understand which the data represents."
+ },
+ {
+  "section_number": 19,
+  "section_name": "Vibration Analysis",
+  "question": "Why does my machine vibration vary with load?",
+  "answer": "Load changes affect: bearing load and stiffness (bearings vibrate differently under different load), hydraulic forces (pumps), gear mesh patterns (gearboxes), and process flow induced forces. Vibration that changes only with load points to load-dependent problem. Vibration constant regardless of load points to mass-related (imbalance, misalignment)."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "How do I align a pump and motor?",
+  "answer": "Use laser alignment if available, otherwise dial indicators on the coupling. Two checks: parallel offset (centerlines offset) and angular misalignment (centerlines at angle). Both in horizontal and vertical planes. Tolerance typically 0.05 to 0.1 mm at the coupling. Eliminate soft foot first; align cold but account for thermal growth."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "What is soft foot?",
+  "answer": "Soft foot is when a machine doesn't sit flat on its foundation — one or more feet has a gap. Trying to align a soft-foot machine fails because tightening the bolts distorts the casing. Detect by loosening each foot in turn and measuring movement. Shim until each foot is within tolerance (typically 0.05 mm) before alignment."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "Why does my alignment drift after operation?",
+  "answer": "Thermal growth — machines grow as they heat up. A motor and pump growing different amounts opens up alignment. Solution: cold-align with offset to account for expected thermal growth (calculated or measured). Trial-and-error or thermal growth charts from OEMs. Vibration measurement at operating temperature confirms alignment is right."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "What tolerance should I use for alignment?",
+  "answer": "Depends on speed and criticality. ANSI standard suggests: 3600 rpm machines = 0.05 mm at coupling; 1800 rpm = 0.075 mm; 1200 rpm = 0.10 mm; 600 rpm = 0.15 mm. Critical or sensitive equipment may need tighter. Manufacturer specs override generic standards. Better alignment = longer bearing and coupling life."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "What is the difference between rim-and-face and reverse-indicator alignment?",
+  "answer": "Rim-and-face uses two indicators measuring the coupling rim (parallel) and face (angular) from one shaft. Quick but indicator on the face is affected by axial float. Reverse-indicator uses indicators across the coupling on each shaft simultaneously — more accurate, less affected by float. Laser alignment supersedes both for precision."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "How do I tell if my alignment is good without measuring?",
+  "answer": "Indirect signs: coupling rubber elements show even wear (not just one side worn), motor and pump bearings have similar temperatures, vibration spectrum has low 2× content. Good alignment shows in longevity — properly aligned machines run for years between bearing changes; misaligned machines fail rapidly."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "Why is my coupling failing repeatedly?",
+  "answer": "Almost always misalignment beyond the coupling's tolerance. Other causes: undersized for the application, missing or wrong lubrication on lubricated couplings, overloading, or material degradation from environment. Stop replacing couplings and check alignment first — that solves 90% of repeat failures."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "What is laser alignment and why is it better?",
+  "answer": "Laser systems use a laser beam between two heads (transmitter and receiver) mounted on the shafts. Computer calculates misalignment and required shim moves directly. Much faster than dial indicators, less error-prone, and gives more usable data. Cost is justified by reduced alignment time and better results."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "How do I align machines with spacer couplings?",
+  "answer": "Spacer couplings (with a middle 'jackshaft') have different alignment tolerances than direct couplings — they can accommodate more angular misalignment but less parallel. Specific procedures handle the jackshaft properly. Some laser systems have spacer- coupling modes. Otherwise, check OEM-specific alignment procedure."
+ },
+ {
+  "section_number": 20,
+  "section_name": "Alignment",
+  "question": "Should I align before or after the piping is connected?",
+  "answer": "Both — align before piping (cold, no load), then check after piping is connected. Piping strain can pull the pump out of alignment. Acceptable change is typically 0.05 mm at the coupling. If piping changes alignment more, piping is too stiff — needs spring supports, expansion joints, or rework."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "What is the difference between static and dynamic balance?",
+  "answer": "Static balance corrects for mass imbalance in a single plane — works for thin rotors like fan wheels and grinding wheels. Dynamic balance corrects for couples — required for longer rotors where imbalance creates rocking forces. Most industrial rotors (pumps, motors, compressors) need dynamic balancing in two planes."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "How do I know if a rotor needs balancing?",
+  "answer": "1× vibration above the limit, after ruling out misalignment, bent shaft, or loose components. Vibration that varies with speed (rises with the square of speed) indicates imbalance. After replacing or repairing an impeller or rotor, balancing is usually required even if the part was 'balanced' at the shop."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "What is balance grade G?",
+  "answer": "ISO 1940 specifies balance quality grades for different equipment types. G1.0 for precision machine tools, G2.5 for most industrial machines, G6.3 for general fans and pumps, G16 for heavier marine and agricultural. Lower G = tighter balance = more expensive. Match grade to application — over-balancing wastes money, under- balancing causes vibration."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "Can I balance a rotor in place?",
+  "answer": "Yes, field (in-situ) balancing is common — measure vibration, add trial weights, calculate correction. Works on rotors with accessible balance planes (fan wheels, exposed shafts). Doesn't work on rotors inside sealed casings. Single-plane balancing handles many cases; two-plane needed for longer rotors. Modern analyzers automate the math."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "What is residual imbalance?",
+  "answer": "Residual imbalance is what remains after balancing — perfect balance is unachievable. Specified as gram-inches or oz-inches per balance plane. ISO standards relate residual imbalance to balance grade G and rotor speed. Acceptable residual depends on application — fans tolerate more than precision machine spindles."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "Why does my balanced rotor still vibrate?",
+  "answer": "If balancing didn't fix it, the problem wasn't imbalance. Likely causes: misalignment, bent shaft, soft foot, loose components, bearing problems, or resonance (operating at a critical speed). Phase analysis distinguishes these. Don't keep adding balance weights — diagnose the real cause."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "How does shaft sag affect balancing?",
+  "answer": "Heavy slow-rotation rotors can develop a sag from their own weight — corrects above a critical speed. Balancing must account for the operating condition, not the at- rest condition. Some rotors are balanced at low speed in a balance machine, but require check-balancing at operating speed. Critical for turbines and large fans."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "What is the right balance speed?",
+  "answer": "Production balancing typically at 200-1500 rpm depending on rotor — enough to see imbalance effects but well below operating speed. Final balance of critical rotors may be at operating speed in special test stands. For field balancing, balance at operating speed where the vibration appears."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "Why is my fan vibrating even after balancing?",
+  "answer": "Common with fans: buildup of material on blades after balancing throws it off again. Address the deposition (process upset, cleaning interval, blade coating). Other causes: blade damage, hub crack, foundation issues, structural resonance, or the trial weight removed without correction. Track when vibration appears."
+ },
+ {
+  "section_number": 21,
+  "section_name": "Balancing",
+  "question": "When should I send a rotor to a balance shop versus field balance?",
+  "answer": "Field balance is faster and cheaper when access is available — typically fans, simple pumps. Shop balance is needed when access is poor (motors with rotors removed), when very tight grade is required (turbines), or when the rotor needs other work (recoating, machining). Shop balance also includes magnaflux and other inspections."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "What is the most common form of corrosion in plants?",
+  "answer": "General atmospheric corrosion (rust on carbon steel exposed to weather) is the most common but usually not failure-causing. Localized corrosion is far more dangerous: pitting under deposits, crevice corrosion at joints, stress corrosion cracking, microbial corrosion under deposits. The visible rust is usually not the problem; the hidden, localized corrosion is."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "Why is my stainless steel rusting?",
+  "answer": "Stainless steel rusts when the chromium oxide protective layer is breached: chloride attack (pitting), iron contamination from carbon steel tools or sparks (galvanic), low- oxygen environment (passive layer breaks down), or wrong grade for the service. Carbon steel particles embedded in stainless start rust spots. Use stainless tools on stainless."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "What is pitting corrosion?",
+  "answer": "Localized attack creating small deep holes (pits) — often in stainless steel exposed to chlorides. Visible pits are tip of the iceberg — they may go much deeper. Very dangerous because a few pits can cause through-wall failure while most of the metal is intact. Detected by UT inspection or pit gauge."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "What is stress corrosion cracking (SCC)?",
+  "answer": "SCC is cracking from combined tensile stress and corrosive environment — neither alone would crack the metal. Common combinations: stainless steel + chloride, brass + ammonia, carbon steel + caustic. Cracks are intergranular and can be hidden until catastrophic failure. Prevention: avoid the combination, reduce stress, change material."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "Why is corrosion higher at welds?",
+  "answer": "Welding creates heat-affected zones with different microstructure than the base metal — often more susceptible to corrosion. Stainless steel in particular can sensitize, becoming susceptible to intergranular attack. Solutions: use low-carbon stainless grades (304L instead of 304), post-weld heat treatment, or stabilized grades (321, 347)."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "How do I select the right material for a service?",
+  "answer": "Consult corrosion engineering references (NACE corrosion data, supplier guides). Factors: process chemistry, temperature, pressure, velocity, abrasive content, and tendency for cycling. Don't substitute materials without engineering review — a small chemistry change can transform a good service into severe attack. When in doubt, run a test coupon."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "What is galvanic corrosion?",
+  "answer": "When two different metals are connected in an electrolyte, the more anodic (active) metal corrodes preferentially. Common pairs: steel-brass, steel-copper, stainless- galvanized. Severity depends on the area ratio — small anode (steel bolt in brass plate) corrodes very fast. Prevention: isolate dissimilar metals, use sacrificial anodes, or match materials."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "What is cathodic protection?",
+  "answer": "Cathodic protection makes the protected metal a cathode in an electrolytic cell — preventing it from corroding. Two types: sacrificial anode (zinc or magnesium that corrodes preferentially, used on small structures and ships) or impressed current (DC power supply driving current, used on pipelines and tanks). Requires monitoring to verify protection."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "How do I detect under-insulation corrosion?",
+  "answer": "Insulated piping rusts under the insulation from water ingress — often invisible until the pipe leaks or fails. Detection methods: pulsed eddy current through insulation, periodic insulation removal at suspect points, neutron backscatter, or strip-and-inspect during turnarounds. CUI (Corrosion Under Insulation) is a leading cause of process leaks."
+ },
+ {
+  "section_number": 22,
+  "section_name": "Corrosion and Materials",
+  "question": "What is erosion-corrosion?",
+  "answer": "Erosion-corrosion is accelerated material loss from fluid velocity combined with corrosion — protective films can't form because flow keeps removing them. Common in pump impellers, valve trim, elbows in high-velocity service. Solutions: lower velocity, harder materials, erosion-resistant coatings, or thicker walls with planned replacement."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "What is the difference between MT, PT, UT, and RT?",
+  "answer": "MT (Magnetic Particle) finds surface and near-surface cracks in ferrous materials. PT (Penetrant) finds surface-only cracks in any material. UT (Ultrasonic) measures wall thickness and finds internal defects. RT (Radiography, X-ray) shows internal defects with film/digital image. Each has its place; select based on defect type, location, and material."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "How often should I do wall thickness inspections?",
+  "answer": "Risk-based: high-corrosion services every 6-12 months, moderate every 2-5 years, low-corrosion every 10 years per code minimum. Track each location over time — corrosion rate calculated from successive readings predicts remaining life. API 510 and 570 codes mandate inspection programs for pressure vessels and piping."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "What is the right thickness measurement location?",
+  "answer": "Establish Standardized Measurement Locations (TMLs) at points likely to corrode: elbows on outside, downstream of pressure drops, low points where water accumulates, at temperature changes, at injection points. Mark TMLs permanently so subsequent inspections measure the same spots — comparable data requires consistent locations."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "When is borescope inspection useful?",
+  "answer": "Visual inspection of internal areas without disassembly: turbine blades, gearbox internals, inside heat exchanger tubes, boiler tubes. Modern videoscope systems give clear color images with measurement capability. Far cheaper than tear-down — schedule borescope inspections at standard intervals on critical equipment."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "What is acoustic emission testing?",
+  "answer": "AE detects high-frequency sound waves from active defects under stress — growing cracks, leaks, partial discharge. Used for pressure vessel inspections, storage tank floors, and online monitoring of critical equipment. Tells you which areas are 'active' so other NDT can confirm. Doesn't see static defects (must be growing during the test)."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "How do I calibrate an ultrasonic thickness meter?",
+  "answer": "Calibrate against a known reference block of the same material as your inspection target. Velocity must match the material — steel is 5920 m/s typical, but varies for alloys. Re-zero against a calibration step. Calibrate before every shift and recheck periodically during use. Bad calibration causes thousands of meaningless readings."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "What is RBI (Risk-Based Inspection)?",
+  "answer": "RBI prioritizes inspection effort based on probability of failure times consequence of failure. High-risk equipment gets frequent thorough inspection; low-risk gets minimum code compliance. Codified in API 580/581. Reduces overall inspection cost while improving safety — focuses effort where it matters."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "How do I find internal cracks without breaking the part?",
+  "answer": "Radiography (X-ray) shows volumetric defects through metal. Ultrasonic shear-wave finds cracks oriented perpendicular to the beam. Phased array UT scans cracks at various angles. Each has limits — internal cracks are harder than surface cracks. Combine techniques for high-confidence inspection on critical components."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "What is the difference between linear and volumetric defects?",
+  "answer": "Linear defects are crack-like — two-dimensional. Very dangerous because they concentrate stress and grow under load. Volumetric defects are blob-like (porosity, slag) — less dangerous because they don't concentrate stress as much. Inspection codes treat them differently — linears have tighter rejection criteria."
+ },
+ {
+  "section_number": 23,
+  "section_name": "Inspection and NDT",
+  "question": "When is destructive testing required?",
+  "answer": "When the integrity of a representative sample is required to verify material properties: tensile tests, impact tests, hardness tests, metallography. Usually done on welded joint coupons before production welding, on failed components for root cause analysis, or on new material lots for certification. Can't be done on the actual production part."
+ },
+ {
+  "section_number": 24,
+  "section_name": "Lubrication Management",
+  "question": "How do I set up a lubrication program?",
+  "answer": "Steps: identify every lubrication point in the plant (motor bearings, pump bearings, gearboxes, slides, chains), specify the right lubricant for each, set a frequency, train technicians, document each application. A formal program (PM in CMMS) prevents missed lubrication and over-lubrication. Both cause failure."
+ },
+ {
+  "section_number": 24,
+  "section_name": "Lubrication Management",
+  "question": "Why is contamination control important?",
+  "answer": "Most lubricant-related failures trace to contamination — particles cause wear, water destroys oil film, air causes oxidation. ISO 4406 cleanliness codes specify particle limits. Hydraulics require very clean oil; gearboxes tolerate more. Filtration, sealed reservoirs, and storage discipline prevent contamination. Clean oil lasts much longer."
+ },
+ {
+  "section_number": 24,
+  "section_name": "Lubrication Management",
+  "question": "What is the ISO cleanliness code?",
+  "answer": "ISO 4406 expresses particle count as three numbers, e.g., 18/16/13. The numbers represent particle ranges (4 micron, 6 micron, 14 micron) on a logarithmic scale. Each number step up doubles the particles. Hydraulics typically target 16/14/11; servo systems 14/12/9. Filtration must achieve and maintain the target."
+ },
+ {
+  "section_number": 24,
+  "section_name": "Lubrication Management",
+  "question": "Should I top up oil or change it?",
+  "answer": "Depends on condition. Oil analysis tells you. Topping up dilutes contaminants and refreshes additives, extending change interval. But if the oil has degraded (high acid number, low viscosity, water contamination), topping up doesn't fix it — change. Some systems are top-up only by design (loss-of-fluid lubrication); others are reservoirs with periodic changes."
+ },
+ {
+  "section_number": 24,
+  "section_name": "Lubrication Management",
+  "question": "What is grease incompatibility?",
+  "answer": "Mixing greases with different thickener types (lithium, calcium, polyurea, complex) can cause chemical reaction or thickener degradation — the mix loses structure and protection. Always use the same grease type. When changing types, purge the old grease completely. Vendor compatibility charts show which mix safely."
+ },
+ {
+  "section_number": 24,
+  "section_name": "Lubrication Management",
+  "question": "How do I take a representative oil sample?",
+  "answer": "Sample from active circulation, not stagnant areas. Use a clean sample bottle. For circulating systems, sample mid-stream at a port. For reservoirs, use a vacuum sampler at mid-depth, not the bottom (sludge) or surface (water and air). Inconsistent sampling gives inconsistent results — establish a procedure."
+ },
+ {
+  "section_number": 24,
+  "section_name": "Lubrication Management",
+  "question": "What does oil analysis tell me?",
+  "answer": "Viscosity (degradation), water content (contamination), particle count (cleanliness), wear metals (which component is wearing), acid number (oxidation), TBN (depletion of additives), and elemental analysis (additive package and contaminants). A complete analysis costs $30-50 — far cheaper than a failure."
+ },
+ {
+  "section_number": 24,
+  "section_name": "Lubrication Management",
+  "question": "How long does oil last in service?",
+  "answer": "Depends on conditions, oil type, and contamination. A typical mineral hydraulic oil might last 5,000-10,000 hours. Synthetic ester compressor oil 8,000-15,000 hours. Steam turbine mineral oil 10-15 years (very lightly stressed). Oil analysis tells when to change rather than guessing — saves both wasted oil and surprise failures."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "What is an Emergency Shutdown System (ESD)?",
+  "answer": "An ESD is an automatic system that brings a process to a safe state when defined hazardous conditions occur. Separate from the control system, with its own sensors, logic solver, and final elements. Designed per IEC 61511 with Safety Integrity Levels. Required for major hazards: fire, gas release, runaway reaction, vessel overpressure."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "What is a Safety Integrity Level (SIL)?",
+  "answer": "SIL is the level of risk reduction provided by a safety instrumented function. SIL 1 reduces risk by factor of 10-100. SIL 2 by 100-1000. SIL 3 by 1000-10,000. SIL 4 by 10,000-100,000. Determined by hazard analysis. Higher SIL requires more redundancy, more testing, and proven equipment."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "How do I prove a SIL rating is achieved?",
+  "answer": "Through hardware fault tolerance, proven-in-use certification or third-party assessment, periodic proof testing at defined intervals, and documented management of change. Calculation methods in IEC 61508 verify the design meets the target Probability of Failure on Demand (PFD). Cannot retrofit SIL — must be designed in."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "What is a fire and gas detection system?",
+  "answer": "F&G systems detect fire (heat, flame, smoke) and combustible/toxic gas, alert personnel, and may trigger automated responses (shutdown, deluge, ventilation). Sensors are placed where releases are likely or hazardous. Voting logic (e.g., 2-out-of-3 sensors required) prevents nuisance trips while ensuring real events are caught."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "How often should I test gas detectors?",
+  "answer": "Bump test (verify response with test gas) typically weekly to monthly. Calibration (adjust span to known concentration) every 3-6 months for combustible, more often for toxic. Detector lifespan varies by type — electrochemical cells last 2-3 years, catalytic bead 3-5 years, infrared 7-10 years. Replace per condition or end-of-life."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "What is the purpose of a deluge system?",
+  "answer": "Deluge floods an area with water (or foam, for hydrocarbons) on confirmed fire detection — cooling equipment and suppressing the fire. Pre-action systems may use multiple sensors voting before water release. Annual flow testing verifies the system delivers required water rate. Frozen pipes in winter cause many deluge failures — heat trace and insulate."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "What is LOPA (Layer of Protection Analysis)?",
+  "answer": "LOPA is a semi-quantitative risk analysis identifying independent protection layers between an initiating cause and the consequence. Each layer (BPCS, operator response, relief valve, SIS, mitigation) provides a risk reduction factor. Sum determines if total protection meets target safety levels. Standard method in process safety."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "Why is bypassing a safety interlock dangerous?",
+  "answer": "Interlocks exist because consequence is severe enough to justify the cost. Bypassing eliminates a designed protection layer — if the upset occurs while bypassed, the consequence happens. Many serious incidents trace to bypassed interlocks (often 'temporarily' for testing, then forgotten). Bypasses must follow strict Management of Change with time limits."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "What is proof testing of safety systems?",
+  "answer": "Proof testing simulates the demand the safety system protects against and verifies it correctly trips. Done at intervals calculated to maintain SIL. Test must exercise the entire safety function — sensor, logic, final element. Partial testing (e.g., only sensor) misses some failure modes. Test documentation is auditable."
+ },
+ {
+  "section_number": 25,
+  "section_name": "Safety Systems and ESD",
+  "question": "What is a 'common cause' failure?",
+  "answer": "Common cause means a single root cause that defeats multiple supposedly- independent safety layers — e.g., common power supply failure, common calibration error, identical sensors with the same drift mode. Common cause failures are why SIL ratings require diverse and independent components. Hardest failure mode to analyze and prevent."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "What is the first action when a fire alarm sounds?",
+  "answer": "Activate the fire response protocol immediately — do not delay for diagnosis. Confirm location from multiple sensors if possible. Identify upstream isolation points for fuel/process feed to the area. Account for personnel in the affected zone. Do not approach without proper PPE and a backup. Site emergency response procedures take precedence over diagnostic work."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "What do I do if I smell gas?",
+  "answer": "Move upwind immediately. Do not use radios, phones, or any potential ignition source — sparks from electronics ignite gas. Verify with a portable gas detector before approaching. Notify control room. Isolate upstream source. For toxic gas, SCBA is required and entry is never solo. Wind direction and concentration matter as much as the leak itself."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "Why should I never reset an e-stop without investigation?",
+  "answer": "Someone pulled the e-stop because they saw a hazard. Resetting without finding out what triggered it can re-create the hazard and harm a person or equipment. Always: identify the trigger from the interlock log, account for personnel, verify the equipment is in a safe state, then follow site authorization procedure for restart."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "What is the difference between safe and unsafe shutdown?",
+  "answer": "Safe shutdown follows a controlled sequence — reducing rate, lowering temperature/pressure gradually, isolating in defined order. Equipment reaches a state where it can be left or worked on safely. Unsafe shutdown is sudden — trip alone may leave equipment hot, pressurized, or in an unstable state. Most modern systems have shutdown sequences."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "What is the role of an emergency response team?",
+  "answer": "Trained team responds to plant emergencies — typically firefighting, rescue, spill response, medical. Operates under the Incident Command System. Practices regularly to maintain proficiency. Has authority to evacuate, isolate, and direct response. Plant operations support but don't lead emergency response — leave that to trained personnel."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "How do I read a Material Safety Data Sheet (MSDS / SDS)?",
+  "answer": "Key sections: hazard identification (what kind of harm), first aid measures, fire- fighting measures, accidental release, handling and storage, exposure controls/PPE, physical/chemical properties, toxicology. SDS is required for every hazardous chemical at site. Workers should know where SDSs are kept and how to find one quickly."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "What is hot work permit?",
+  "answer": "Hot work permit authorizes welding, cutting, grinding — anything generating heat or sparks. Required when work is done outside designated areas. Pre-work checks: combustibles removed or covered, fire watch assigned, fire extinguisher present, atmospheric tests if needed. Permit specifies area, work, time period, and required protections."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "What is the buddy system in confined space entry?",
+  "answer": "A trained attendant remains outside the confined space at all times — maintains communication with entrants, monitors atmosphere, and summons rescue if needed. Attendant cannot leave. Entries must have rescue capability available — confined space deaths often involve would-be rescuers. Never enter alone, never improvise rescue."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "Why is lockout/tagout critical?",
+  "answer": "Energy isolation prevents accidental start-up during maintenance. Every energy source (electrical, pneumatic, hydraulic, gravity, stored mechanical) must be isolated and locked. Personal locks prevent another worker from energizing. Major industrial accidents trace to LOTO failures — every worker doing maintenance must understand and follow it."
+ },
+ {
+  "section_number": 26,
+  "section_name": "Emergency Response",
+  "question": "What is the response to a runaway reaction?",
+  "answer": "Reactor temperature rising uncontrolled is serious. Standard responses (per design): quench with cold material, open emergency vent or relief, dump to a kill tank, cut off feed. The right response is process-specific and pre-planned. Following procedure beats improvisation in crisis. Practice the response — operators must know it cold."
+ },
+ {
+  "section_number": 27,
+  "section_name": "Cooling Towers",
+  "question": "Why has my cooling water temperature increased?",
+  "answer": "Causes: higher heat load in the plant, lower air flow (fan problem, fouled fill), lower water flow (pump issue, plugged spray nozzles), high ambient wet-bulb temperature, scale buildup on fill reducing heat transfer, or air recirculation. Trend cold water temperature against wet-bulb — approach widening means tower is degrading."
+ },
+ {
+  "section_number": 27,
+  "section_name": "Cooling Towers",
+  "question": "What is tower approach and range?",
+  "answer": "Approach is cold water temperature minus wet-bulb temperature — typical 4-5°F for good towers, indicates tower performance. Range is hot water minus cold water — indicates heat removed, determined by plant load. Approach is the diagnostic value — widening approach means tower efficiency falling."
+ },
+ {
+  "section_number": 27,
+  "section_name": "Cooling Towers",
+  "question": "Why is my cooling tower fan vibrating?",
+  "answer": "Causes: blade buildup (mineral scale, biological), unbalanced fan from blade damage, gearbox issues (misalignment, bearing wear), structural problems with the fan stack, or motor problem. Cooling tower fans are big — vibration can shake the whole tower. Investigate quickly; major blade failures damage the tower."
+ },
+ {
+  "section_number": 27,
+  "section_name": "Cooling Towers",
+  "question": "What is cycles of concentration?",
+  "answer": "Cycles is how concentrated cooling water dissolved solids are versus the makeup water. Higher cycles = less blowdown waste, but also more scale and corrosion risk. Typical: 3-6 cycles depending on water chemistry. Water treatment program controls cycles via blowdown. Calculate from chloride or conductivity ratio."
+ },
+ {
+  "section_number": 27,
+  "section_name": "Cooling Towers",
+  "question": "How do I prevent legionella in cooling towers?",
+  "answer": "Legionella grows in warm stagnant water. Prevention: proper biocide program (typically oxidizing biocide like bleach plus non-oxidizing alternating biocide), regular cleaning, eliminate stagnant areas, monitor with culture testing. Cooling towers are a common legionella source — outbreaks lead to serious illness and lawsuits."
+ },
+ {
+  "section_number": 27,
+  "section_name": "Cooling Towers",
+  "question": "Why is my drift eliminator important?",
+  "answer": "Drift eliminators capture water droplets in the air stream leaving the tower — preventing them from drifting downwind (carrying treatment chemicals, legionella, and minerals). Modern eliminators reduce drift to less than 0.001% of circulation rate. Damaged or missing eliminators worsen environmental impact and legionella risk."
+ },
+ {
+  "section_number": 27,
+  "section_name": "Cooling Towers",
+  "question": "What is the right water treatment for cooling towers?",
+  "answer": "Three components: corrosion inhibitor (typically zinc-phosphate or molybdate), scale inhibitor (phosphonate, polymer), biocide (oxidizing and non-oxidizing). Specific chemistry depends on water source and metallurgy. Water treatment vendors typically provide custom programs and monitoring. Don't try to design treatment yourself."
+ },
+ {
+  "section_number": 28,
+  "section_name": "Pressure Vessels and Tanks",
+  "question": "What is MAWP and how is it determined?",
+  "answer": "MAWP is Maximum Allowable Working Pressure — the highest pressure the vessel is rated for at design temperature. Determined by design calculation per ASME Section VIII, considering material, thickness, geometry, and corrosion allowance. Stamped on the vessel nameplate. Never operate above MAWP — vessel rupture is catastrophic."
+ },
+ {
+  "section_number": 28,
+  "section_name": "Pressure Vessels and Tanks",
+  "question": "How often are pressure vessels inspected?",
+  "answer": "Per API 510 and jurisdictional requirements. External inspection: 5 years typical. Internal inspection: based on remaining life, maximum 10 years. Risk-Based Inspection (RBI) can extend intervals with technical justification. Inspection includes thickness measurement at established locations, visual for cracks and corrosion, and documentation review."
+ },
+ {
+  "section_number": 28,
+  "section_name": "Pressure Vessels and Tanks",
+  "question": "What is a corrosion allowance?",
+  "answer": "Corrosion allowance is the extra wall thickness specified in design to allow for expected corrosion during the vessel's life. Typical: 1/8 inch (3 mm) for most carbon steel vessels. The vessel can lose up to the allowance and still meet MAWP. Inspection tracks remaining corrosion allowance — when consumed, repair or retire required."
+ },
+ {
+  "section_number": 28,
+  "section_name": "Pressure Vessels and Tanks",
+  "question": "Why does my pressure vessel relief valve discharge frequently?",
+  "answer": "Either the process is genuinely overpressuring (control system issue, undersized capacity, plugged outlet) or the relief valve set pressure has drifted low. Frequent relief operation damages the valve seat — root cause must be addressed. Don't just keep replacing the valve; fix the upstream issue or replace with proper size/setting."
+ },
+ {
+  "section_number": 28,
+  "section_name": "Pressure Vessels and Tanks",
+  "question": "What is the difference between a code-stamped and non-code vessel?",
+  "answer": "Code-stamped vessels (ASME 'U' stamp) are designed, fabricated, and inspected per ASME Boiler and Pressure Vessel Code — legally required for most pressurized vessels in most jurisdictions. Non-code vessels are typically for low pressure or atmospheric service. Adding pressure to a non-code vessel without engineering review is illegal and dangerous."
+ },
+ {
+  "section_number": 28,
+  "section_name": "Pressure Vessels and Tanks",
+  "question": "Why is my tank breathing causing problems?",
+  "answer": "Atmospheric tanks 'breathe' as level changes — air in when emptying, vapor out when filling. Problems: vapor losses, air contamination of stored product, condensation moisture, atmospheric emissions. Solutions: vapor recovery systems, inert gas blanketing (nitrogen pad), pressure-vacuum vents (limit pressure differential). Each addresses different aspects of breathing."
+ },
+ {
+  "section_number": 28,
+  "section_name": "Pressure Vessels and Tanks",
+  "question": "What is a hydrotest?",
+  "answer": "A hydrotest pressurizes a vessel or piping system to 1.3-1.5× MAWP with water to verify integrity after construction, repair, or per code requirement. Water is used (not gas) because compressed water releases far less energy if a failure occurs. Hydrotest is the standard pressure-test method per ASME and other codes."
+ },
+ {
+  "section_number": 29,
+  "section_name": "Process Upsets",
+  "question": "What is the first action when multiple alarms appear?",
+  "answer": "Don't try to address everything at once. Identify the highest-priority alarm — usually safety-related (high-high level, high-high pressure, fire/gas). Acknowledge but don't suppress. Look for the initiating cause — many alarms often cascade from one root cause. Address the root cause; the cascade clears itself."
+ },
+ {
+  "section_number": 29,
+  "section_name": "Process Upsets",
+  "question": "How do I prevent alarm flooding?",
+  "answer": "Per EEMUA 191 standards: review and rationalize each alarm (what action does the operator take?), eliminate unnecessary alarms, set proper priorities, configure dynamic alarming for different operating states. Most plants operate with 10-100× more alarms than EEMUA recommends. NexOps' intelligent segregation addresses this by filtering nuisance noise."
+ },
+ {
+  "section_number": 29,
+  "section_name": "Process Upsets",
+  "question": "What does EEMUA 191 say about alarm rates?",
+  "answer": "EEMUA 191 recommends 1 actionable alarm per 10 minutes during steady operation — about 6 alarms per hour. Burst rates during upsets should not exceed 10 alarms in 10 minutes (60/hour). Plants commonly run 7+ alarms per minute (420/hour) — 70× the standard. Operators tune out. Critical alarms get missed."
+ },
+ {
+  "section_number": 29,
+  "section_name": "Process Upsets",
+  "question": "Why is my process not responding to control changes?",
+  "answer": "Possibilities: controller in manual not auto, output saturated (valve fully open or closed), valve stuck, sensor reading wrong giving false feedback, or process at a different operating point than expected. Look at controller output and process variable on a trend. If output is changing but PV isn't, the loop is broken downstream."
+ },
+ {
+  "section_number": 29,
+  "section_name": "Process Upsets",
+  "question": "How do I start up a process safely after shutdown?",
+  "answer": "Follow the written startup procedure. Verify all safety interlocks are functional and not bypassed. Bring up utilities first (instrument air, cooling water, electrical). Establish flows before applying heat or chemistry. Test each stage before proceeding. Startup is a leading cause of incidents — slow and methodical beats fast and dangerous."
+ },
+ {
+  "section_number": 29,
+  "section_name": "Process Upsets",
+  "question": "What causes process trends to drift?",
+  "answer": "Slow drift may be: sensor calibration drift, gradual fouling of equipment, feed quality change, environmental change (ambient temperature affecting cooling), or operator setpoint changes. Trend long-term — drift over weeks indicates gradual degradation. Trend short-term — abrupt change indicates a discrete event."
+ },
+ {
+  "section_number": 29,
+  "section_name": "Process Upsets",
+  "question": "Why does my batch reaction give variable results?",
+  "answer": "Variability sources: feed quality variation, charging order or rate change, temperature profile differences, mixing variation, catalyst aging. Track each batch's parameters and yield. Statistical Process Control identifies which variables correlate with results. Reduce variability of the controlling factor — that's where improvement is largest."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "What is the difference between PM, PdM, and run-to-failure?",
+  "answer": "PM (Preventive Maintenance) is time-based — scheduled by hours or calendar. PdM (Predictive Maintenance) is condition-based — actions triggered by measurements (vibration, oil analysis, thermography). RTF (Run-to-Failure) lets equipment fail before replacement. Choose strategy by criticality and economics — not everything needs PdM."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "How do I write a good maintenance procedure?",
+  "answer": "Clear sequence of steps. Each step has a specific action. Safety steps explicit. Required tools, parts, and PPE listed at the start. Acceptance criteria for each check. Sign-off points for verification. Use someone unfamiliar with the work to test the procedure — if they can do it correctly, the procedure is good."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "What is mean time between failures (MTBF)?",
+  "answer": "MTBF is the average operating time between failures for repairable equipment. Calculated as total operating hours divided by number of failures. Higher is better. Trended over time shows whether reliability is improving or degrading. Industry benchmarks compare your equipment to similar service elsewhere."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "What is mean time to repair (MTTR)?",
+  "answer": "MTTR is the average time to restore equipment after failure — diagnosis, parts, repair, testing. Lower is better. Improvable by spare parts strategy, trained personnel, good documentation, and accessible design. NexOps targets MTTR reduction through faster engineer dispatch and explainable assignment reasoning."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "How do I calculate equipment availability?",
+  "answer": "Availability = MTBF / (MTBF + MTTR). Expressed as percentage. World-class is 99%+ for critical equipment. Improved by either reducing failures or reducing repair time. The math drives strategy — if MTBF is high but MTTR is too, work on repair time; vice versa."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "What spare parts should I stock?",
+  "answer": "Stock based on lead time, criticality, cost, and consumption rate. Long-lead-time critical spares need on-site stock. Short-lead-time inexpensive items can be ordered when needed. Common consumables (gaskets, fasteners, lubricants) stocked in larger quantities. Use slow-mover analysis to retire obsolete inventory."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "What is overall equipment effectiveness (OEE)?",
+  "answer": "OEE = Availability × Performance × Quality. Standard manufacturing KPI. Availability is uptime ratio. Performance is actual rate vs. design rate. Quality is good output vs. total output. World-class OEE is 85%+. Tracks improvement systematically and shows where to focus (availability, speed, or quality issues)."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "How do I justify a capital project for maintenance?",
+  "answer": "Quantify current cost: failure frequency × cost per failure (repair, downtime production loss, safety risk). Compare to project cost. Calculate payback period and Net Present Value. Include risk reduction benefits — sometimes hardest to quantify but most important. Management approves projects with documented business cases, not gut feelings."
+ },
+ {
+  "section_number": 30,
+  "section_name": "Maintenance Planning",
+  "question": "What is a CMMS and why use one?",
+  "answer": "Computerized Maintenance Management System tracks equipment, schedules PM, manages work orders, stores history, manages parts inventory. Provides data for reliability analysis, cost tracking, and continuous improvement. Without CMMS, maintenance knowledge stays with individuals and walks out when they retire. Implement before you need it."
+ },
+ {
+  "section_number": 31,
+  "section_name": "General Troubleshooting",
+  "question": "How do I troubleshoot a problem I've never seen before?",
+  "answer": "Start with what changed — when did the problem appear, what was changed before that? Use the 5 Whys method: ask why repeatedly to drill to root cause. Check easy/cheap things first. Don't assume; verify with measurements. Document what you find — next time will be faster. Don't be the lone hero — ask for help when stuck."
+ },
+ {
+  "section_number": 31,
+  "section_name": "General Troubleshooting",
+  "question": "What is root cause analysis?",
+  "answer": "RCA finds the underlying cause of a problem, not just the immediate trigger. Methods: 5 Whys (simple, structured questioning), Fishbone diagram (categorized brainstorming), Fault Tree Analysis (logical), TapRoot (formal). The goal is preventing recurrence — fixing the symptom alone means the problem returns. RCA is a discipline, not an instinct."
+ },
+ {
+  "section_number": 31,
+  "section_name": "General Troubleshooting",
+  "question": "Why do the same problems keep recurring?",
+  "answer": "Because the previous fix addressed the symptom, not the root cause. Or the root cause was identified but not fixed (cost, time, political resistance). Or a temporary fix became permanent. Recurring failures need RCA, then commitment to address the underlying issue — even if expensive or inconvenient."
+ },
+ {
+  "section_number": 31,
+  "section_name": "General Troubleshooting",
+  "question": "How do I know if a problem is mechanical or electrical?",
+  "answer": "Symptoms differ. Mechanical: noise, vibration, heat at specific bearing or location, oil/grease changes. Electrical: tripping, current variations, burning smell, motor temperature uniform. Many problems have both mechanical and electrical symptoms — measure both. Confirm with separate tools rather than guessing."
+ },
+ {
+  "section_number": 31,
+  "section_name": "General Troubleshooting",
+  "question": "What does 'troubleshoot from the simplest cause to the most complex' mean?",
+  "answer": "When diagnosing, start with cheap, fast checks: is it plugged in? Is the valve open? Are the bolts tight? Is the air supply on? Most problems trace to something simple. Save expensive tear-downs and complex theories until simple checks rule them out. Experienced troubleshooters know what 'simple' is for each kind of equipment."
+ },
+ {
+  "section_number": 31,
+  "section_name": "General Troubleshooting",
+  "question": "Why is documenting the problem important?",
+  "answer": "Documentation enables: pattern recognition (similar problems clustered in time), knowledge sharing (next technician benefits from your work), reliability analysis (which equipment has most problems), and root cause analysis (timeline of events). Undocumented problems are solved repeatedly. Document at the time, not later when memory fades."
+ },
+ {
+  "section_number": 31,
+  "section_name": "General Troubleshooting",
+  "question": "What is the difference between a symptom and a cause?",
+  "answer": "Symptom is what you observe — high temperature, low flow, alarm. Cause is what produced the symptom. Fixing a symptom (like clearing an alarm) doesn't fix the cause. The cause continues and the symptom recurs. Always look past the symptom to the cause. Multiple symptoms often trace to one cause — find it."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "Why is this machine flagged HIGH risk but the gateway says Normal?",
+  "answer": "That's the early-warning catch. NexOps anomaly detection sees the developing fault before the gateway's static threshold trips. The gateway only fires after a limit is breached. NexOps catches the trend toward the limit — usually 10-30 minutes earlier. That extra time is what prevents downtime."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "What does an anomaly score mean?",
+  "answer": "It's a number from 0 to 1 showing how unusual the current sensor pattern is compared to this machine's recent normal behavior. Above 0.7 is significantly unusual. Above 0.85 is highly anomalous. The score combined with trend direction is what raises the risk level. Trending up over time is more meaningful than absolute value."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "Why did this fault get assigned to this engineer?",
+  "answer": "The assignment engine scored every available engineer on five factors: skill match for this fault type, current workload, past fix time on this fault category, experience, and zone proximity. The highest scoring engineer was chosen. The assignment reason shows in the task — it tells you exactly why."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "Can I reassign the task to someone else?",
+  "answer": "Yes — plant managers can reassign any task. Zone managers can reassign within their zone. The audit trail records the override and the reason. The algorithm is the default, not a dictator. Reassignment patterns over time can highlight where the algorithm needs tuning."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "What does it mean when the system shows 'EARLY' badge?",
+  "answer": "NexOps flagged MEDIUM or HIGH risk while the gateway still shows Normal. The anomaly detection saw the fault developing before the static threshold tripped. The ⚠ EARLY badge appears on the alert. This is the headline feature — predicting before reacting, giving extra time to respond."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "Why are some alarms tagged as 'nuisance'?",
+  "answer": "Nuisance noise is sensor chatter at threshold edges, single-sample spikes, or transient signals that don't indicate real faults. NexOps tags them so they don't drown out real alarms. The tagged nuisance shows in the UI but doesn't generate tasks. Filtering nuisance is core to managing alarm fatigue."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "How do I acknowledge an alarm?",
+  "answer": "Click the alarm in the UI and acknowledge. Acknowledgment doesn't clear the underlying condition — that requires resolution. Acknowledged alarms are tracked separately from unacknowledged. Best practice: acknowledge promptly, then work the resolution. Unacknowledged alarms accumulate quickly and reduce situational awareness."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "What is the difference between alarm and event?",
+  "answer": "An alarm requires operator action — something is wrong that needs attention. An event is just notable information — pump started, valve opened, batch complete. Don't make events into alarms unless action is needed. Modern alarm management distinguishes the two so alarms remain meaningful."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "How do I know if an alarm is real or false?",
+  "answer": "Cross-check with other sensors on the same equipment. Look at the trend leading up to the alarm. Check the simulator/process state. False alarms have characteristic signatures — too brief, no corroborating signal, or impossible value. Real alarms usually have buildup and corroborating evidence. Verify by walking the field if unsure."
+ },
+ {
+  "section_number": 32,
+  "section_name": "Alarm Management and Operations",
+  "question": "What is alarm priority and how is it set?",
+  "answer": "Priority determines response urgency — Critical (immediate action, life safety), High (action this shift), Medium (action this day), Low (next opportunity). Set by reviewing each alarm: what happens if ignored? Critical alarms need backup notification methods. Most alarms are over-prioritized — strict rationalization is needed."
+ },
+ {
+  "section_number": 33,
+  "section_name": "Chemical Process Operations",
+  "question": "What is a runaway reaction?",
+  "answer": "A runaway reaction is when reaction heat exceeds the cooling capacity, temperature rises, reaction rate increases (often exponentially with temperature), and the cycle spirals out of control. Can rupture vessels or cause explosion. Prevention: redundant cooling, temperature interlocks, emergency dump systems, quench injection. Several major industrial disasters have been runaway reactions."
+ },
+ {
+  "section_number": 33,
+  "section_name": "Chemical Process Operations",
+  "question": "Why is heat removal critical in exothermic reactions?",
+  "answer": "Exothermic reactions release heat. If heat removal can't keep up with heat generation, temperature rises. Most reaction rates double with every 10°C temperature rise — so any temperature excursion can quickly become runaway. Heat removal capacity should significantly exceed peak heat generation, with redundancy."
+ },
+ {
+  "section_number": 33,
+  "section_name": "Chemical Process Operations",
+  "question": "What is a kill tank or quench system?",
+  "answer": "Emergency dump that stops a reaction by diluting or quenching. The reactor contents dump to a tank with cold water, inhibitor, or large heat sink. Process safety design feature for runaway reaction protection. Some chemistries can be quenched with neutralizer (acid-base) — depends on the reaction."
+ },
+ {
+  "section_number": 33,
+  "section_name": "Chemical Process Operations",
+  "question": "Why is feed quality control important in batch reactions?",
+  "answer": "Reactions are sensitive to feed composition, contamination, and concentration. Off- spec feed can cause runaway, side reactions, poor yield, or product quality problems. Incoming material certification, sampling, and analysis prevent surprises. Don't accept material without proper documentation, even if 'just like last time.'"
+ },
+ {
+  "section_number": 33,
+  "section_name": "Chemical Process Operations",
+  "question": "What is catalyst poisoning?",
+  "answer": "Catalysts can be deactivated by trace impurities that adsorb on active sites — sulfur on nickel catalysts, chlorides on noble metals, water on zeolites. Even ppm-level contaminants can kill expensive catalyst beds. Feed purification protects catalyst. Once poisoned, replacement is usually the only option — and catalyst is expensive."
+ },
+ {
+  "section_number": 33,
+  "section_name": "Chemical Process Operations",
+  "question": "Why is mixing important in batch reactions?",
+  "answer": "Local concentration variations cause uneven reaction — high concentration zones can runaway while well-mixed zones react normally. Hot spots form. Yield drops. Modern reactors have specific impeller designs for uniform mixing. Mixing studies (CFD or tracer) verify performance. Poor mixing is often hidden until problems appear."
+ },
+ {
+  "section_number": 33,
+  "section_name": "Chemical Process Operations",
+  "question": "What is a reaction calorimetry test?",
+  "answer": "Calorimetry measures heat generated by a reaction under controlled conditions — used to identify safe operating conditions, maximum heat load, and runaway potential. Done in dedicated equipment (RC1, ARC). Required for new chemistries and for scale- up. Process safety departments interpret results and set operating limits."
+ },
+ {
+  "section_number": 33,
+  "section_name": "Chemical Process Operations",
+  "question": "Why are some chemicals stored under inert gas?",
+  "answer": "Many chemicals oxidize, react with moisture, or polymerize when exposed to air. Inert blanketing (nitrogen, argon) prevents these reactions. Required for: many organic chemicals, finely divided metals, peroxide-formers. Loss of inert blanket is a slow but real degradation. Maintain blanket pressure monitoring."
+ },
+ {
+  "section_number": 34,
+  "section_name": "Refining Operations",
+  "question": "Why does crude composition matter?",
+  "answer": "Different crudes have different yields of products (gasoline, diesel, jet, asphalt), different impurities (sulfur, nitrogen, metals), and different processing requirements. Refineries are designed for specific crude slates. Processing the wrong crude reduces yield, damages catalysts, and may exceed equipment limits. Crude diet planning is a major refinery activity."
+ },
+ {
+  "section_number": 34,
+  "section_name": "Refining Operations",
+  "question": "What is fouling in a refinery preheat train?",
+  "answer": "Crude preheat exchangers foul rapidly — asphaltenes deposit, particulates accumulate, polymerization at high temperatures forms coke. Each exchanger loses heat transfer over months. Cleaning required during turnarounds. Fouling models predict cleaning timing. Anti-fouling additives slow deposition but don't eliminate."
+ },
+ {
+  "section_number": 34,
+  "section_name": "Refining Operations",
+  "question": "Why is hydrogen important in modern refineries?",
+  "answer": "Hydrogen is consumed in hydrotreating (sulfur removal), hydrocracking (heavier to lighter), and isomerization. Required to meet modern fuel specifications (low sulfur diesel and gasoline). Hydrogen plants produce it from natural gas via steam reforming. Hydrogen balance is a major operational metric in refineries."
+ },
+ {
+  "section_number": 34,
+  "section_name": "Refining Operations",
+  "question": "What is a coker and what does it do?",
+  "answer": "A coker thermally cracks heavy bottoms (vacuum residue) into lighter products plus solid coke. Allows refining of heaviest crude fractions that otherwise have no market. Delayed cokers process in batches; fluid cokers continuously. The petroleum coke product is sold as fuel (steel, cement, power) or anode-grade for aluminum."
+ },
+ {
+  "section_number": 34,
+  "section_name": "Refining Operations",
+  "question": "Why does a fluid catalytic cracker need catalyst regeneration?",
+  "answer": "FCC catalyst (zeolite-based) is deactivated by coke deposition during cracking — typically every few seconds. Spent catalyst regenerates in a separate vessel by burning off the coke with air. Regenerated catalyst returns to the reactor. The heat from regeneration also supplies reaction heat. Catalyst circulation rates are huge."
+ },
+ {
+  "section_number": 34,
+  "section_name": "Refining Operations",
+  "question": "What is product blending in a refinery?",
+  "answer": "Final products (gasoline, diesel, jet) are blended from multiple refinery streams to meet specifications — octane, vapor pressure, sulfur, density, cetane. Linear programming optimizes blends for lowest cost while meeting specs. Real-time optimization adjusts blends as crude or unit operations change. Blending is where margin is captured."
+ },
+ {
+  "section_number": 35,
+  "section_name": "Mining and Mineral Processing",
+  "question": "Why is conveyor maintenance critical in mining?",
+  "answer": "Mining operations move huge volumes of material — conveyors are the lifeline. Failure stops production immediately. Conveyors face severe service: abrasion from ore, weather exposure, dust, long runs. Routine maintenance prevents catastrophic failures. Belt monitoring (rip detectors, alignment switches, splice trackers) catches problems early."
+ },
+ {
+  "section_number": 35,
+  "section_name": "Mining and Mineral Processing",
+  "question": "What causes ball mill liner wear?",
+  "answer": "Liners protect the mill shell from impact and abrasion of grinding media. Wear rate depends on ore hardness, grinding media size, mill speed, and liner design. Liner profile change (from new to worn) affects grinding efficiency. Replace liners when worn beyond design profile — typically 3-12 months depending on service."
+ },
+ {
+  "section_number": 35,
+  "section_name": "Mining and Mineral Processing",
+  "question": "Why is dust suppression important in mining plants?",
+  "answer": "Dust is health hazard (silicosis), explosion risk (coal dust, sulfide dust), environmental issue, and reduces equipment life (motor cooling, bearing seal damage). Suppression: water sprays at transfer points, enclosure of conveyors, ventilation systems. Dust control program required by health and safety regulations."
+ },
+ {
+  "section_number": 35,
+  "section_name": "Mining and Mineral Processing",
+  "question": "What is the difference between ball mill and SAG mill?",
+  "answer": "SAG (Semi-Autogenous Grinding) uses big rocks plus some steel balls — relies on the ore itself to do grinding. Used for primary grinding. Ball mill uses only steel balls — finer grinding, downstream of SAG. Sequential SAG-ball mill circuits are standard in mineral processing. SAG mills are huge — 30+ feet diameter."
+ },
+ {
+  "section_number": 35,
+  "section_name": "Mining and Mineral Processing",
+  "question": "Why does flotation chemistry matter?",
+  "answer": "Froth flotation separates valuable minerals from waste by chemistry — specific reagents make valuable minerals float on bubbles while gangue sinks. Different ores need different reagents (collectors, frothers, depressants). Wrong chemistry means poor recovery and high reagent cost. Metallurgists optimize reagent suites for each ore body."
+ },
+ {
+  "section_number": 35,
+  "section_name": "Mining and Mineral Processing",
+  "question": "What is tailings management?",
+  "answer": "Tailings are the waste from mineral processing — slurry of ground rock with residual chemistry. Stored in tailings dams or disposed underground. Failure of tailings dams has caused catastrophic disasters (Brumadinho, Mount Polley). Modern tailings management uses dewatering, dry stacking, or filtered tailings to reduce dam risk."
+ },
+ {
+  "section_number": 36,
+  "section_name": "Food and Pharmaceutical Plants",
+  "question": "What is GMP and why does it matter?",
+  "answer": "Good Manufacturing Practice — regulatory requirements for food, pharmaceutical, and medical device manufacturing. Covers facility design, equipment maintenance, cleaning, personnel hygiene, documentation, and quality control. Failure to meet GMP results in product recall, plant shutdown, or regulatory action. Audits verify compliance."
+ },
+ {
+  "section_number": 36,
+  "section_name": "Food and Pharmaceutical Plants",
+  "question": "What is CIP (Clean In Place)?",
+  "answer": "CIP cleans equipment without disassembly — circulating cleaning solutions through process piping and vessels. Stages: pre-rinse (cold water), alkaline wash (caustic, breaks down fats), rinse, acid wash (descales), final rinse. Validated for each product and equipment combination. Maintains hygiene without manual cleaning effort."
+ },
+ {
+  "section_number": 36,
+  "section_name": "Food and Pharmaceutical Plants",
+  "question": "Why is contamination control critical in pharmaceutical plants?",
+  "answer": "Cross-contamination between products is regulatory violation and patient safety risk. Prevention: dedicated equipment for some products, validated cleaning between batches, separate HVAC, separate personnel flows. Containment levels match drug potency. Highly potent drugs (oncology, hormones) require isolators."
+ },
+ {
+  "section_number": 36,
+  "section_name": "Food and Pharmaceutical Plants",
+  "question": "What is validation and why is it required?",
+  "answer": "Validation proves that processes, equipment, and systems consistently produce specified results. Required by FDA, EMA, and other regulators for pharmaceutical manufacturing. Done at installation (IQ), operation (OQ), and performance (PQ). Re- validation when changes occur. Without validation, products can't be sold."
+ },
+ {
+  "section_number": 36,
+  "section_name": "Food and Pharmaceutical Plants",
+  "question": "Why are food plants sensitive to maintenance materials?",
+  "answer": "Lubricants, sealants, and replacement parts can contaminate food products. NSF H1 lubricants are food-grade (incidental contact acceptable). Food-grade gaskets, gloves, and tools required in production areas. Maintenance discipline prevents contamination — lost or shed bolts, gaskets, and tools cause recalls."
+ },
+ {
+  "section_number": 36,
+  "section_name": "Food and Pharmaceutical Plants",
+  "question": "What is HACCP?",
+  "answer": "Hazard Analysis Critical Control Points — systematic approach to food safety. Identifies hazards (biological, chemical, physical), defines critical control points where hazards are controlled, sets limits, and monitors compliance. Required for most food manufacturing. Equipment failures often impact HACCP critical points."
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "What is Reliability-Centered Maintenance (RCM)?",
+  "answer": "RCM is a structured approach to determining the right maintenance strategy for each piece of equipment based on its function, failure modes, and consequences. Outputs: which equipment needs PM, which needs PdM, which can be run-to-failure. Done by cross-functional teams. Refocuses maintenance from 'fix what breaks' to 'prevent what matters.'"
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "What is the bathtub curve in reliability?",
+  "answer": "The bathtub curve shows three life phases of equipment failure rate: infant mortality (early failures from defects), useful life (constant low rate), wear-out (rising rate as equipment ages). Different maintenance strategies fit each phase. Many electronic components don't follow this — they fail randomly throughout life."
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "What is FMEA?",
+  "answer": "Failure Mode and Effects Analysis — systematic identification of failure modes, their causes, effects, and detection. Each mode is rated on Severity, Occurrence, and Detection. Risk Priority Number (S × O × D) prioritizes attention. Standard tool in design and reliability engineering. Drives both maintenance strategy and design improvement."
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "Why measure reliability KPIs?",
+  "answer": "What you measure improves. Without measurement, reliability efforts feel like work without progress. Standard KPIs: MTBF, MTTR, availability, OEE, PM compliance, schedule attainment, emergency work percentage. Track over time. Compare to industry benchmarks. Use to justify investments in reliability programs."
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "What is condition-based maintenance?",
+  "answer": "CBM triggers actions based on equipment condition rather than time. Conditions measured: vibration, oil analysis, thermography, ultrasonic, motor circuit analysis, performance trends. Avoids both premature replacement (waste) and late failure (damage). Requires data collection program and analysis capability. More efficient than calendar-based PM."
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "How do I justify a reliability improvement project?",
+  "answer": "Quantify current state: failure frequency, downtime, repair costs, safety risks. Compare to project cost. Calculate payback. Include hard-to-quantify benefits (employee morale, regulatory standing). Present to management with business case. Reliability projects are usually high-return but need clear ROI presentation."
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "What is a reliability improvement program?",
+  "answer": "Coordinated program to systematically improve equipment reliability over time. Components: data collection, root cause analysis of failures, defect elimination, improved procedures, training, design improvements. Multi-year effort. Best plants run reliability programs continuously — never 'done.'"
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "Why do reliability programs fail?",
+  "answer": "Common reasons: lack of management commitment (program priorities shift to other things), no measurable goals (program drifts), focus on tools instead of culture (CMMS implementation without behavior change), and short-term cost cuts that gut reliability resources. Successful programs are sustained over years with consistent leadership focus."
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "What is precision maintenance?",
+  "answer": "Doing every maintenance task to the highest possible standard — proper torque, exact alignment, correct lubricant quantity, defect-free installation. Recognizes that 'good enough' compounds into reliability problems over time. Precision maintenance practitioners get better results from the same equipment, often dramatically."
+ },
+ {
+  "section_number": 37,
+  "section_name": "Reliability Programs",
+  "question": "What is a reliability culture?",
+  "answer": "Organization-wide commitment to preventing failures rather than recovering from them. Everyone from operators to plant manager prioritizes reliability. Failures investigated to learn, not blame. Best practices shared openly. Maintenance taken seriously, not seen as cost center. Hardest part of reliability — takes years to build, weeks to destroy."
+ },
+ {
+  "section_number": 38,
+  "section_name": "Water and Wastewater Systems",
+  "question": "Why is dissolved oxygen monitored in wastewater treatment?",
+  "answer": "Aerobic bacteria need oxygen to break down organic matter — dissolved oxygen below ~2 mg/L starves the bacteria, treatment efficiency drops. Above ~4 mg/L wastes blower energy. DO sensors in aeration basins control blower output. Calibration matters — DO probes drift and biofoul."
+ },
+ {
+  "section_number": 38,
+  "section_name": "Water and Wastewater Systems",
+  "question": "What causes filter media fouling?",
+  "answer": "Filter media (sand, anthracite, multimedia) traps particles. Over time, biofilm grows, particles compact, and head loss rises. Periodic backwash reverses flow to flush trapped material. Backwash frequency, intensity, and chemical assistance affect filter life. Air scour combined with water backwash improves cleaning of fouled media."
+ },
+ {
+  "section_number": 38,
+  "section_name": "Water and Wastewater Systems",
+  "question": "Why do membrane systems need pretreatment?",
+  "answer": "Reverse osmosis and microfiltration membranes are sensitive to fouling. Pretreatment removes: suspended solids (cartridge filters or media filters), iron and manganese (oxidation and filtration), biological growth (chlorination/dechlorination), and scaling species (anti-scalant). Skipping pretreatment shortens membrane life dramatically."
+ },
+ {
+  "section_number": 38,
+  "section_name": "Water and Wastewater Systems",
+  "question": "What is membrane fouling and how is it cleaned?",
+  "answer": "Fouling is unwanted deposition on membrane surface — reduces flow at given pressure. Types: particulate, organic, biological, scaling. Cleaning depends on type: alkaline for organic, acid for scaling, biocide for biological. Clean-in-place systems automate periodic cleaning. Severe fouling requires off-line manual cleaning."
+ },
+ {
+  "section_number": 38,
+  "section_name": "Water and Wastewater Systems",
+  "question": "Why does my sludge dewatering not work well?",
+  "answer": "Causes: poor polymer dosing (chemistry, dose, mixing), variable feed quality (changes coagulation), worn equipment (belt press belts, centrifuge bowl), upset upstream process (changing sludge composition). Lab tests (CST, capillary suction time) optimize polymer. Equipment condition matters — worn belts and seals reduce efficiency."
+ },
+ {
+  "section_number": 38,
+  "section_name": "Water and Wastewater Systems",
+  "question": "What is the difference between aerobic and anaerobic treatment?",
+  "answer": "Aerobic uses oxygen-loving bacteria — fast, more complete breakdown, requires aeration energy. Anaerobic uses oxygen-free bacteria — slower, produces methane (can be captured for energy), used for high-strength waste. Choice depends on waste strength, energy economics, and product requirements."
+ }
+]

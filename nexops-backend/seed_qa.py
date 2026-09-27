@@ -1,10 +1,13 @@
 """
 Seed the industrial_qa table from NexOps-Industrial-QA.pdf.
 
-Run once:  python seed_qa.py
+Run once:  python seed_qa.py          (the backend also does this at startup)
 Safe to re-run — skips insert if rows already exist.
+Regenerate the pre-parsed JSON after editing the PDF:
+           python seed_qa.py --export-json
 """
 
+import json
 import os
 import re
 import sys
@@ -61,18 +64,42 @@ def parse_qa_from_pdf(pdf_path: str) -> list[dict]:
     return all_qa
 
 
-DEFAULT_PDF = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           "NexOps-Industrial-QA.pdf")
+_HERE = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_PDF = os.path.join(_HERE, "NexOps-Industrial-QA.pdf")
+# Pre-parsed copy of the PDF's Q&A pairs. Seeding from it takes milliseconds
+# instead of seconds of PDF parsing — which matters on hosts that cold-start
+# often with an empty (ephemeral) database and a fraction of a CPU. Regenerate
+# after changing the PDF:  python seed_qa.py --export-json
+DEFAULT_JSON = os.path.join(_HERE, "industrial_qa.json")
+
+
+def load_qa_pairs(pdf_path: str | None = None) -> list[dict]:
+    """The Q&A pairs: from the pre-parsed JSON when present (and no explicit
+    PDF was requested), else parsed from the PDF."""
+    if pdf_path is None and os.path.exists(DEFAULT_JSON):
+        with open(DEFAULT_JSON, encoding="utf-8") as f:
+            return json.load(f)
+    pdf_path = pdf_path or DEFAULT_PDF
+    if not os.path.exists(pdf_path):
+        raise FileNotFoundError(f"PDF not found at: {pdf_path}")
+    print(f"[seed_qa] parsing Q&A pairs from: {pdf_path}")
+    return parse_qa_from_pdf(pdf_path)
+
+
+def export_json(pdf_path: str | None = None, out_path: str = DEFAULT_JSON) -> int:
+    """Parse the PDF and write the pre-parsed JSON used for fast seeding."""
+    qa_pairs = parse_qa_from_pdf(pdf_path or DEFAULT_PDF)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(qa_pairs, f, ensure_ascii=False, indent=1)
+        f.write("\n")
+    print(f"[seed_qa] wrote {len(qa_pairs)} Q&A pairs to {out_path}")
+    return len(qa_pairs)
 
 
 def ensure_qa_seeded(pdf_path: str | None = None) -> int:
     """Load the knowledge base if the table is empty. Idempotent and safe to
     call on every startup. Returns the number of rows inserted (0 = skipped).
-    Raises FileNotFoundError if the PDF is missing."""
-    pdf_path = pdf_path or DEFAULT_PDF
-    if not os.path.exists(pdf_path):
-        raise FileNotFoundError(f"PDF not found at: {pdf_path}")
-
+    Raises FileNotFoundError if neither the JSON nor the PDF is available."""
     init_db()
     session = get_session()
     try:
@@ -81,8 +108,7 @@ def ensure_qa_seeded(pdf_path: str | None = None) -> int:
             print(f"[seed_qa] industrial_qa already contains {existing} rows — skipping seed.")
             return 0
 
-        print(f"[seed_qa] parsing Q&A pairs from: {pdf_path}")
-        qa_pairs = parse_qa_from_pdf(pdf_path)
+        qa_pairs = load_qa_pairs(pdf_path)
         sections = len({qa["section_number"] for qa in qa_pairs})
 
         for qa in qa_pairs:
@@ -112,5 +138,8 @@ def seed_qa(pdf_path: str | None = None) -> None:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--export-json":
+        export_json(sys.argv[2] if len(sys.argv) > 2 else None)
+        sys.exit(0)
     pdf_arg = sys.argv[1] if len(sys.argv) > 1 else None
     seed_qa(pdf_arg)

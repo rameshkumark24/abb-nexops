@@ -250,12 +250,6 @@ function AdminConsole() {
   const filteredEvents = useMemo(
     () => {
       const { from: activeFrom, to: activeTo } = resolveWindow(filters);
-      console.log("[DEBUG HEATMAP] events count:", events.length);
-      if (events.length > 0) {
-        console.log("[DEBUG HEATMAP] sample event:", events[0]);
-        console.log("[DEBUG HEATMAP] from:", activeFrom, "to:", activeTo, "now:", Date.now());
-        console.log("[DEBUG HEATMAP] zonesSel:", zonesSel, "sevSel:", sevSel);
-      }
       return events.filter(
         (e) => {
           const zClean = e.zone.replace('Zone ', '').trim();
