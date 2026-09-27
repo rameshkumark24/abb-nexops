@@ -51,8 +51,16 @@ const securityHeaders = [
 // rewrite also proxies the WebSocket upgrade for /api/ws.
 //
 // NOTE: rewrites are resolved at BUILD time — set BACKEND_ORIGIN when running
-// `next build` (the Dockerfile takes it as a build arg).
-const BACKEND_ORIGIN = process.env.BACKEND_ORIGIN || 'http://localhost:8000';
+// `next build` (the Dockerfile takes it as a build arg; on Vercel, set it as a
+// project env var). The value is normalized because a bare host
+// ("api.example.com") makes `next build` abort with "Invalid rewrite found",
+// and a trailing slash would produce `//path` URLs.
+function normalizeOrigin(raw) {
+  let origin = (raw || '').trim() || 'http://localhost:8000';
+  if (!/^https?:\/\//i.test(origin)) origin = `https://${origin}`;
+  return origin.replace(/\/+$/, '');
+}
+const BACKEND_ORIGIN = normalizeOrigin(process.env.BACKEND_ORIGIN);
 
 const nextConfig = {
   // Self-contained server bundle (server.js + minimal node_modules) for a small
