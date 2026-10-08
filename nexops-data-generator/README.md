@@ -198,7 +198,9 @@ $env:PUBLISHER="mqtt"; python publisher.py
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `PUBLISHER` | `console` | `mqtt` to publish to a broker |
+| `PUBLISHER` | `console` | `mqtt` to publish to a broker, `http` to POST to the backend's ingest endpoint |
+| `INGEST_URL` / `INGEST_TOKEN` | unset | `PUBLISHER=http`: `https://<backend>/ingest/telemetry` and the backend's `INGEST_TOKEN` |
+| `PORT` / `HEALTH_PORT` | unset | serve `GET /healthz` (publisher status) on this port — needed to run as a web service |
 | `MQTT_HOST` / `MQTT_PORT` | `localhost` / `1883` | broker address (e.g. `mosquitto` under docker compose) |
 | `MQTT_BASE_TOPIC` | `nexops/refinery/telemetry` | base topic; a per-machine suffix is added |
 | `MQTT_USERNAME` / `MQTT_PASSWORD` / `MQTT_TLS` | unset | broker credentials / TLS for a secured broker |

@@ -36,7 +36,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import paho.mqtt.client as mqtt
-from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import Body, Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -118,7 +118,9 @@ async def _security_headers(request: Request, call_next):
 # ----------------------------------------------------------------------
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 # Paths that can't carry CSRF yet (no session established) or don't need it.
-_CSRF_EXEMPT_PATHS = {"/auth/login"}
+# /ingest/telemetry authenticates ONLY with its bearer INGEST_TOKEN (never the
+# session cookie), so CSRF — a cookie attack — does not apply to it.
+_CSRF_EXEMPT_PATHS = {"/auth/login", "/ingest/telemetry"}
 
 
 def _set_auth_cookies(response: Response, token: str) -> None:
@@ -899,6 +901,44 @@ async def healthz():
     return JSONResponse(status_code=200 if db_ok else 503, content=body)
 
 
+@app.post("/ingest/telemetry")
+def http_ingest_telemetry(request: Request, payload: dict | list = Body(...)):
+    """Telemetry ingest over HTTPS for a remote generator or gateway that has no
+    MQTT broker to publish to. Accepts one record or a list of records, each
+    processed exactly like an MQTT message (process_record). Authenticated with
+    the shared INGEST_TOKEN (`Authorization: Bearer <token>`); 404 when ingest
+    is not configured, so the endpoint doesn't exist unless deliberately
+    enabled."""
+    if not config.INGEST_TOKEN:
+        return JSONResponse(status_code=404, content={"error": "ingest disabled"})
+    sent = _bearer_value(request)
+    if not sent or not hmac.compare_digest(sent, config.INGEST_TOKEN):
+        return JSONResponse(status_code=401, content={"error": "invalid ingest token"})
+
+    records = payload if isinstance(payload, list) else [payload]
+    if len(records) > config.INGEST_MAX_BATCH:
+        return JSONResponse(status_code=413, content={
+            "error": f"batch too large (max {config.INGEST_MAX_BATCH} records)"})
+    accepted, rejected = 0, 0
+    for raw in records:
+        if not isinstance(raw, dict) or not raw.get("Machine"):
+            rejected += 1
+            continue
+        try:
+            process_record(raw)
+            accepted += 1
+        except Exception as exc:  # one bad record must not drop the batch
+            rejected += 1
+            print(f"[ingest] record for {raw.get('Machine')!r} failed: {exc}")
+    return {"accepted": accepted, "rejected": rejected}
+
+
+def _bearer_value(request: Request) -> str | None:
+    header = request.headers.get("authorization") or ""
+    scheme, _, value = header.partition(" ")
+    return value.strip() or None if scheme.lower() == "bearer" else None
+
+
 @app.get("/telemetry/snapshot")
 def get_telemetry_snapshot(current: CurrentUser = Depends(get_current_user)):
     """Return the latest telemetry record for each machine.
@@ -1582,7 +1622,9 @@ def auth_ws_ticket(current: CurrentUser = Depends(get_current_user)):
         session.close()
     if not ticket:
         return JSONResponse(status_code=401, content={"error": "no session"})
-    return {"ticket": ticket}
+    # ws_url tells the browser where to open the socket when its own origin
+    # can't proxy WebSockets (e.g. a Vercel-hosted frontend); null = use /api/ws.
+    return {"ticket": ticket, "ws_url": config.PUBLIC_WS_URL or None}
 
 
 class AriaAskRequest(BaseModel):

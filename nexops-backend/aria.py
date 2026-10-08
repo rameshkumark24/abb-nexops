@@ -62,7 +62,28 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 # Model names are env-overridable so a deprecated model can be swapped without
 # a code change.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Groq retired its Llama 3.x models on the free/developer tiers (Aug 2026) and
+# names openai/gpt-oss-120b as their successor.
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+# Providers retire model names (Groq answers 404 / "model_decommissioned").
+# When the configured model is rejected we ask Groq which models exist and pick
+# the first available one from this preference list (else any chat model), and
+# remember it for the life of the process.
+_GROQ_PREFERRED_MODELS = (
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+)
+_GROQ_NON_CHAT = ("whisper", "tts", "guard", "embed", "playai", "orpheus", "compound")
+_groq_model_override: str | None = None
+# Models that refused our reasoning settings (sent without them from then on).
+_groq_plain_models: set[str] = set()
+# Groq's current chat models reason before answering, and the hidden reasoning
+# shares this budget with the answer, so it must leave room for both.
+_GROQ_MAX_COMPLETION_TOKENS = 1024
+_THINK_BLOCK = re.compile(r"<think>.*?(?:</think>|$)", re.S | re.I)
 LLM_TIMEOUT_S = float(os.environ.get("ARIA_LLM_TIMEOUT", "8"))
 
 class AriaLLMUnavailable(Exception):
@@ -811,31 +832,129 @@ async def call_llm(query: str, ctx: dict) -> tuple[str, str]:
     # 2. Secondary fallback: Groq API (only if a key is configured)
     if GROQ_API_KEY:
         try:
-            url = "https://api.groq.com/openai/v1/chat/completions"
-            headers = {
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json",
-            }
-            body = {
-                "model": GROQ_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2,
-                "max_tokens": 600,
-            }
-            async with httpx.AsyncClient() as client:
-                res = await client.post(url, headers=headers, json=body,
-                                        timeout=LLM_TIMEOUT_S)
-                if res.status_code == 200:
-                    data = res.json()
-                    text = (data["choices"][0]["message"].get("content") or "").strip()
-                    if text:
-                        return text, "llm"
-                else:
-                    print(f"[aria-llm] Groq API HTTP {res.status_code}")
+            text = await _call_groq(prompt)
+            if text:
+                return text, "llm"
         except Exception as e:
             print(f"[aria-llm] Groq API failed or timed out: {type(e).__name__}")
 
     raise AriaLLMUnavailable("All configured LLM pipelines failed.")
+
+def _groq_error_text(res) -> str:
+    """Lower-cased code/param/message of a Groq error response ('' if none)."""
+    try:
+        err = res.json().get("error", {})
+    except Exception:
+        return ""
+    if not isinstance(err, dict):
+        return ""
+    return " ".join(str(err.get(k) or "") for k in ("code", "param", "message")).lower()
+
+
+def _groq_model_rejected(res) -> bool:
+    """True when Groq refused the request because of the MODEL (unknown or
+    decommissioned), as opposed to auth, rate-limit or server errors."""
+    if res.status_code == 404:
+        return True
+    if res.status_code == 400:
+        blob = _groq_error_text(res)
+        return "model" in blob and ("decommission" in blob or "not found" in blob
+                                    or "does not exist" in blob)
+    return False
+
+
+def _groq_reasoning_rejected(res) -> bool:
+    """True when Groq refused the per-model reasoning settings."""
+    return res.status_code == 400 and "reasoning" in _groq_error_text(res)
+
+
+def _groq_reasoning_params(model: str) -> dict:
+    """Keep a reasoning model's hidden reasoning short, so it neither crowds the
+    answer out of the token budget nor runs past the ARIA timeout."""
+    if model in _groq_plain_models:
+        return {}
+    name = model.lower()
+    if "gpt-oss" in name:
+        return {"reasoning_effort": "low"}
+    if "qwen3" in name:
+        return {"reasoning_effort": "none"}  # Qwen3.x instruct mode: no thinking
+    return {}
+
+
+def _groq_answer_text(data: dict) -> str:
+    """The answer of a Groq chat completion, minus any inline <think> block
+    (models that return their reasoning in the content)."""
+    content = data["choices"][0]["message"].get("content") or ""
+    return _THINK_BLOCK.sub("", content).strip()
+
+
+async def _discover_groq_model(client, headers) -> str | None:
+    """Pick an available Groq chat model: first match from the preference list,
+    else any active chat-capable model."""
+    res = await client.get("https://api.groq.com/openai/v1/models",
+                           headers=headers, timeout=LLM_TIMEOUT_S)
+    if res.status_code != 200:
+        print(f"[aria-llm] Groq model list HTTP {res.status_code}")
+        return None
+    ids = [m.get("id", "") for m in res.json().get("data", [])
+           if m.get("active", True)]
+    chat = [i for i in ids if i and not any(t in i.lower() for t in _GROQ_NON_CHAT)]
+    for preferred in _GROQ_PREFERRED_MODELS:
+        if preferred in chat:
+            return preferred
+    return chat[0] if chat else None
+
+
+async def _call_groq(prompt: str) -> str | None:
+    """One Groq chat completion. If the configured model has been retired,
+    discover a current one and keep using it; if a model refuses the reasoning
+    settings, retry without them."""
+    global _groq_model_override
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient() as client:
+        model = _groq_model_override or GROQ_MODEL
+        reasoning = _groq_reasoning_params(model)
+        replaced = False
+        for _attempt in range(3):
+            body = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2,
+                "max_completion_tokens": _GROQ_MAX_COMPLETION_TOKENS,
+                **reasoning,
+            }
+            res = await client.post(url, headers=headers, json=body,
+                                    timeout=LLM_TIMEOUT_S)
+            if res.status_code == 200:
+                data = res.json()
+                text = _groq_answer_text(data)
+                if not text:
+                    print(f"[aria-llm] Groq returned no answer (model '{model}', "
+                          f"finish_reason={data['choices'][0].get('finish_reason')})")
+                return text or None
+            if not replaced and _groq_model_rejected(res):
+                replaced = True
+                replacement = await _discover_groq_model(client, headers)
+                if replacement and replacement != model:
+                    print(f"[aria-llm] Groq model '{model}' unavailable -> using '{replacement}'")
+                    _groq_model_override = model = replacement
+                    reasoning = _groq_reasoning_params(model)
+                    continue
+            elif reasoning and _groq_reasoning_rejected(res):
+                print(f"[aria-llm] Groq model '{model}' refused {', '.join(reasoning)}; "
+                      "retrying without it")
+                _groq_plain_models.add(model)
+                reasoning = {}
+                continue
+            print(f"[aria-llm] Groq API HTTP {res.status_code} (model '{model}')")
+            return None
+    return None
+
 
 async def answer(query: str, role: str, scope_zone: str | None, latest: dict, history: dict, session, username: str | None = None, engineer_id: int | None = None) -> dict:
     """The central orchestrator driving the context assembly, LLM/fallback rendering, and evidence footer binding."""
