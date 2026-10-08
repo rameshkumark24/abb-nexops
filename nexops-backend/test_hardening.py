@@ -280,20 +280,25 @@ def test_public_ws_url_derived_from_render(monkeypatch):
     assert main.config._public_ws_url() == "wss://svc.onrender.com/ws"
 
 
-def test_groq_retired_model_is_replaced(monkeypatch):
-    """Groq answers 404 for a retired model: ARIA must discover a current model,
-    retry once, and keep using it."""
-    import asyncio
+class _Resp:
+    def __init__(self, status, body):
+        self.status_code, self._body = status, body
+
+    def json(self):
+        return self._body
+
+
+def _answer(text, finish_reason="stop"):
+    return _Resp(200, {"choices": [{"message": {"content": text},
+                                    "finish_reason": finish_reason}]})
+
+
+def _fake_groq(monkeypatch, on_post, models=()):
+    """Route aria's Groq HTTP calls to on_post(body) -> _Resp. Returns the calls
+    made: ("POST", request body) and ("GET", url)."""
     import aria
 
     calls = []
-
-    class Resp:
-        def __init__(self, status, body):
-            self.status_code, self._body = status, body
-
-        def json(self):
-            return self._body
 
     class FakeClient:
         async def __aenter__(self):
@@ -304,25 +309,92 @@ def test_groq_retired_model_is_replaced(monkeypatch):
 
         async def get(self, url, **kw):
             calls.append(("GET", url))
-            return Resp(200, {"data": [{"id": "whisper-large-v3", "active": True},
-                                       {"id": "openai/gpt-oss-120b", "active": True}]})
+            return _Resp(200, {"data": [{"id": m, "active": True} for m in models]})
 
         async def post(self, url, json=None, **kw):
-            calls.append(("POST", json["model"]))
-            if json["model"] == "retired-model":
-                return Resp(404, {"error": {"code": "model_not_found"}})
-            return Resp(200, {"choices": [{"message": {"content": "grounded answer"}}]})
+            calls.append(("POST", json))
+            return on_post(json)
 
     monkeypatch.setattr(aria.httpx, "AsyncClient", lambda *a, **k: FakeClient())
     monkeypatch.setattr(aria, "GROQ_API_KEY", "k")
-    monkeypatch.setattr(aria, "GROQ_MODEL", "retired-model")
     monkeypatch.setattr(aria, "_groq_model_override", None)
+    monkeypatch.setattr(aria, "_groq_plain_models", set())
+    return calls
+
+
+def test_groq_retired_model_is_replaced(monkeypatch):
+    """Groq answers 404 for a retired model: ARIA must discover a current model,
+    retry once, and keep using it."""
+    import asyncio
+    import aria
+
+    def on_post(body):
+        if body["model"] == "retired-model":
+            return _Resp(404, {"error": {"code": "model_not_found"}})
+        return _answer("grounded answer")
+
+    calls = _fake_groq(monkeypatch, on_post,
+                       models=("whisper-large-v3", "openai/gpt-oss-120b"))
+    monkeypatch.setattr(aria, "GROQ_MODEL", "retired-model")
 
     assert asyncio.run(aria._call_groq("q")) == "grounded answer"
-    assert calls == [("POST", "retired-model"),
-                     ("GET", "https://api.groq.com/openai/v1/models"),
-                     ("POST", "openai/gpt-oss-120b")]
+    assert [(verb, x if verb == "GET" else x["model"]) for verb, x in calls] == [
+        ("POST", "retired-model"),
+        ("GET", "https://api.groq.com/openai/v1/models"),
+        ("POST", "openai/gpt-oss-120b")]
     # Remembered: the next call goes straight to the working model.
     calls.clear()
     asyncio.run(aria._call_groq("q2"))
-    assert calls == [("POST", "openai/gpt-oss-120b")]
+    assert [body["model"] for _, body in calls] == ["openai/gpt-oss-120b"]
+
+
+def test_groq_reasoning_model_keeps_room_for_the_answer(monkeypatch):
+    """Groq's current chat models reason before answering, and that reasoning
+    shares the token budget: ARIA asks for short reasoning, leaves room for the
+    answer, and strips any inline <think> block from the reply."""
+    import asyncio
+    import aria
+
+    calls = _fake_groq(monkeypatch,
+                       lambda body: _answer("<think>scratch work</think>\nPump B2 is fine."))
+    monkeypatch.setattr(aria, "GROQ_MODEL", "openai/gpt-oss-120b")
+
+    assert asyncio.run(aria._call_groq("q")) == "Pump B2 is fine."
+    body = calls[0][1]
+    assert body["reasoning_effort"] == "low"
+    assert body["max_completion_tokens"] >= 1024
+    assert aria._groq_reasoning_params("qwen/qwen3.8-27b") == {"reasoning_effort": "none"}
+    assert aria._groq_reasoning_params("some-instruct-model") == {}
+
+
+def test_groq_refused_reasoning_settings_are_dropped(monkeypatch):
+    import asyncio
+    import aria
+
+    def on_post(body):
+        if "reasoning_effort" in body:
+            return _Resp(400, {"error": {
+                "param": "reasoning_effort",
+                "message": "`reasoning_effort` is not supported with this model"}})
+        return _answer("plain answer")
+
+    calls = _fake_groq(monkeypatch, on_post)
+    monkeypatch.setattr(aria, "GROQ_MODEL", "openai/gpt-oss-120b")
+
+    assert asyncio.run(aria._call_groq("q")) == "plain answer"
+    assert ["reasoning_effort" in body for _, body in calls] == [True, False]
+    # Remembered: later questions skip the refused settings.
+    calls.clear()
+    asyncio.run(aria._call_groq("q2"))
+    assert ["reasoning_effort" in body for _, body in calls] == [False]
+
+
+def test_groq_reply_without_answer_falls_back(monkeypatch):
+    """A reply whose whole budget went to reasoning has no answer text; ARIA
+    must use its offline answer rather than show an empty one."""
+    import asyncio
+    import aria
+
+    _fake_groq(monkeypatch, lambda body: _answer("<think>still thinking", "length"))
+    monkeypatch.setattr(aria, "GROQ_MODEL", "openai/gpt-oss-120b")
+    assert asyncio.run(aria._call_groq("q")) is None
