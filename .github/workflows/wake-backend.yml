@@ -1,21 +1,20 @@
-name: Keep backend awake
+name: Wake backend
 
-# Render's free tier puts a web service to sleep after ~15 min without traffic,
-# and the next visitor waits ~30-60 s for it to wake (the login shows 503).
-# Pinging /healthz every 10 min keeps it warm.
+# Render's free tier puts the backend to sleep after ~15 min without traffic,
+# and the next visitor waits ~30-60 s while it wakes (the login page shows
+# "WAKING SERVER..." and retries on its own). Run this by hand shortly before a
+# demo (Actions -> Wake backend -> Run workflow) so nobody has to wait.
+#
+# It is deliberately not scheduled: GitHub ran a 10-minute schedule here only
+# every few hours, which never kept the service awake and only spent the free
+# instance hours that all free Render services in a workspace share.
 #
 # The default target goes through the Vercel frontend, whose /api/* proxy
 # forwards to the backend, so no setup is needed. To ping Render directly, set
 # a repository variable KEEPALIVE_URL (Settings -> Secrets and variables ->
 # Actions -> Variables), e.g. https://<service>.onrender.com/healthz
-#
-# Notes: GitHub runs scheduled workflows from the default branch only, may
-# delay them by a few minutes under load, and pauses them after 60 days
-# without repository activity (re-enable from the Actions tab).
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions: {}

@@ -91,7 +91,7 @@ The backend must be a Render **Web Service** (not a Static Site):
 | Runtime | Python |
 | Build command | `pip install -r nexops-backend/requirements.txt` |
 | Start command | `cd nexops-backend && uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers` |
-| Env | `PYTHON_VERSION=3.11.11`, `EMBEDDED_SIMULATOR=1`, `MQTT_ENABLED=0`, `COOKIE_SECURE=1`, `FORWARDED_ALLOW_IPS=*`, `TZ=Asia/Kolkata` (the plant's timezone), optionally `NEXOPS_JWT_SECRET`, `GEMINI_API_KEY` / `GROQ_API_KEY` |
+| Env | `PYTHON_VERSION=3.11.11`, `EMBEDDED_SIMULATOR=1`, `MQTT_ENABLED=0`, `COOKIE_SECURE=1`, `FORWARDED_ALLOW_IPS=*`, `TZ=Asia/Kolkata` (the plant's timezone), `NEXOPS_JWT_SECRET` (use Render's **Generate**; without it everyone is signed out whenever the service sleeps or restarts), `GEMINI_API_KEY` / `GROQ_API_KEY` |
 
 `EMBEDDED_SIMULATOR=1` generates the telemetry inside the backend, so no MQTT broker or
 publisher service is needed. To run the generator as its **own service** instead
@@ -110,13 +110,16 @@ automatically (Vercel's proxy can't carry WebSockets).
   Vercel's rewrites don't carry WebSockets, so also set
   `NEXT_PUBLIC_WS_URL=wss://<backend>/ws` (ticket-authenticated; the CSP allows it
   automatically). Set `COOKIE_SECURE=1` on the backend.
-- **Free-tier sleep (Render etc.):** the backend spins down after ~15 min idle.
-  `.github/workflows/keepalive.yml` pings `/api/healthz` every 10 min to keep it
-  awake (set the repo variable `KEEPALIVE_URL` to ping the backend directly). If it
-  does sleep, the login page wakes it and retries automatically ("WAKING SERVER…")
-  instead of failing with 503. Note that Render's free disk is ephemeral: with the
-  default SQLite, data resets on every restart/redeploy — attach a disk at `/data`
-  or use Postgres via `DATABASE_URL` for persistence.
+- **Free-tier sleep (Render etc.):** the backend spins down after ~15 min idle, and
+  the next visitor waits ~30-60 s while it wakes: the login page shows "WAKING
+  SERVER…" and retries automatically instead of failing with 503. Before a demo, run
+  the **Wake backend** workflow (Actions tab) to wake it ahead of time. It is not
+  scheduled, because GitHub runs frequent schedules only every few hours: that never
+  kept the service awake and only spent the free instance hours that all free Render
+  services in a workspace share. To keep it awake permanently, use a paid instance.
+  Render's free disk is also ephemeral: with the default SQLite, data resets on
+  every restart/redeploy — attach a disk at `/data` or use Postgres via
+  `DATABASE_URL` for persistence.
 
 ---
 
